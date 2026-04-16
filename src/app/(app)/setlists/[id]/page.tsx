@@ -45,7 +45,7 @@ export default async function SetlistPage({ params }: Props) {
       </Link>
 
       {/* Header */}
-      <div className="mb-6 flex items-start justify-between gap-4">
+      <div className="mb-6 flex flex-col gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{setlist.title}</h1>
           <div className="mt-2 flex flex-wrap gap-3 text-sm text-gray-500">
@@ -54,7 +54,7 @@ export default async function SetlistPage({ params }: Props) {
           </div>
           {setlist.notes && <p className="mt-2 text-sm text-gray-500 italic">{setlist.notes}</p>}
         </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <SaveOfflineButton
             setlistTitle={setlist.title}
             showDate={setlist.show_date}

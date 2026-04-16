@@ -66,7 +66,7 @@ export default async function SongPage({ params }: Props) {
       )}
 
       {/* Chord chart */}
-      <ChordViewer chordChart={song.chord_chart ?? ''} songKey={song.song_key} />
+      <ChordViewer chordChart={song.chord_chart ?? ''} songKey={song.song_key} songId={id} />
     </div>
   )
 }

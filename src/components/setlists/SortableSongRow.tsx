@@ -2,7 +2,7 @@
 
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Trash2, ExternalLink } from 'lucide-react'
+import { GripVertical, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import type { Song } from '@/types'
@@ -44,23 +44,20 @@ export function SortableSongRow({ id, song, index, onRemove }: SortableSongRowPr
         <GripVertical className="h-5 w-5" />
       </button>
 
-      {/* Song info */}
-      <div className="min-w-0 flex-1">
-        <p className="truncate font-medium text-gray-900">{song.title}</p>
-        {song.artist && <p className="truncate text-xs text-gray-400">{song.artist}</p>}
-      </div>
-
-      {/* Key badge */}
-      {song.song_key && (
-        <span className="shrink-0 rounded bg-brand-100 px-1.5 py-0.5 text-xs font-bold text-brand-700">
-          {song.song_key}
-        </span>
-      )}
+      {/* Song info — tappable link to song page */}
+      <Link href={`/songs/${song.id}`} className="flex min-w-0 flex-1 items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium text-gray-900">{song.title}</p>
+          {song.artist && <p className="truncate text-xs text-gray-400">{song.artist}</p>}
+        </div>
+        {song.song_key && (
+          <span className="shrink-0 rounded bg-brand-100 px-1.5 py-0.5 text-xs font-bold text-brand-700">
+            {song.song_key}
+          </span>
+        )}
+      </Link>
 
       {/* Actions */}
-      <Link href={`/songs/${song.id}`} className="text-brand-200 hover:text-brand-500" aria-label="View song">
-        <ExternalLink className="h-4 w-4" />
-      </Link>
       <button
         onClick={onRemove}
         className="text-brand-200 hover:text-red-500"

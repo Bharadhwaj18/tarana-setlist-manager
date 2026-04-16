@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { ChevronUp, ChevronDown } from 'lucide-react'
+import Link from 'next/link'
 import { parseSong } from '@/lib/chords/parser'
 import { formatSong, getCss } from '@/lib/chords/formatter'
 import { transposeSong } from '@/lib/chords/transposer'
@@ -12,9 +13,10 @@ interface ChordViewerProps {
   chordChart: string
   songKey?: string | null
   printRef?: React.RefObject<HTMLDivElement | null>
+  songId?: string
 }
 
-export function ChordViewer({ chordChart, printRef }: ChordViewerProps) {
+export function ChordViewer({ chordChart, printRef, songId }: ChordViewerProps) {
   const [song, setSong] = useState<Song>(() => parseSong(chordChart))
   const [semitones, setSemitones] = useState(0)
   const [cssInjected, setCssInjected] = useState(false)
@@ -59,7 +61,14 @@ export function ChordViewer({ chordChart, printRef }: ChordViewerProps) {
   if (!chordChart) {
     return (
       <div className="rounded-lg border border-dashed border-gray-300 p-10 text-center text-sm text-gray-400">
-        No chord chart added yet. Edit the song to add chords.
+        No chord chart added yet.{' '}
+        {songId ? (
+          <Link href={`/songs/${songId}/edit`} className="font-medium text-brand-500 underline underline-offset-2 hover:text-brand-600">
+            Edit song to add chords
+          </Link>
+        ) : (
+          'Edit the song to add chords.'
+        )}
       </div>
     )
   }
