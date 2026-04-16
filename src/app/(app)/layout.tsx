@@ -9,6 +9,15 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   if (!user) redirect('/login')
 
+  // Block access until display name is set
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('display_name')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile?.display_name?.trim()) redirect('/setup')
+
   return (
     <div className="flex h-full min-h-screen">
       <Sidebar user={user} />
