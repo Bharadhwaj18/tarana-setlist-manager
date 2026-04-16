@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { saveDisplayName } from '@/actions/profile'
 import { Button } from '@/components/ui/Button'
@@ -9,15 +10,17 @@ export function SetupForm({ email }: { email: string }) {
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const router = useRouter()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError(null)
     startTransition(async () => {
-      try {
-        await saveDisplayName(name)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Something went wrong')
+      const result = await saveDisplayName(name)
+      if (result?.error) {
+        setError(result.error)
+      } else {
+        router.push('/setlists')
       }
     })
   }

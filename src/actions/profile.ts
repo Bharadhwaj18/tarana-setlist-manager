@@ -1,24 +1,35 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 
-export async function saveDisplayName(name: string) {
+export async function saveDisplayName(name: string): Promise<{ error?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Not authenticated')
+  if (!user) return { error: 'Not authenticated' }
 
   const trimmed = name.trim()
-  if (!trimmed) throw new Error('Display name is required')
-  if (trimmed.length > 40) throw new Error('Display name must be 40 characters or fewer')
+  if (!trimmed) return { error: 'Display name is required' }
+  if (trimmed.length > 40) return { error: 'Display name must be 40 characters or fewer' }
 
-  const { error } = await supabase
+  // Try UPDATE first (profile row should exist from auth trigger)
+  const { error: updateError, data: updated } = await supabase
     .from('profiles')
-    .upsert({ id: user.id, display_name: trimmed })
+    .update({ display_name: trimmed })
+    .eq('id', user.id)
+    .select('id')
 
-  if (error) throw new Error(error.message)
+  if (updateError) return { error: updateError.message }
+
+  // If no row was updated, the trigger didn't create the profile — INSERT it
+  if (!updated || updated.length === 0) {
+    const { error: insertError } = await supabase
+      .from('profiles')
+      .insert({ id: user.id, display_name: trimmed })
+
+    if (insertError) return { error: insertError.message }
+  }
 
   revalidatePath('/', 'layout')
-  redirect('/setlists')
+  return {}
 }

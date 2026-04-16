@@ -14,7 +14,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     .from('profiles')
     .select('display_name')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
 
   if (!profile?.display_name?.trim()) redirect('/setup')
 

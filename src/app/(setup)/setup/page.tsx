@@ -13,7 +13,7 @@ export default async function SetupPage() {
     .from('profiles')
     .select('display_name')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
 
   if (profile?.display_name?.trim()) redirect('/setlists')
 
