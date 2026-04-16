@@ -1,26 +1,21 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+@theme {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Tarana brand palette */
+  --color-brand-50:  #fefae0;   /* cream — page background */
+  --color-brand-100: #e9edc9;   /* moss — selected states, light surfaces */
+  --color-brand-200: #ccd5ae;   /* sage — borders, section labels */
+  --color-brand-300: #faedcd;   /* peach — sidebar, warm surfaces */
+  --color-brand-400: #d4a373;   /* tan — primary action */
+  --color-brand-500: #c08d62;   /* darker tan — hover */
+  --color-brand-600: #a87a52;   /* deep tan — active */
+  --color-brand-700: #7a5436;   /* dark brown — text on light */
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #fefae0;
+  color: #1a1a1a;
 }

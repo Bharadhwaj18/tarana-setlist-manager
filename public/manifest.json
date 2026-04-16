@@ -1,0 +1,17 @@
+{
+  "name": "Tarana Setlist Manager",
+  "short_name": "Tarana",
+  "description": "Band setlist and chord chart manager",
+  "start_url": "/setlists",
+  "display": "standalone",
+  "background_color": "#fefae0",
+  "theme_color": "#d4a373",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
