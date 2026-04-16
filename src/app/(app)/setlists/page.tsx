@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Plus, ListMusic } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
-import { SetlistCard } from '@/components/setlists/SetlistCard'
+import { SetlistSearchList } from '@/components/setlists/SetlistSearchList'
 import { Button } from '@/components/ui/Button'
 
 export default async function SetlistsPage() {
@@ -50,11 +50,7 @@ export default async function SetlistsPage() {
           </Button>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {setlists.map(setlist => (
-            <SetlistCard key={setlist.id} setlist={setlist} songCount={countMap[setlist.id] ?? 0} />
-          ))}
-        </div>
+        <SetlistSearchList setlists={setlists} countMap={countMap} />
       )}
     </div>
   )

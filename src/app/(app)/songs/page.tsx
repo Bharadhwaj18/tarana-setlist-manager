@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Plus, Music2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
-import { SongCard } from '@/components/songs/SongCard'
+import { SongSearchList } from '@/components/songs/SongSearchList'
 import { Button } from '@/components/ui/Button'
 
 export default async function SongsPage() {
@@ -41,11 +41,7 @@ export default async function SongsPage() {
           </Button>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {songs.map(song => (
-            <SongCard key={song.id} song={song} />
-          ))}
-        </div>
+        <SongSearchList songs={songs} />
       )}
     </div>
   )
