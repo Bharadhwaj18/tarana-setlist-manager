@@ -4,9 +4,11 @@ import type { Song } from '@/types'
 
 interface SongCardProps {
   song: Song
+  createdBy?: string
+  updatedBy?: string
 }
 
-export function SongCard({ song }: SongCardProps) {
+export function SongCard({ song, createdBy, updatedBy }: SongCardProps) {
   return (
     <Link
       href={`/songs/${song.id}`}
@@ -38,6 +40,14 @@ export function SongCard({ song }: SongCardProps) {
           <span className="italic text-gray-300">No chords yet</span>
         )}
       </div>
+      {(createdBy || updatedBy) && (
+        <div className="border-t border-gray-100 pt-2 text-xs text-gray-400">
+          {updatedBy
+            ? <span>Edited by <span className="font-medium text-gray-500">{updatedBy}</span></span>
+            : <span>Added by <span className="font-medium text-gray-500">{createdBy}</span></span>
+          }
+        </div>
+      )}
     </Link>
   )
 }

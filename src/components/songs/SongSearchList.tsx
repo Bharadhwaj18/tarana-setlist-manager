@@ -5,7 +5,12 @@ import { Search } from 'lucide-react'
 import { SongCard } from './SongCard'
 import type { Song } from '@/types'
 
-export function SongSearchList({ songs }: { songs: Song[] }) {
+interface SongSearchListProps {
+  songs: Song[]
+  profileMap: Record<string, string>
+}
+
+export function SongSearchList({ songs, profileMap }: SongSearchListProps) {
   const [query, setQuery] = useState('')
 
   const filtered = query.trim()
@@ -36,7 +41,12 @@ export function SongSearchList({ songs }: { songs: Song[] }) {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map(song => (
-            <SongCard key={song.id} song={song} />
+            <SongCard
+              key={song.id}
+              song={song}
+              createdBy={profileMap[song.created_by]}
+              updatedBy={song.updated_by ? profileMap[song.updated_by] : undefined}
+            />
           ))}
         </div>
       )}

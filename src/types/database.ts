@@ -31,6 +31,7 @@ export type Database = {
         Row: {
           id: string
           created_by: string
+          updated_by: string | null
           title: string
           artist: string | null
           song_key: string | null
@@ -44,6 +45,7 @@ export type Database = {
         Insert: {
           id?: string
           created_by: string
+          updated_by?: string | null
           title: string
           artist?: string | null
           song_key?: string | null
@@ -57,6 +59,7 @@ export type Database = {
         Update: {
           id?: string
           created_by?: string
+          updated_by?: string | null
           title?: string
           artist?: string | null
           song_key?: string | null
@@ -73,6 +76,7 @@ export type Database = {
         Row: {
           id: string
           created_by: string
+          updated_by: string | null
           title: string
           show_date: string | null
           venue: string | null
@@ -83,6 +87,7 @@ export type Database = {
         Insert: {
           id?: string
           created_by: string
+          updated_by?: string | null
           title: string
           show_date?: string | null
           venue?: string | null
@@ -93,6 +98,7 @@ export type Database = {
         Update: {
           id?: string
           created_by?: string
+          updated_by?: string | null
           title?: string
           show_date?: string | null
           venue?: string | null

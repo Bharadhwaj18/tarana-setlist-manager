@@ -6,10 +6,28 @@ import { Button } from '@/components/ui/Button'
 
 export default async function SongsPage() {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
   const { data: songs } = await supabase
     .from('songs')
     .select('*')
     .order('title')
+
+  // Build profile name map for all referenced users
+  const userIds = [...new Set([
+    ...(songs ?? []).map(s => s.created_by),
+    ...(songs ?? []).flatMap(s => s.updated_by ? [s.updated_by] : []),
+  ])]
+
+  const { data: profiles } = userIds.length
+    ? await supabase.from('profiles').select('id, display_name').in('id', userIds)
+    : { data: [] }
+
+  const profileMap: Record<string, string> = {}
+  for (const p of profiles ?? []) {
+    profileMap[p.id] = p.id === user?.id ? 'You' : (p.display_name ?? 'Band member')
+  }
+  if (user && !profileMap[user.id]) profileMap[user.id] = 'You'
 
   return (
     <div>
@@ -41,7 +59,7 @@ export default async function SongsPage() {
           </Button>
         </div>
       ) : (
-        <SongSearchList songs={songs} />
+        <SongSearchList songs={songs} profileMap={profileMap} />
       )}
     </div>
   )

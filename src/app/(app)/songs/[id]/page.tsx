@@ -14,9 +14,16 @@ interface Props {
 export default async function SongPage({ params }: Props) {
   const { id } = await params
   const supabase = await createClient()
-  const { data: song } = await supabase.from('songs').select('*').eq('id', id).single()
+  const [{ data: song }, { data: { user } }] = await Promise.all([
+    supabase.from('songs').select('*').eq('id', id).single(),
+    supabase.auth.getUser(),
+  ])
 
   if (!song) notFound()
+
+  const userIds = [...new Set([song.created_by, ...(song.updated_by ? [song.updated_by] : [])])]
+  const { data: profiles } = await supabase.from('profiles').select('id, display_name').in('id', userIds)
+  const nameOf = (uid: string) => uid === user?.id ? 'You' : (profiles?.find(p => p.id === uid)?.display_name ?? 'Band member')
 
   return (
     <div className="max-w-3xl">
@@ -56,6 +63,14 @@ export default async function SongPage({ params }: Props) {
           </Button>
           <DeleteSongButton id={id} />
         </div>
+      </div>
+
+      {/* Created / modified by */}
+      <div className="mb-4 flex flex-wrap gap-4 text-xs text-gray-400">
+        <span>Added by <span className="font-medium text-gray-600">{nameOf(song.created_by)}</span></span>
+        {song.updated_by && (
+          <span>Last edited by <span className="font-medium text-gray-600">{nameOf(song.updated_by)}</span></span>
+        )}
       </div>
 
       {/* Notes */}

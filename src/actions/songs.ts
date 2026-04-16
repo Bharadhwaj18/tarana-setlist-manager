@@ -36,6 +36,7 @@ export async function updateSong(id: string, data: SongFormData) {
     .update({
       ...data,
       bpm: data.bpm ?? null,
+      updated_by: user.id,
     })
     .eq('id', id)
 

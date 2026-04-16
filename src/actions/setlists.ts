@@ -28,7 +28,7 @@ export async function updateSetlist(id: string, data: SetlistFormData) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
-  const { error } = await supabase.from('setlists').update(data).eq('id', id)
+  const { error } = await supabase.from('setlists').update({ ...data, updated_by: user.id }).eq('id', id)
   if (error) throw new Error(error.message)
 
   revalidatePath('/setlists')

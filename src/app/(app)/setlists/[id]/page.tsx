@@ -31,6 +31,11 @@ export default async function SetlistPage({ params }: Props) {
 
   if (!setlist) notFound()
 
+  const userIds = [...new Set([setlist.created_by, ...(setlist.updated_by ? [setlist.updated_by] : [])])]
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: profiles } = await supabase.from('profiles').select('id, display_name').in('id', userIds)
+  const nameOf = (uid: string) => uid === user?.id ? 'You' : (profiles?.find(p => p.id === uid)?.display_name ?? 'Band member')
+
   const date = setlist.show_date
     ? new Date(setlist.show_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
     : null
@@ -53,6 +58,12 @@ export default async function SetlistPage({ params }: Props) {
             {setlist.venue && <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" />{setlist.venue}</span>}
           </div>
           {setlist.notes && <p className="mt-2 text-sm text-gray-500 italic">{setlist.notes}</p>}
+          <div className="mt-2 flex flex-wrap gap-4 text-xs text-gray-400">
+            <span>Created by <span className="font-medium text-gray-600">{nameOf(setlist.created_by)}</span></span>
+            {setlist.updated_by && (
+              <span>Last edited by <span className="font-medium text-gray-600">{nameOf(setlist.updated_by)}</span></span>
+            )}
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <SaveOfflineButton

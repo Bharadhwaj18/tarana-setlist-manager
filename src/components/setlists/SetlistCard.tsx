@@ -5,9 +5,11 @@ import type { Setlist } from '@/types'
 interface SetlistCardProps {
   setlist: Setlist
   songCount: number
+  createdBy?: string
+  updatedBy?: string
 }
 
-export function SetlistCard({ setlist, songCount }: SetlistCardProps) {
+export function SetlistCard({ setlist, songCount, createdBy, updatedBy }: SetlistCardProps) {
   const date = setlist.show_date
     ? new Date(setlist.show_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
     : null
@@ -35,6 +37,14 @@ export function SetlistCard({ setlist, songCount }: SetlistCardProps) {
           <ListMusic className="h-3 w-3" /> {songCount} {songCount === 1 ? 'song' : 'songs'}
         </span>
       </div>
+      {(createdBy || updatedBy) && (
+        <div className="border-t border-gray-100 pt-2 text-xs text-gray-400">
+          {updatedBy
+            ? <span>Edited by <span className="font-medium text-gray-500">{updatedBy}</span></span>
+            : <span>Created by <span className="font-medium text-gray-500">{createdBy}</span></span>
+          }
+        </div>
+      )}
     </Link>
   )
 }

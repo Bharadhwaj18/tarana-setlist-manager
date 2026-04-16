@@ -8,9 +8,10 @@ import type { Setlist } from '@/types'
 interface SetlistSearchListProps {
   setlists: Setlist[]
   countMap: Record<string, number>
+  profileMap: Record<string, string>
 }
 
-export function SetlistSearchList({ setlists, countMap }: SetlistSearchListProps) {
+export function SetlistSearchList({ setlists, countMap, profileMap }: SetlistSearchListProps) {
   const [query, setQuery] = useState('')
 
   const filtered = query.trim()
@@ -40,7 +41,13 @@ export function SetlistSearchList({ setlists, countMap }: SetlistSearchListProps
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map(setlist => (
-            <SetlistCard key={setlist.id} setlist={setlist} songCount={countMap[setlist.id] ?? 0} />
+            <SetlistCard
+              key={setlist.id}
+              setlist={setlist}
+              songCount={countMap[setlist.id] ?? 0}
+              createdBy={profileMap[setlist.created_by]}
+              updatedBy={setlist.updated_by ? profileMap[setlist.updated_by] : undefined}
+            />
           ))}
         </div>
       )}

@@ -6,21 +6,33 @@ import { Button } from '@/components/ui/Button'
 
 export default async function SetlistsPage() {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: setlists } = await supabase
-    .from('setlists')
-    .select('*')
-    .order('show_date', { ascending: false, nullsFirst: false })
-
-  // Get song counts per setlist
-  const { data: counts } = await supabase
-    .from('setlist_songs')
-    .select('setlist_id')
+  const [{ data: setlists }, { data: counts }] = await Promise.all([
+    supabase.from('setlists').select('*').order('show_date', { ascending: false, nullsFirst: false }),
+    supabase.from('setlist_songs').select('setlist_id'),
+  ])
 
   const countMap: Record<string, number> = {}
   counts?.forEach(({ setlist_id }) => {
     countMap[setlist_id] = (countMap[setlist_id] ?? 0) + 1
   })
+
+  // Build profile name map
+  const userIds = [...new Set([
+    ...(setlists ?? []).map(s => s.created_by),
+    ...(setlists ?? []).flatMap(s => s.updated_by ? [s.updated_by] : []),
+  ])]
+
+  const { data: profiles } = userIds.length
+    ? await supabase.from('profiles').select('id, display_name').in('id', userIds)
+    : { data: [] }
+
+  const profileMap: Record<string, string> = {}
+  for (const p of profiles ?? []) {
+    profileMap[p.id] = p.id === user?.id ? 'You' : (p.display_name ?? 'Band member')
+  }
+  if (user && !profileMap[user.id]) profileMap[user.id] = 'You'
 
   return (
     <div>
@@ -50,7 +62,7 @@ export default async function SetlistsPage() {
           </Button>
         </div>
       ) : (
-        <SetlistSearchList setlists={setlists} countMap={countMap} />
+        <SetlistSearchList setlists={setlists} countMap={countMap} profileMap={profileMap} />
       )}
     </div>
   )
