@@ -153,6 +153,45 @@ export async function bulkImportSongs(
   return { imported, created }
 }
 
+export async function quickCreateSongAndAdd(
+  setlistId: string,
+  title: string
+): Promise<{ song: { id: string; title: string; artist: string | null; song_key: string | null } } | { error: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const trimmed = title.trim()
+  if (!trimmed) return { error: 'Title is required' }
+
+  const { data: newSong, error: createError } = await supabase
+    .from('songs')
+    .insert({ title: trimmed, created_by: user.id })
+    .select('id, title, artist, song_key')
+    .single()
+
+  if (createError || !newSong) return { error: createError?.message ?? 'Failed to create song' }
+
+  const { data: existing } = await supabase
+    .from('setlist_songs')
+    .select('position')
+    .eq('setlist_id', setlistId)
+    .order('position', { ascending: false })
+    .limit(1)
+
+  const nextPosition = existing?.[0] ? existing[0].position + 1 : 0
+
+  const { error: addError } = await supabase
+    .from('setlist_songs')
+    .insert({ setlist_id: setlistId, song_id: newSong.id, position: nextPosition })
+
+  if (addError && addError.code !== '23505') return { error: addError.message }
+
+  revalidatePath(`/setlists/${setlistId}`)
+  revalidatePath('/songs')
+  return { song: newSong }
+}
+
 export async function reorderSetlistSongs(setlistId: string, orderedSongIds: string[]) {
   const supabase = await createClient()
 
