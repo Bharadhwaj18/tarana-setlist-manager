@@ -64,6 +64,7 @@ export default async function SetlistPage({ params }: Props) {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <SaveOfflineButton
+            setlistId={id}
             setlistTitle={setlist.title}
             showDate={setlist.show_date}
             venue={setlist.venue}

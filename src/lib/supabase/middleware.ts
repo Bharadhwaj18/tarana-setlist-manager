@@ -26,19 +26,27 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // Refresh session — IMPORTANT: do not remove this
-  const { data: { user } } = await supabase.auth.getUser()
+  // getUser() verifies the token with Supabase's servers.
+  // When offline, it fails and returns null. In that case, fall back to
+  // getSession() which reads the JWT from the cookie locally — no network needed.
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+
+  let effectiveUser = user
+  if (!user && userError) {
+    const { data: { session } } = await supabase.auth.getSession()
+    effectiveUser = session?.user ?? null
+  }
 
   const pathname = request.nextUrl.pathname
   const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/auth')
 
-  if (!user && !isAuthRoute) {
+  if (!effectiveUser && !isAuthRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  if (user && isAuthRoute) {
+  if (effectiveUser && isAuthRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/setlists'
     return NextResponse.redirect(url)

@@ -18,12 +18,14 @@ function LogoImage() {
     )
   }
   return (
-    <img
-      src="/logo.png"
-      alt="Tarana"
-      className="h-8 w-8 rounded-lg object-contain"
-      onError={() => setImgError(true)}
-    />
+    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-900 shadow-sm">
+      <img
+        src="/logo.png"
+        alt="Tarana"
+        className="h-6 w-6 object-contain"
+        onError={() => setImgError(true)}
+      />
+    </div>
   )
 }
 
@@ -115,20 +117,24 @@ export function Sidebar({ user }: SidebarProps) {
       </div>
 
       {/* Mobile drawer */}
-      {mobileOpen && (
-        <div className="fixed inset-0 z-30 lg:hidden">
-          <div className="absolute inset-0 bg-black/30" onClick={() => setMobileOpen(false)} />
-          <aside className="absolute left-0 top-0 flex h-full w-56 flex-col bg-brand-300">
-            <div className="flex items-center border-b border-brand-200 px-4 py-4">
-              {logo}
-            </div>
-            <div className="flex flex-1 flex-col overflow-y-auto px-3">
-              {nav}
-            </div>
-            {footer}
-          </aside>
-        </div>
-      )}
+      <div className={cn('fixed inset-0 z-30 lg:hidden', mobileOpen ? 'pointer-events-auto' : 'pointer-events-none')}>
+        <div
+          className={cn('absolute inset-0 bg-black/30 transition-opacity duration-300', mobileOpen ? 'opacity-100' : 'opacity-0')}
+          onClick={() => setMobileOpen(false)}
+        />
+        <aside className={cn(
+          'absolute left-0 top-0 flex h-full w-56 flex-col bg-brand-300 shadow-xl transition-transform duration-300 ease-in-out',
+          mobileOpen ? 'translate-x-0' : '-translate-x-full'
+        )}>
+          <div className="flex items-center border-b border-brand-200 px-4 py-4">
+            {logo}
+          </div>
+          <div className="flex flex-1 flex-col overflow-y-auto px-3">
+            {nav}
+          </div>
+          {footer}
+        </aside>
+      </div>
     </>
   )
 }

@@ -33,13 +33,13 @@ export function SortableSongRow({ id, song, index, setlistId, onRemove }: Sortab
       )}
     >
       {/* Position number */}
-      <span className="w-6 shrink-0 text-center text-sm font-bold text-brand-300">{index + 1}</span>
+      <span className="w-6 shrink-0 text-center text-sm font-bold text-gray-500">{index + 1}</span>
 
       {/* Drag handle */}
       <button
         {...attributes}
         {...listeners}
-        className="cursor-grab touch-none text-brand-300 hover:text-brand-400 active:cursor-grabbing"
+        className="cursor-grab touch-none text-gray-400 hover:text-gray-700 active:cursor-grabbing"
         aria-label="Drag to reorder"
       >
         <GripVertical className="h-5 w-5" />

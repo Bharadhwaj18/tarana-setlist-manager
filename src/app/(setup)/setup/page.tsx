@@ -4,18 +4,24 @@ import { SetupForm } from './SetupForm'
 
 export default async function SetupPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
 
-  if (!user) redirect('/login')
+  let effectiveUser = user
+  if (!user && userError) {
+    const { data: { session } } = await supabase.auth.getSession()
+    effectiveUser = session?.user ?? null
+  }
 
-  // If display name already set, skip setup
-  const { data: profile } = await supabase
+  if (!effectiveUser) redirect('/login')
+
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('display_name')
-    .eq('id', user.id)
+    .eq('id', effectiveUser.id)
     .maybeSingle()
 
-  if (profile?.display_name?.trim()) redirect('/setlists')
+  // Only skip setup if we got a successful response confirming name is set
+  if (!profileError && profile?.display_name?.trim()) redirect('/setlists')
 
-  return <SetupForm email={user.email ?? ''} />
+  return <SetupForm email={effectiveUser.email ?? ''} />
 }
