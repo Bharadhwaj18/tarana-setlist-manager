@@ -11,10 +11,11 @@ interface SortableSongRowProps {
   id: string
   song: Song
   index: number
+  setlistId: string
   onRemove: () => void
 }
 
-export function SortableSongRow({ id, song, index, onRemove }: SortableSongRowProps) {
+export function SortableSongRow({ id, song, index, setlistId, onRemove }: SortableSongRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
 
   const style = {
@@ -45,7 +46,7 @@ export function SortableSongRow({ id, song, index, onRemove }: SortableSongRowPr
       </button>
 
       {/* Song info — tappable link to song page */}
-      <Link href={`/songs/${song.id}`} className="flex min-w-0 flex-1 items-center gap-2">
+      <Link href={`/songs/${song.id}?from=/setlists/${setlistId}`} className="flex min-w-0 flex-1 items-center gap-2">
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium text-gray-900">{song.title}</p>
           {song.artist && <p className="truncate text-xs text-gray-400">{song.artist}</p>}

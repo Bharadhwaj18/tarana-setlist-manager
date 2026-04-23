@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft, Pencil, Calendar, MapPin } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import { getCachedSetlist, getCachedSetlistSongs, getCachedSongs, getCachedAllProfiles } from '@/lib/data'
 import { SetlistSongList } from '@/components/setlists/SetlistSongList'
 import { AddSongToSetlistModal } from '@/components/setlists/AddSongToSetlistModal'
 import { BulkImportModal } from '@/components/setlists/BulkImportModal'
@@ -17,31 +18,27 @@ interface Props {
 
 export default async function SetlistPage({ params }: Props) {
   const { id } = await params
-  const supabase = await createClient()
 
-  const [{ data: setlist }, { data: setlistSongs }, { data: allSongs }] = await Promise.all([
-    supabase.from('setlists').select('*').eq('id', id).single(),
-    supabase
-      .from('setlist_songs')
-      .select('*, song:songs(*)')
-      .eq('setlist_id', id)
-      .order('position'),
-    supabase.from('songs').select('*').order('title'),
+  const supabase = await createClient()
+  const [setlist, setlistSongs, allSongs, profiles, { data: { user } }] = await Promise.all([
+    getCachedSetlist(id),
+    getCachedSetlistSongs(id),
+    getCachedSongs(),
+    getCachedAllProfiles(),
+    supabase.auth.getUser(),
   ])
 
   if (!setlist) notFound()
 
-  const userIds = [...new Set([setlist.created_by, ...(setlist.updated_by ? [setlist.updated_by] : [])])]
-  const { data: { user } } = await supabase.auth.getUser()
-  const { data: profiles } = await supabase.from('profiles').select('id, display_name').in('id', userIds)
-  const nameOf = (uid: string) => uid === user?.id ? 'You' : (profiles?.find(p => p.id === uid)?.display_name ?? 'Band member')
+  const nameOf = (uid: string) =>
+    uid === user?.id ? 'You' : (profiles.find(p => p.id === uid)?.display_name ?? 'Band member')
 
   const date = setlist.show_date
     ? new Date(setlist.show_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
     : null
 
-  const currentSongIds = setlistSongs?.map(ss => ss.song_id) ?? []
-  const currentSongTitles = setlistSongs?.map(ss => ss.song.title) ?? []
+  const currentSongIds = setlistSongs.map(ss => ss.song_id)
+  const currentSongTitles = setlistSongs.map(ss => ss.song.title)
 
   return (
     <div className="max-w-2xl">
@@ -70,9 +67,9 @@ export default async function SetlistPage({ params }: Props) {
             setlistTitle={setlist.title}
             showDate={setlist.show_date}
             venue={setlist.venue}
-            items={(setlistSongs ?? []).map(ss => ({ song: ss.song, section: (ss as SetlistSongWithSong).section }))}
+            items={setlistSongs.map(ss => ({ song: ss.song, section: (ss as SetlistSongWithSong).section }))}
           />
-          <SetlistPdfExport setlist={setlist} songs={setlistSongs?.map(ss => ss.song) ?? []} />
+          <SetlistPdfExport setlist={setlist} songs={setlistSongs.map(ss => ss.song)} />
           <Button variant="secondary" size="sm" asChild>
             <Link href={`/setlists/${id}/edit`}><Pencil className="h-4 w-4" /> Edit</Link>
           </Button>
@@ -83,17 +80,17 @@ export default async function SetlistPage({ params }: Props) {
       {/* Song count + action buttons */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium text-gray-500">
-          {setlistSongs?.length ?? 0} {setlistSongs?.length === 1 ? 'song' : 'songs'}
+          {setlistSongs.length} {setlistSongs.length === 1 ? 'song' : 'songs'}
         </p>
         <div className="flex gap-2">
           <BulkImportModal
             setlistId={id}
-            existingSongs={allSongs ?? []}
+            existingSongs={allSongs}
             currentSongTitles={currentSongTitles}
           />
           <AddSongToSetlistModal
             setlistId={id}
-            allSongs={allSongs ?? []}
+            allSongs={allSongs}
             currentSongIds={currentSongIds}
           />
         </div>
@@ -102,7 +99,7 @@ export default async function SetlistPage({ params }: Props) {
       {/* Drag-and-drop song list */}
       <SetlistSongList
         setlistId={id}
-        initialItems={(setlistSongs ?? []) as SetlistSongWithSong[]}
+        initialItems={setlistSongs as SetlistSongWithSong[]}
       />
     </div>
   )

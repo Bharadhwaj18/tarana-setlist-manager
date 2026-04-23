@@ -8,10 +8,12 @@ import type { SongFormData } from '@/lib/validators'
 
 interface Props {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ from?: string }>
 }
 
-export default async function EditSongPage({ params }: Props) {
+export default async function EditSongPage({ params, searchParams }: Props) {
   const { id } = await params
+  const { from } = await searchParams
   const supabase = await createClient()
   const { data: song } = await supabase.from('songs').select('*').eq('id', id).single()
 
@@ -19,12 +21,17 @@ export default async function EditSongPage({ params }: Props) {
 
   const handleUpdate = async (data: SongFormData) => {
     'use server'
-    await updateSong(id, data)
+    const backTo = from ? `/songs/${id}?from=${encodeURIComponent(from)}` : `/songs/${id}`
+    await updateSong(id, data, backTo)
   }
+
+  const backHref = from
+    ? `/songs/${id}?from=${encodeURIComponent(from)}`
+    : `/songs/${id}`
 
   return (
     <div className="max-w-2xl">
-      <Link href={`/songs/${id}`} className="mb-6 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
+      <Link href={backHref} className="mb-6 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
         <ChevronLeft className="h-4 w-4" /> {song.title}
       </Link>
       <h1 className="mb-8 text-2xl font-bold text-gray-900">Edit Song</h1>

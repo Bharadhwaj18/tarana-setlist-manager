@@ -111,6 +111,7 @@ export function SetlistSongList({ setlistId, initialItems }: SetlistSongListProp
                 id={entry.item.id}
                 song={entry.item.song}
                 index={entry.index}
+                setlistId={setlistId}
                 onRemove={() => handleRemove(entry.item.song_id)}
               />
             )

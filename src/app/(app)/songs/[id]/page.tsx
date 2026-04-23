@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft, Pencil, Clock, Hash, Music } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import { getCachedSong, getCachedAllProfiles } from '@/lib/data'
 import { ChordViewer } from '@/components/songs/ChordViewer'
 import { Button } from '@/components/ui/Button'
 import { DeleteSongButton } from '@/components/songs/DeleteSongButton'
@@ -9,26 +10,29 @@ import { SongPdfExport } from '@/components/pdf/SongPdfExport'
 
 interface Props {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ from?: string }>
 }
 
-export default async function SongPage({ params }: Props) {
+export default async function SongPage({ params, searchParams }: Props) {
   const { id } = await params
+  const { from } = await searchParams
+
   const supabase = await createClient()
-  const [{ data: song }, { data: { user } }] = await Promise.all([
-    supabase.from('songs').select('*').eq('id', id).single(),
+  const [song, profiles, { data: { user } }] = await Promise.all([
+    getCachedSong(id),
+    getCachedAllProfiles(),
     supabase.auth.getUser(),
   ])
 
   if (!song) notFound()
 
-  const userIds = [...new Set([song.created_by, ...(song.updated_by ? [song.updated_by] : [])])]
-  const { data: profiles } = await supabase.from('profiles').select('id, display_name').in('id', userIds)
-  const nameOf = (uid: string) => uid === user?.id ? 'You' : (profiles?.find(p => p.id === uid)?.display_name ?? 'Band member')
+  const nameOf = (uid: string) =>
+    uid === user?.id ? 'You' : (profiles.find(p => p.id === uid)?.display_name ?? 'Band member')
 
   return (
     <div className="max-w-3xl">
-      <Link href="/songs" className="mb-6 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
-        <ChevronLeft className="h-4 w-4" /> Songs
+      <Link href={from ?? '/songs'} className="mb-6 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
+        <ChevronLeft className="h-4 w-4" /> {from ? 'Back to setlist' : 'Songs'}
       </Link>
 
       {/* Header */}
@@ -57,7 +61,7 @@ export default async function SongPage({ params }: Props) {
         <div className="flex shrink-0 items-center gap-2">
           <SongPdfExport song={song} />
           <Button variant="secondary" size="sm" asChild>
-            <Link href={`/songs/${id}/edit`}>
+            <Link href={from ? `/songs/${id}/edit?from=${encodeURIComponent(from)}` : `/songs/${id}/edit`}>
               <Pencil className="h-4 w-4" /> Edit
             </Link>
           </Button>

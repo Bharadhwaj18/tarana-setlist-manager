@@ -26,7 +26,7 @@ export async function createSong(data: SongFormData) {
   redirect(`/songs/${song.id}`)
 }
 
-export async function updateSong(id: string, data: SongFormData) {
+export async function updateSong(id: string, data: SongFormData, redirectTo?: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
@@ -44,7 +44,7 @@ export async function updateSong(id: string, data: SongFormData) {
 
   revalidatePath('/songs')
   revalidatePath(`/songs/${id}`)
-  redirect(`/songs/${id}`)
+  redirect(redirectTo ?? `/songs/${id}`)
 }
 
 export async function deleteSong(id: string) {
