@@ -1,12 +1,15 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { ChevronUp, ChevronDown } from 'lucide-react'
+import { useState, useEffect, useRef, useTransition } from 'react'
+import { ChevronUp, ChevronDown, Save } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { parseSong } from '@/lib/chords/parser'
-import { formatSong, getCss } from '@/lib/chords/formatter'
-import { transposeSong } from '@/lib/chords/transposer'
+import { formatSong, formatSongAsChordPro, getCss } from '@/lib/chords/formatter'
+import { transposeSong, transposeKey } from '@/lib/chords/transposer'
+import { saveTranspose } from '@/actions/songs'
 import { Button } from '@/components/ui/Button'
+import { useToast } from '@/components/ui/Toaster'
 import type { Song } from 'chordsheetjs'
 
 interface ChordViewerProps {
@@ -16,11 +19,14 @@ interface ChordViewerProps {
   songId?: string
 }
 
-export function ChordViewer({ chordChart, printRef, songId }: ChordViewerProps) {
+export function ChordViewer({ chordChart, songKey, printRef, songId }: ChordViewerProps) {
   const [song, setSong] = useState<Song>(() => parseSong(chordChart))
   const [semitones, setSemitones] = useState(0)
   const [cssInjected, setCssInjected] = useState(false)
+  const [isSaving, startSave] = useTransition()
   const internalRef = useRef<HTMLDivElement>(null)
+  const router = useRouter()
+  const toast = useToast()
 
   useEffect(() => {
     setSong(parseSong(chordChart))
@@ -48,6 +54,22 @@ export function ChordViewer({ chordChart, printRef, songId }: ChordViewerProps) 
     setSemitones(prev => prev + delta)
   }
 
+  const handleSave = () => {
+    if (!songId) return
+    const newKey = transposeKey(songKey, semitones)
+    const transposedChart = formatSongAsChordPro(song)
+    startSave(async () => {
+      const result = await saveTranspose(songId, transposedChart, newKey)
+      if (result.error) {
+        toast(result.error, 'error')
+      } else {
+        toast('Key saved', 'success')
+        router.refresh()
+      }
+    })
+  }
+
+  const currentKey = semitones === 0 ? songKey : transposeKey(songKey, semitones)
   const html = formatSong(song)
 
   const viewer = (
@@ -76,7 +98,7 @@ export function ChordViewer({ chordChart, printRef, songId }: ChordViewerProps) 
   return (
     <div className="space-y-4">
       {/* Transpose controls */}
-      <div className="flex items-center gap-3 rounded-lg border border-brand-200 bg-brand-50 px-4 py-2.5">
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-brand-200 bg-brand-50 px-4 py-2.5">
         <span className="text-sm font-medium text-gray-600">Transpose</span>
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="sm" onClick={() => transpose(-1)} className="h-7 w-7 p-0">
@@ -89,10 +111,24 @@ export function ChordViewer({ chordChart, printRef, songId }: ChordViewerProps) 
             <ChevronUp className="h-4 w-4" />
           </Button>
         </div>
+
+        {currentKey && (
+          <span className="rounded bg-brand-100 px-2 py-0.5 text-xs font-bold text-brand-700">
+            Key: {currentKey}
+          </span>
+        )}
+
         {semitones !== 0 && (
-          <Button variant="ghost" size="sm" onClick={() => { setSong(parseSong(chordChart)); setSemitones(0) }}>
-            Reset
-          </Button>
+          <>
+            <Button variant="ghost" size="sm" onClick={() => { setSong(parseSong(chordChart)); setSemitones(0) }}>
+              Reset
+            </Button>
+            {songId && (
+              <Button size="sm" loading={isSaving} onClick={handleSave}>
+                <Save className="h-3.5 w-3.5" /> Save key
+              </Button>
+            )}
+          </>
         )}
       </div>
 

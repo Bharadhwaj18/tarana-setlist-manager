@@ -47,6 +47,31 @@ export async function updateSong(id: string, data: SongFormData, redirectTo?: st
   redirect(redirectTo ?? `/songs/${id}`)
 }
 
+export async function saveTranspose(
+  songId: string,
+  chordChart: string,
+  newKey: string | null
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { error } = await supabase
+    .from('songs')
+    .update({
+      chord_chart: chordChart,
+      ...(newKey !== null && { song_key: newKey }),
+      updated_by: user.id,
+    })
+    .eq('id', songId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/songs')
+  revalidatePath(`/songs/${songId}`)
+  return {}
+}
+
 export async function deleteSong(id: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
