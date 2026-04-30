@@ -74,7 +74,7 @@ function buildOfflineHtml(
             ${meta.length ? `<p class="song-meta">${meta.join(' &nbsp;·&nbsp; ')}</p>` : ''}
           </div>
         </div>
-        ${song.notes ? `<div class="song-notes">${escapeHtml(song.notes)}</div>` : ''}
+        ${song.notes ? `<div class="song-notes" style="white-space:pre-wrap">${escapeHtml(song.notes)}</div>` : ''}
         ${chordHtml ? `<div class="chord-sheet-wrap">${chordHtml}</div>` : '<p class="no-chords">No chord chart</p>'}
       </section>`
   }

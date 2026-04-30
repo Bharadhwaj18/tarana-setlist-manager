@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft, Pencil, Clock, Hash, Music } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
-import { getCachedSong, getCachedAllProfiles } from '@/lib/data'
+import { getCachedSong, getCachedAllProfiles, getCachedSetlistSongs } from '@/lib/data'
 import { ChordViewer } from '@/components/songs/ChordViewer'
 import { Button } from '@/components/ui/Button'
 import { DeleteSongButton } from '@/components/songs/DeleteSongButton'
@@ -17,11 +17,14 @@ export default async function SongPage({ params, searchParams }: Props) {
   const { id } = await params
   const { from } = await searchParams
 
+  const setlistId = from?.match(/^\/setlists\/([^/]+)$/)?.[1] ?? null
+
   const supabase = await createClient()
-  const [song, profiles, { data: { user } }] = await Promise.all([
+  const [song, profiles, { data: { user } }, setlistSongs] = await Promise.all([
     getCachedSong(id),
     getCachedAllProfiles(),
     supabase.auth.getUser(),
+    setlistId ? getCachedSetlistSongs(setlistId) : Promise.resolve([]),
   ])
 
   if (!song) notFound()
@@ -80,12 +83,27 @@ export default async function SongPage({ params, searchParams }: Props) {
       {/* Notes */}
       {song.notes && (
         <div className="mb-6 rounded-lg bg-brand-50 px-4 py-3 text-sm text-brand-700 ring-1 ring-brand-200">
-          <strong>Notes:</strong> {song.notes}
+          <strong className="block mb-1">Notes</strong>
+          <span className="whitespace-pre-wrap">{song.notes}</span>
         </div>
       )}
 
       {/* Chord chart */}
-      <ChordViewer chordChart={song.chord_chart ?? ''} songKey={song.song_key} songId={id} />
+      <ChordViewer
+        chordChart={song.chord_chart ?? ''}
+        songKey={song.song_key}
+        songId={id}
+        songTitle={song.title}
+        bpm={song.bpm}
+        setlistId={setlistId ?? undefined}
+        setlistSongs={setlistSongs.map(ss => ({
+          id: ss.song_id,
+          title: ss.song.title,
+          chord_chart: ss.song.chord_chart ?? '',
+          song_key: ss.song.song_key ?? null,
+          bpm: ss.song.bpm ?? null,
+        }))}
+      />
     </div>
   )
 }

@@ -53,7 +53,7 @@ function buildSongPrintHtml(song: Song): string {
   <h1>${escapeHtml(song.title)}</h1>
   ${song.artist ? `<p class="artist">${escapeHtml(song.artist)}</p>` : ''}
   ${meta.length ? `<p class="meta">${meta.join(' &nbsp;·&nbsp; ')}</p>` : ''}
-  ${song.notes ? `<p class="notes">${escapeHtml(song.notes)}</p>` : ''}
+  ${song.notes ? `<p class="notes" style="white-space:pre-wrap">${escapeHtml(song.notes)}</p>` : ''}
   <hr/>
   ${chordHtml || '<p style="color:#aaa;font-family:sans-serif">No chord chart</p>'}
   <script>window.onload = () => { window.print(); }<\/script>

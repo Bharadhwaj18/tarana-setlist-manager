@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useTransition } from 'react'
-import { ChevronUp, ChevronDown, Save } from 'lucide-react'
+import { ChevronUp, ChevronDown, Save, MonitorPlay } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { parseSong } from '@/lib/chords/parser'
@@ -10,6 +10,7 @@ import { transposeSong, transposeKey } from '@/lib/chords/transposer'
 import { saveTranspose } from '@/actions/songs'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toaster'
+import { PerformanceMode, type SetlistNavSong } from './PerformanceMode'
 import type { Song } from 'chordsheetjs'
 
 interface ChordViewerProps {
@@ -17,12 +18,19 @@ interface ChordViewerProps {
   songKey?: string | null
   printRef?: React.RefObject<HTMLDivElement | null>
   songId?: string
+  songTitle?: string
+  bpm?: number | null
+  setlistSongs?: SetlistNavSong[]
+  setlistId?: string
 }
 
-export function ChordViewer({ chordChart, songKey, printRef, songId }: ChordViewerProps) {
+export function ChordViewer({
+  chordChart, songKey, printRef, songId, songTitle, bpm, setlistSongs, setlistId
+}: ChordViewerProps) {
   const [song, setSong] = useState<Song>(() => parseSong(chordChart))
   const [semitones, setSemitones] = useState(0)
   const [cssInjected, setCssInjected] = useState(false)
+  const [performMode, setPerformMode] = useState(false)
   const [isSaving, startSave] = useTransition()
   const internalRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
@@ -72,14 +80,6 @@ export function ChordViewer({ chordChart, songKey, printRef, songId }: ChordView
   const currentKey = semitones === 0 ? songKey : transposeKey(songKey, semitones)
   const html = formatSong(song)
 
-  const viewer = (
-    <div
-      ref={printRef ?? internalRef}
-      className="rounded-lg bg-white p-6 ring-1 ring-gray-100"
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
-  )
-
   if (!chordChart) {
     return (
       <div className="rounded-lg border border-dashed border-gray-300 p-10 text-center text-sm text-gray-400">
@@ -96,43 +96,73 @@ export function ChordViewer({ chordChart, songKey, printRef, songId }: ChordView
   }
 
   return (
-    <div className="space-y-4">
-      {/* Transpose controls */}
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-brand-200 bg-brand-50 px-4 py-2.5">
-        <span className="text-sm font-medium text-gray-600">Transpose</span>
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" onClick={() => transpose(-1)} className="h-7 w-7 p-0">
-            <ChevronDown className="h-4 w-4" />
-          </Button>
-          <span className="w-16 text-center text-sm font-mono font-semibold text-brand-500">
-            {semitones > 0 ? `+${semitones}` : semitones === 0 ? 'Original' : semitones}
-          </span>
-          <Button variant="ghost" size="sm" onClick={() => transpose(1)} className="h-7 w-7 p-0">
-            <ChevronUp className="h-4 w-4" />
+    <>
+      <div className="space-y-4">
+        {/* Transpose + Perform controls */}
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-brand-200 bg-brand-50 px-4 py-2.5">
+          <span className="text-sm font-medium text-gray-600">Transpose</span>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="sm" onClick={() => transpose(-1)} className="h-7 w-7 p-0">
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+            <span className="w-16 text-center text-sm font-mono font-semibold text-brand-500">
+              {semitones > 0 ? `+${semitones}` : semitones === 0 ? 'Original' : semitones}
+            </span>
+            <Button variant="ghost" size="sm" onClick={() => transpose(1)} className="h-7 w-7 p-0">
+              <ChevronUp className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {currentKey && (
+            <span className="rounded bg-brand-100 px-2 py-0.5 text-xs font-bold text-brand-700">
+              Key: {currentKey}
+            </span>
+          )}
+
+          {semitones !== 0 && (
+            <>
+              <Button variant="ghost" size="sm" onClick={() => { setSong(parseSong(chordChart)); setSemitones(0) }}>
+                Reset
+              </Button>
+              {songId && (
+                <Button size="sm" loading={isSaving} onClick={handleSave}>
+                  <Save className="h-3.5 w-3.5" /> Save key
+                </Button>
+              )}
+            </>
+          )}
+
+          {/* Perform button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setPerformMode(true)}
+            className="ml-auto text-brand-600 hover:text-brand-700"
+          >
+            <MonitorPlay className="h-4 w-4" />
+            <span className="hidden sm:inline">Perform</span>
           </Button>
         </div>
 
-        {currentKey && (
-          <span className="rounded bg-brand-100 px-2 py-0.5 text-xs font-bold text-brand-700">
-            Key: {currentKey}
-          </span>
-        )}
-
-        {semitones !== 0 && (
-          <>
-            <Button variant="ghost" size="sm" onClick={() => { setSong(parseSong(chordChart)); setSemitones(0) }}>
-              Reset
-            </Button>
-            {songId && (
-              <Button size="sm" loading={isSaving} onClick={handleSave}>
-                <Save className="h-3.5 w-3.5" /> Save key
-              </Button>
-            )}
-          </>
-        )}
+        <div
+          ref={printRef ?? internalRef}
+          className="rounded-lg bg-white p-6 ring-1 ring-gray-100"
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
       </div>
 
-      {viewer}
-    </div>
+      {performMode && (
+        <PerformanceMode
+          song={song}
+          songKey={currentKey ?? null}
+          songId={songId ?? ''}
+          songTitle={songTitle ?? 'Song'}
+          bpm={bpm}
+          setlistSongs={setlistSongs}
+          setlistId={setlistId}
+          onClose={() => setPerformMode(false)}
+        />
+      )}
+    </>
   )
 }
