@@ -48,7 +48,7 @@ export async function deleteSetlist(id: string) {
   redirect('/setlists')
 }
 
-export async function addSongToSetlist(setlistId: string, songId: string) {
+export async function addSongToSetlist(setlistId: string, songId: string, section?: string | null) {
   const supabase = await createClient()
 
   // Get max position
@@ -63,7 +63,7 @@ export async function addSongToSetlist(setlistId: string, songId: string) {
 
   const { error } = await supabase
     .from('setlist_songs')
-    .insert({ setlist_id: setlistId, song_id: songId, position: nextPosition })
+    .insert({ setlist_id: setlistId, song_id: songId, position: nextPosition, section: section ?? null })
 
   if (error && error.code !== '23505') throw new Error(error.message) // ignore duplicate
 
@@ -85,7 +85,8 @@ export async function removeSongFromSetlist(setlistId: string, songId: string) {
 
 export async function bulkImportSongs(
   setlistId: string,
-  parsedSongs: ParsedSong[]
+  parsedSongs: ParsedSong[],
+  preResolvedIds: Record<string, string> = {}
 ): Promise<{ imported: number; created: number }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -111,7 +112,7 @@ export async function bulkImportSongs(
 
   for (const parsed of parsedSongs) {
     const key = parsed.title.toLowerCase().trim()
-    let songId = songMap.get(key)
+    let songId = songMap.get(key) ?? preResolvedIds[key]
 
     // Create the song if it doesn't exist
     if (!songId) {
@@ -155,7 +156,8 @@ export async function bulkImportSongs(
 
 export async function quickCreateSongAndAdd(
   setlistId: string,
-  title: string
+  title: string,
+  section?: string | null
 ): Promise<{ song: { id: string; title: string; artist: string | null; song_key: string | null } } | { error: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -183,7 +185,7 @@ export async function quickCreateSongAndAdd(
 
   const { error: addError } = await supabase
     .from('setlist_songs')
-    .insert({ setlist_id: setlistId, song_id: newSong.id, position: nextPosition })
+    .insert({ setlist_id: setlistId, song_id: newSong.id, position: nextPosition, section: section ?? null })
 
   if (addError && addError.code !== '23505') return { error: addError.message }
 
@@ -192,13 +194,17 @@ export async function quickCreateSongAndAdd(
   return { song: newSong }
 }
 
-export async function reorderSetlistSongs(setlistId: string, orderedSongIds: string[]) {
+export async function reorderSetlistSongs(
+  setlistId: string,
+  orderedItems: { songId: string; section: string | null }[]
+) {
   const supabase = await createClient()
 
-  const updates = orderedSongIds.map((songId, index) => ({
+  const updates = orderedItems.map(({ songId, section }, index) => ({
     setlist_id: setlistId,
     song_id: songId,
     position: index,
+    section,
   }))
 
   const { error } = await supabase

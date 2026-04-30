@@ -39,6 +39,9 @@ export default async function SetlistPage({ params }: Props) {
 
   const currentSongIds = setlistSongs.map(ss => ss.song_id)
   const currentSongTitles = setlistSongs.map(ss => ss.song.title)
+  const availableSections = [...new Set(
+    setlistSongs.map(ss => ss.section).filter((s): s is string => !!s)
+  )]
 
   return (
     <div className="max-w-2xl">
@@ -93,6 +96,7 @@ export default async function SetlistPage({ params }: Props) {
             setlistId={id}
             allSongs={allSongs}
             currentSongIds={currentSongIds}
+            availableSections={availableSections}
           />
         </div>
       </div>

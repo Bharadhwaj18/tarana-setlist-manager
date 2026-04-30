@@ -5,52 +5,26 @@ import { Search, Plus, Check, PlusCircle } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { addSongToSetlist, quickCreateSongAndAdd } from '@/actions/setlists'
+import { similarity, FUZZY_THRESHOLD } from '@/lib/fuzzy'
 import { useToast } from '@/components/ui/Toaster'
+import { cn } from '@/lib/utils'
 import type { Song } from '@/types'
 
 interface AddSongToSetlistModalProps {
   setlistId: string
   allSongs: Song[]
   currentSongIds: string[]
+  availableSections?: string[]
 }
 
-function similarity(a: string, b: string): number {
-  a = a.toLowerCase()
-  b = b.toLowerCase()
-  if (a === b) return 1
-  if (b.includes(a) || a.includes(b)) return 0.9
-
-  // Count matching characters (order-sensitive subsequence scoring)
-  let i = 0, j = 0, matches = 0
-  while (i < a.length && j < b.length) {
-    if (a[i] === b[j]) { matches++; i++; j++ }
-    else { j++ }
-  }
-  const subseqScore = matches / Math.max(a.length, b.length)
-
-  // Bigram overlap
-  const bigrams = (s: string) => {
-    const set = new Set<string>()
-    for (let k = 0; k < s.length - 1; k++) set.add(s[k] + s[k + 1])
-    return set
-  }
-  const ba = bigrams(a), bb = bigrams(b)
-  let shared = 0
-  ba.forEach(g => { if (bb.has(g)) shared++ })
-  const bigramScore = (2 * shared) / (ba.size + bb.size || 1)
-
-  return Math.max(subseqScore, bigramScore)
-}
-
-const FUZZY_THRESHOLD = 0.4
-
-export function AddSongToSetlistModal({ setlistId, allSongs, currentSongIds }: AddSongToSetlistModalProps) {
+export function AddSongToSetlistModal({ setlistId, allSongs, currentSongIds, availableSections = [] }: AddSongToSetlistModalProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [adding, setAdding] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [addedIds, setAddedIds] = useState<string[]>(currentSongIds)
   const [localSongs, setLocalSongs] = useState<Song[]>(allSongs)
+  const [selectedSection, setSelectedSection] = useState<string | null>(availableSections[0] ?? null)
   const [, startTransition] = useTransition()
   const toast = useToast()
 
@@ -75,7 +49,7 @@ export function AddSongToSetlistModal({ setlistId, allSongs, currentSongIds }: A
     setAdding(songId)
     startTransition(async () => {
       try {
-        await addSongToSetlist(setlistId, songId)
+        await addSongToSetlist(setlistId, songId, selectedSection)
         setAddedIds(prev => [...prev, songId])
       } catch {
         toast('Failed to add song', 'error')
@@ -90,7 +64,7 @@ export function AddSongToSetlistModal({ setlistId, allSongs, currentSongIds }: A
     setCreating(true)
     startTransition(async () => {
       try {
-        const result = await quickCreateSongAndAdd(setlistId, q)
+        const result = await quickCreateSongAndAdd(setlistId, q, selectedSection)
         if ('error' in result) {
           toast(result.error, 'error')
         } else {
@@ -114,6 +88,38 @@ export function AddSongToSetlistModal({ setlistId, allSongs, currentSongIds }: A
       </Button>
 
       <Modal open={open} onOpenChange={setOpen} title="Add Songs to Setlist" className="max-w-xl">
+        {/* Section picker — only shown when the setlist has sections */}
+        {availableSections.length > 0 && (
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-gray-500">Add to:</span>
+            {availableSections.map(sec => (
+              <button
+                key={sec}
+                onClick={() => setSelectedSection(sec)}
+                className={cn(
+                  'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                  selectedSection === sec
+                    ? 'bg-brand-400 text-white'
+                    : 'bg-brand-100 text-brand-700 hover:bg-brand-200'
+                )}
+              >
+                {sec}
+              </button>
+            ))}
+            <button
+              onClick={() => setSelectedSection(null)}
+              className={cn(
+                'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                selectedSection === null
+                  ? 'bg-gray-700 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              )}
+            >
+              No section
+            </button>
+          </div>
+        )}
+
         {/* Search */}
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-300" />
@@ -163,7 +169,7 @@ export function AddSongToSetlistModal({ setlistId, allSongs, currentSongIds }: A
             )
           })}
 
-          {/* Create option — shown when query is non-empty and no exact title match */}
+          {/* Create option */}
           {q && !exactMatch && (
             <div className="mt-2 border-t border-brand-100 pt-2">
               <button

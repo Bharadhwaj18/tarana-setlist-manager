@@ -44,9 +44,22 @@ export function SetlistSongList({ setlistId, initialItems }: SetlistSongListProp
     const newIndex = items.findIndex(i => i.id === over.id)
     const reordered = arrayMove(items, oldIndex, newIndex)
 
-    setItems(reordered)
+    // Moved item inherits the section of the song now directly above it,
+    // or the song below if dropped at position 0
+    const newSection = newIndex > 0
+      ? (reordered[newIndex - 1].section ?? null)
+      : (reordered[newIndex + 1]?.section ?? null)
 
-    reorderSetlistSongs(setlistId, reordered.map(i => i.song_id)).catch(() => {
+    const withSection = reordered.map((item, idx) =>
+      idx === newIndex ? { ...item, section: newSection } : item
+    )
+
+    setItems(withSection)
+
+    reorderSetlistSongs(
+      setlistId,
+      withSection.map(i => ({ songId: i.song_id, section: i.section ?? null }))
+    ).catch(() => {
       setItems(items)
       toast('Failed to save order', 'error')
     })
