@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Music2, ListMusic, LogOut, Menu, X } from 'lucide-react'
+import { Music2, ListMusic, Wallet, LogOut, Menu, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
@@ -36,6 +36,7 @@ interface SidebarProps {
 const navItems = [
   { href: '/songs', label: 'Songs', icon: Music2 },
   { href: '/setlists', label: 'Setlists', icon: ListMusic },
+  { href: '/finance', label: 'Finance', icon: Wallet },
 ]
 
 export function Sidebar({ user }: SidebarProps) {

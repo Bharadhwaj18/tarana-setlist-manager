@@ -150,6 +150,72 @@ export type Database = {
           }
         ]
       }
+      finance_shows: {
+        Row: {
+          id: string
+          title: string
+          show_date: string | null
+          venue: string | null
+          gross_income: number
+          split_at: string | null
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          show_date?: string | null
+          venue?: string | null
+          gross_income?: number
+          split_at?: string | null
+          created_by: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          show_date?: string | null
+          venue?: string | null
+          gross_income?: number
+          split_at?: string | null
+          created_by?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      finance_transactions: {
+        Row: {
+          id: string
+          member_id: string | null
+          amount: number
+          description: string
+          show_id: string | null
+          date: string
+          recorded_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          member_id?: string | null
+          amount: number
+          description: string
+          show_id?: string | null
+          date?: string
+          recorded_by: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          member_id?: string | null
+          amount?: number
+          description?: string
+          show_id?: string | null
+          date?: string
+          recorded_by?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: { [_ in never]: never }
     Functions: { [_ in never]: never }
