@@ -1,33 +1,51 @@
 'use client'
 
 import { useState, useTransition, useMemo } from 'react'
-import { Check, RotateCcw, ArrowRight } from 'lucide-react'
+import { Check, RotateCcw, ArrowRight, AlertTriangle } from 'lucide-react'
 import { splitShows } from '@/actions/finance'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toaster'
+import { ShowExpensePanel } from '@/components/finance/ShowExpensePanel'
 import { cn } from '@/lib/utils'
-import type { FinanceShow } from '@/types/finance'
+import type { FinanceShow, FinanceShowExpense } from '@/types/finance'
 
 interface Member { id: string; name: string }
-interface Props { shows: FinanceShow[]; members: Member[] }
+interface Props {
+  shows: FinanceShow[]
+  members: Member[]
+  initialExpenses: Record<string, FinanceShowExpense[]>
+}
+
+type ShortfallResolution = 'band_fund' | 'pending'
 
 function round2(n: number) { return Math.round(n * 100) / 100 }
-function fmt(n: number) { return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}` }
+function fmt(n: number) { return `₹${Math.abs(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}` }
 
-export function SplitWizard({ shows, members }: Props) {
+export function SplitWizard({ shows, members, initialExpenses }: Props) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(shows.map(s => s.id)))
   const [bandPct, setBandPct] = useState(20)
   const [overrides, setOverrides] = useState<Record<string, string>>({})
   const [included, setIncluded] = useState<Set<string>>(new Set(members.map(m => m.id)))
-  // Per-show collector: show_id → member_id
   const [collectedByShow, setCollectedByShow] = useState<Record<string, string>>(
     Object.fromEntries(shows.map(s => [s.id, members[0]?.id ?? '']))
   )
+  const [expensesByShow, setExpensesByShow] = useState<Record<string, FinanceShowExpense[]>>(initialExpenses)
+  const [shortfallResolutions, setShortfallResolutions] = useState<Record<string, ShortfallResolution>>({})
   const [isPending, startTransition] = useTransition()
   const toast = useToast()
 
   const selectedShows = shows.filter(s => selectedIds.has(s.id))
-  const total = useMemo(() => selectedShows.reduce((sum, s) => sum + s.gross_income, 0), [selectedShows])
+
+  const netForShow = (show: FinanceShow): number => {
+    const expenses = expensesByShow[show.id] ?? []
+    return show.gross_income - expenses.reduce((s, e) => s + e.amount, 0)
+  }
+
+  const total = useMemo(
+    () => selectedShows.reduce((sum, s) => sum + netForShow(s), 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedShows, expensesByShow]
+  )
 
   const bandAmount = round2(total * bandPct / 100)
   const memberPool = round2(total - bandAmount)
@@ -55,32 +73,54 @@ export function SplitWizard({ shows, members }: Props) {
     setOverrides({})
   }
   const handleBandPct = (v: number) => { setBandPct(v); setOverrides({}) }
+  const handleExpensesChange = (showId: string, expenses: FinanceShowExpense[]) => {
+    setExpensesByShow(prev => ({ ...prev, [showId]: expenses }))
+    setOverrides({})
+  }
 
-  // Per-show "who pays who" — grouped by collector
+  // Per-show cash settlements
   const showSettlements = useMemo(() => {
     if (total === 0) return []
     return selectedShows.map(show => {
+      const showNet = netForShow(show)
       const collectorId = collectedByShow[show.id] ?? members[0]?.id
       const collector = members.find(m => m.id === collectorId)
       if (!collector) return null
 
-      const ratio = show.gross_income / total
-      const payments: { to: string; amount: number; label: string }[] = []
+      const ratio = total > 0 ? showNet / total : 0
+      const payments: { to: string; toId: string; amount: number }[] = []
 
       for (const m of memberAmounts) {
         if (m.id === collectorId || m.excluded || m.amount <= 0) continue
         const share = round2(m.amount * ratio)
-        if (share > 0) payments.push({ to: m.name, amount: share, label: 'share' })
+        if (share > 0) payments.push({ to: m.name, toId: m.id, amount: share })
       }
 
-      // Band fund stays with the collector (no transaction created)
       const bandFromShow = round2(bandAmount * ratio)
       const ownShare = round2((memberAmounts.find(m => m.id === collectorId)?.amount ?? 0) * ratio)
       const keeps = round2(ownShare + bandFromShow)
 
-      return { show, collector, payments, keeps }
-    }).filter(Boolean) as { show: FinanceShow; collector: Member; payments: { to: string; amount: number; label: string }[]; keeps: number }[]
-  }, [selectedShows, collectedByShow, memberAmounts, bandAmount, total, members])
+      // Cash position: collector has gross_income minus expenses they personally paid
+      const collectorExpenses = (expensesByShow[show.id] ?? [])
+        .filter(e => e.paid_by === collectorId)
+        .reduce((s, e) => s + e.amount, 0)
+      const availableCash = show.gross_income - collectorExpenses
+      const totalToPayOut = payments.reduce((s, p) => s + p.amount, 0) + bandFromShow
+      const shortfall = round2(Math.max(0, totalToPayOut - availableCash))
+
+      return { show, showNet, collector, payments, keeps, availableCash, shortfall, bandFromShow }
+    }).filter(Boolean) as {
+      show: FinanceShow
+      showNet: number
+      collector: Member
+      payments: { to: string; toId: string; amount: number }[]
+      keeps: number
+      availableCash: number
+      shortfall: number
+      bandFromShow: number
+    }[]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedShows, collectedByShow, memberAmounts, bandAmount, total, expensesByShow, members])
 
   const showLabel = selectedIds.size === 1
     ? (shows.find(s => selectedIds.has(s.id))?.title ?? 'Show')
@@ -88,14 +128,30 @@ export function SplitWizard({ shows, members }: Props) {
 
   const handleSplit = () => {
     if (selectedIds.size === 0) return
-    // Band fund stays with collector — no transaction created for it
     const shares = memberAmounts.filter(m => !m.excluded && m.amount > 0).map(m => ({
       memberId: m.id,
       amount: m.amount,
       description: `Show split — ${showLabel}`,
     }))
+
+    // Build adjustments for shortfall resolutions
+    const adjustments: { fromMemberId: string | null; toMemberId: string | null; amount: number; description: string }[] = []
+    for (const s of showSettlements) {
+      if (s.shortfall <= 0) continue
+      const resolution = shortfallResolutions[s.show.id] ?? 'band_fund'
+      if (resolution === 'band_fund') {
+        adjustments.push({
+          fromMemberId: null,
+          toMemberId: s.collector.id,
+          amount: s.shortfall,
+          description: `Band fund cover shortfall — ${s.show.title}`,
+        })
+      }
+      // 'pending' = no transaction
+    }
+
     startTransition(async () => {
-      const result = await splitShows([...selectedIds], bandPct, shares)
+      const result = await splitShows([...selectedIds], bandPct, shares, adjustments.length ? adjustments : undefined)
       if (result && 'error' in result && result.error) toast(result.error, 'error')
     })
   }
@@ -105,15 +161,15 @@ export function SplitWizard({ shows, members }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* Show selection with per-show collector */}
+      {/* Show selection with expenses */}
       <section className="rounded-xl border border-brand-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-3 text-sm font-semibold text-gray-700">Select shows & who collected</h2>
+        <h2 className="mb-3 text-sm font-semibold text-gray-700">Select shows & expenses</h2>
         <div className="space-y-2">
           {shows.map(s => {
             const selected = selectedIds.has(s.id)
+            const showNet = netForShow(s)
             return (
-              <div key={s.id}
-                className={cn('rounded-lg border transition-colors', selected ? 'border-brand-400 bg-brand-50' : 'border-brand-200')}>
+              <div key={s.id} className={cn('rounded-lg border transition-colors', selected ? 'border-brand-400 bg-brand-50' : 'border-brand-200')}>
                 <div className="flex items-center gap-3 px-4 py-3">
                   <button type="button" onClick={() => toggleShow(s.id)}
                     className={cn('flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors',
@@ -127,33 +183,48 @@ export function SplitWizard({ shows, members }: Props) {
                       {s.venue ? ` · ${s.venue}` : ''}
                     </p>}
                   </div>
-                  <span className="text-sm font-bold text-gray-700">{fmt(s.gross_income)}</span>
-                </div>
-                {/* Per-show collector — only shown when selected */}
-                {selected && (
-                  <div className="flex items-center gap-2 border-t border-brand-100 px-4 py-2">
-                    <span className="text-xs text-gray-500">Collected by</span>
-                    <select
-                      value={collectedByShow[s.id] ?? members[0]?.id}
-                      onChange={e => setCollectedByShow(prev => ({ ...prev, [s.id]: e.target.value }))}
-                      className={selectCls}
-                      onClick={e => e.stopPropagation()}
-                    >
-                      {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                    </select>
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-gray-700">{fmt(s.gross_income)}</p>
+                    {showNet < s.gross_income && (
+                      <p className="text-xs text-brand-600">net {fmt(showNet)}</p>
+                    )}
                   </div>
+                </div>
+
+                {/* Show expenses panel */}
+                {selected && (
+                  <>
+                    <ShowExpensePanel
+                      showId={s.id}
+                      grossIncome={s.gross_income}
+                      initialExpenses={expensesByShow[s.id] ?? []}
+                      members={members}
+                      onExpensesChange={handleExpensesChange}
+                    />
+                    <div className="flex items-center gap-2 border-t border-brand-100 px-4 py-2">
+                      <span className="text-xs text-gray-500">Collected by</span>
+                      <select
+                        value={collectedByShow[s.id] ?? members[0]?.id}
+                        onChange={e => setCollectedByShow(prev => ({ ...prev, [s.id]: e.target.value }))}
+                        className={selectCls}
+                        onClick={e => e.stopPropagation()}
+                      >
+                        {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      </select>
+                    </div>
+                  </>
                 )}
               </div>
             )
           })}
         </div>
         <div className="mt-3 flex items-center justify-between rounded-lg bg-brand-50 px-4 py-2.5">
-          <span className="text-sm font-medium text-gray-600">Total</span>
+          <span className="text-sm font-medium text-gray-600">Total net</span>
           <span className="text-lg font-bold text-gray-900">{fmt(total)}</span>
         </div>
       </section>
 
-      {/* Band fund slider + holder */}
+      {/* Band fund slider */}
       <section className="rounded-xl border border-brand-200 bg-white p-5 shadow-sm">
         <h2 className="mb-4 text-sm font-semibold text-gray-700">Band fund cut</h2>
         <div className="mb-2 flex items-center justify-between text-sm">
@@ -227,23 +298,31 @@ export function SplitWizard({ shows, members }: Props) {
       </section>
 
       {/* Per-show cash settlements */}
-      {showSettlements.some(s => s.payments.length > 0) && (
+      {showSettlements.some(s => s.payments.length > 0 || s.shortfall > 0) && (
         <section className="rounded-xl border border-gray-200 bg-gray-50 p-5">
           <h2 className="mb-4 text-sm font-semibold text-gray-600">Cash settlements</h2>
-          <div className="space-y-4">
-            {showSettlements.map(({ show, collector, payments, keeps }) => (
+          <div className="space-y-5">
+            {showSettlements.map(({ show, showNet, collector, payments, keeps, availableCash, shortfall, bandFromShow }) => (
               <div key={show.id}>
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
-                  {show.title} · {fmt(show.gross_income)} collected by {collector.name}
+                  {show.title} · net {fmt(showNet)} · collected by {collector.name}
                 </p>
+
+                {/* Available cash vs what they need to distribute */}
+                <div className="mb-2 flex items-center justify-between rounded-lg bg-white px-4 py-2 shadow-sm text-sm">
+                  <span className="text-gray-500">{collector.name} available cash</span>
+                  <span className={cn('font-semibold', availableCash < (payments.reduce((s,p)=>s+p.amount,0) + bandFromShow) ? 'text-amber-600' : 'text-gray-700')}>
+                    {fmt(availableCash)}
+                  </span>
+                </div>
+
                 <div className="space-y-1.5">
                   {payments.map((p, i) => (
                     <div key={i} className="flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 shadow-sm">
                       <span className="text-xs text-gray-500">{collector.name}</span>
                       <ArrowRight className="h-3 w-3 shrink-0 text-gray-300" />
                       <span className="text-sm font-medium text-gray-700">{p.to}</span>
-                      <span className="ml-auto text-xs text-gray-400">{p.label}</span>
-                      <span className="text-sm font-bold text-gray-900">{fmt(p.amount)}</span>
+                      <span className="ml-auto text-sm font-bold text-gray-900">{fmt(p.amount)}</span>
                     </div>
                   ))}
                   {keeps > 0 && (
@@ -253,6 +332,52 @@ export function SplitWizard({ shows, members }: Props) {
                     </div>
                   )}
                 </div>
+
+                {/* Shortfall resolver */}
+                {shortfall > 0 && (
+                  <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                    <div className="mb-2 flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-amber-600" />
+                      <p className="text-sm font-semibold text-amber-800">
+                        {collector.name} is short {fmt(shortfall)} — how will this be covered?
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setShortfallResolutions(prev => ({ ...prev, [show.id]: 'band_fund' }))}
+                        className={cn(
+                          'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                          (shortfallResolutions[show.id] ?? 'band_fund') === 'band_fund'
+                            ? 'bg-amber-600 text-white'
+                            : 'bg-white text-amber-700 hover:bg-amber-100'
+                        )}
+                      >
+                        Band fund covers it
+                      </button>
+                      <button
+                        onClick={() => setShortfallResolutions(prev => ({ ...prev, [show.id]: 'pending' }))}
+                        className={cn(
+                          'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                          shortfallResolutions[show.id] === 'pending'
+                            ? 'bg-gray-600 text-white'
+                            : 'bg-white text-gray-600 hover:bg-gray-100'
+                        )}
+                      >
+                        Mark as pending
+                      </button>
+                    </div>
+                    {(shortfallResolutions[show.id] ?? 'band_fund') === 'band_fund' && (
+                      <p className="mt-1.5 text-xs text-amber-600">
+                        Band fund will lend {fmt(shortfall)} to {collector.name} — recorded as debit on band fund.
+                      </p>
+                    )}
+                    {shortfallResolutions[show.id] === 'pending' && (
+                      <p className="mt-1.5 text-xs text-gray-500">
+                        No transaction recorded. You can settle this manually later.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -265,7 +390,7 @@ export function SplitWizard({ shows, members }: Props) {
           <p className="text-sm font-semibold text-green-800">
             {fmt(allocatedTotal)} to members{bandAmount > 0 ? `, ${fmt(bandAmount)} band fund kept by collectors` : ''}
           </p>
-          <p className="text-xs text-green-600">from {selectedIds.size} show{selectedIds.size !== 1 ? 's' : ''}</p>
+          <p className="text-xs text-green-600">from {selectedIds.size} show{selectedIds.size !== 1 ? 's' : ''} · net {fmt(total)}</p>
         </div>
         <Button onClick={handleSplit} loading={isPending} disabled={selectedIds.size === 0 || total === 0}>
           Confirm & Split →

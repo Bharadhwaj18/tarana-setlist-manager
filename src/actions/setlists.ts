@@ -194,35 +194,6 @@ export async function quickCreateSongAndAdd(
   return { song: newSong }
 }
 
-export async function setSongSection(setlistId: string, songId: string, section: string | null) {
-  const supabase = await createClient()
-
-  const { error } = await supabase
-    .from('setlist_songs')
-    .update({ section })
-    .eq('setlist_id', setlistId)
-    .eq('song_id', songId)
-
-  if (error) throw new Error(error.message)
-  revalidatePath(`/setlists/${setlistId}`)
-}
-
-// Bulk-clears a section label off every song currently under it — for
-// fixing a section that was actually a mis-parsed song title from a bulk
-// import (a line without a leading number gets read as a section header).
-export async function clearSection(setlistId: string, section: string) {
-  const supabase = await createClient()
-
-  const { error } = await supabase
-    .from('setlist_songs')
-    .update({ section: null })
-    .eq('setlist_id', setlistId)
-    .eq('section', section)
-
-  if (error) throw new Error(error.message)
-  revalidatePath(`/setlists/${setlistId}`)
-}
-
 export async function reorderSetlistSongs(
   setlistId: string,
   orderedItems: { songId: string; section: string | null }[]
@@ -242,4 +213,92 @@ export async function reorderSetlistSongs(
 
   if (error) throw new Error(error.message)
   revalidatePath(`/setlists/${setlistId}`)
+}
+
+// Replaces the ENTIRE setlist's songs/order/sections to match the given
+// parsed text exactly — the "edit the setlist as bulk-import text" flow.
+// A song no longer mentioned is removed from the setlist (not just its
+// section); a title matching an existing song updates that song's stored
+// key if the line's key differs (by explicit choice — this is NOT the same
+// as bulkImportSongs, which leaves existing songs' keys untouched).
+export async function syncSetlistFromText(
+  setlistId: string,
+  parsedSongs: ParsedSong[],
+  preResolvedIds: Record<string, string> = {} // lowercase title -> existing song id chosen by the user
+): Promise<{ songCount: number; created: number; removed: number }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const { data: existingSongsRaw } = await supabase.from('songs').select('id, title, song_key')
+  const existingSongs = existingSongsRaw ?? []
+  const byTitle = new Map(existingSongs.map(s => [s.title.toLowerCase().trim(), s]))
+  const byId = new Map(existingSongs.map(s => [s.id, s]))
+
+  const { data: currentEntries } = await supabase
+    .from('setlist_songs')
+    .select('song_id')
+    .eq('setlist_id', setlistId)
+  const previousSongIds = new Set((currentEntries ?? []).map(e => e.song_id))
+
+  // A song can only appear once per setlist — keep the first occurrence of
+  // a repeated title, same convention as bulkImportSongs.
+  const seenTitles = new Set<string>()
+  const finalRows: { setlist_id: string; song_id: string; position: number; section: string }[] = []
+  let created = 0
+
+  for (const parsed of parsedSongs) {
+    const key = parsed.title.toLowerCase().trim()
+    if (seenTitles.has(key)) continue
+    seenTitles.add(key)
+
+    let songId = preResolvedIds[key] ?? byTitle.get(key)?.id
+
+    if (!songId) {
+      const { data: newSong, error } = await supabase
+        .from('songs')
+        .insert({ title: parsed.title, song_key: parsed.song_key ?? null, created_by: user.id })
+        .select('id')
+        .single()
+      if (error || !newSong) continue
+      songId = newSong.id
+      created++
+    } else if (parsed.song_key) {
+      const existing = byId.get(songId)
+      if (existing && existing.song_key !== parsed.song_key) {
+        await supabase.from('songs').update({ song_key: parsed.song_key }).eq('id', songId)
+      }
+    }
+
+    finalRows.push({
+      setlist_id: setlistId,
+      song_id: songId,
+      position: finalRows.length,
+      section: parsed.section,
+    })
+  }
+
+  const finalSongIds = new Set(finalRows.map(r => r.song_id))
+  const removedIds = [...previousSongIds].filter(sid => !finalSongIds.has(sid))
+
+  if (removedIds.length > 0) {
+    const { error } = await supabase
+      .from('setlist_songs')
+      .delete()
+      .eq('setlist_id', setlistId)
+      .in('song_id', removedIds)
+    if (error) throw new Error(error.message)
+  }
+
+  if (finalRows.length > 0) {
+    const { error } = await supabase
+      .from('setlist_songs')
+      .upsert(finalRows, { onConflict: 'setlist_id,song_id' })
+    if (error) throw new Error(error.message)
+  }
+
+  revalidatePath(`/setlists/${setlistId}`)
+  revalidatePath(`/setlists/${setlistId}/edit`)
+  revalidatePath('/songs')
+  return { songCount: finalRows.length, created, removed: removedIds.length }
 }

@@ -216,6 +216,42 @@ export type Database = {
         }
         Relationships: []
       }
+      finance_show_expenses: {
+        Row: {
+          id: string
+          show_id: string
+          description: string
+          amount: number
+          paid_by: string
+          category: string
+          date: string
+          recorded_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          show_id: string
+          description: string
+          amount: number
+          paid_by: string
+          category?: string
+          date?: string
+          recorded_by: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          show_id?: string
+          description?: string
+          amount?: number
+          paid_by?: string
+          category?: string
+          date?: string
+          recorded_by?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: { [_ in never]: never }
     Functions: { [_ in never]: never }

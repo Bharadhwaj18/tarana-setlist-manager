@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getCachedUser } from '@/lib/data'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { OfflineUserSync } from '@/components/OfflineUserSync'
 import type { ReactNode } from 'react'
@@ -10,7 +11,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   // getUser() calls Supabase's API to verify the token.
   // When offline it returns null + an error — fall back to getSession()
   // which reads the JWT from the cookie locally without any network call.
-  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  const { data: { user }, error: userError } = await getCachedUser()
 
   let effectiveUser = user
   if (!user && userError) {

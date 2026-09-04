@@ -1,8 +1,7 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { getCachedUser } from '@/lib/data'
 
 export default async function RootPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getCachedUser()
   redirect(user ? '/setlists' : '/login')
 }

@@ -1,8 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft, Pencil, Calendar, MapPin } from 'lucide-react'
-import { createClient } from '@/lib/supabase/server'
-import { getCachedSetlist, getCachedSetlistSongs, getCachedSongs, getCachedAllProfiles } from '@/lib/data'
+import { getCachedSetlist, getCachedSetlistSongs, getCachedSongs, getCachedAllProfiles, getCachedUser } from '@/lib/data'
 import { SetlistSongList } from '@/components/setlists/SetlistSongList'
 import { AddSongToSetlistModal } from '@/components/setlists/AddSongToSetlistModal'
 import { BulkImportModal } from '@/components/setlists/BulkImportModal'
@@ -20,13 +19,12 @@ interface Props {
 export default async function SetlistPage({ params }: Props) {
   const { id } = await params
 
-  const supabase = await createClient()
   const [setlist, setlistSongs, allSongs, profiles, { data: { user } }] = await Promise.all([
     getCachedSetlist(id),
     getCachedSetlistSongs(id),
     getCachedSongs(),
     getCachedAllProfiles(),
-    supabase.auth.getUser(),
+    getCachedUser(),
   ])
 
   if (!setlist) notFound()

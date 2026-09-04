@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseSetlistText } from './setlist-parser'
+import { parseSetlistText, serializeSetlistText } from './setlist-parser'
 
 describe('parseSetlistText', () => {
   it('parses a numbered song with a trailing key', () => {
@@ -44,5 +44,43 @@ describe('parseSetlistText', () => {
   it('defaults to "Main Set" when no section header precedes the songs', () => {
     const result = parseSetlistText('1. Song A E')
     expect(result[0].section).toBe('Main Set')
+  })
+})
+
+describe('serializeSetlistText', () => {
+  it('numbers songs within a section starting at 1', () => {
+    const text = serializeSetlistText([
+      { title: 'Song A', song_key: 'E', section: 'Main Set' },
+      { title: 'Song B', song_key: 'D', section: 'Main Set' },
+    ])
+    expect(text).toBe('Main Set\n1. Song A E\n2. Song B D')
+  })
+
+  it('resets numbering and blank-lines between sections', () => {
+    const text = serializeSetlistText([
+      { title: 'Song A', song_key: 'E', section: 'Main Set' },
+      { title: 'Song B', song_key: 'D', section: 'Encore' },
+    ])
+    expect(text).toBe('Main Set\n1. Song A E\n\nEncore\n1. Song B D')
+  })
+
+  it('omits the key suffix when a song has none', () => {
+    const text = serializeSetlistText([{ title: 'Song A', section: 'Main Set' }])
+    expect(text).toBe('Main Set\n1. Song A')
+  })
+
+  it('defaults a missing/null section to "Main Set", matching parseSetlistText\'s own default', () => {
+    const text = serializeSetlistText([{ title: 'Song A', section: null }])
+    expect(text).toBe('Main Set\n1. Song A')
+  })
+
+  it('round-trips through parseSetlistText unchanged', () => {
+    const original = [
+      { title: 'Manovega', song_key: 'E', section: 'Main Set' },
+      { title: 'Om Shivoham', song_key: 'C#', section: 'Main Set' },
+      { title: 'Nagumo', song_key: 'C', section: 'Encore' },
+    ]
+    const reparsed = parseSetlistText(serializeSetlistText(original))
+    expect(reparsed).toEqual(original)
   })
 })

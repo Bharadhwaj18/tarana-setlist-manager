@@ -1,10 +1,11 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getCachedUser } from '@/lib/data'
 import { SetupForm } from './SetupForm'
 
 export default async function SetupPage() {
   const supabase = await createClient()
-  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  const { data: { user }, error: userError } = await getCachedUser()
 
   let effectiveUser = user
   if (!user && userError) {

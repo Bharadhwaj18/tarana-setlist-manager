@@ -1,11 +1,12 @@
 import Link from 'next/link'
 import { TrendingUp, TrendingDown, ArrowRightLeft, Landmark } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
-import { getCachedAllProfiles } from '@/lib/data'
+import { getCachedAllProfiles, getCachedUser } from '@/lib/data'
 import { Button } from '@/components/ui/Button'
 import { AddTransactionModal } from '@/components/finance/AddTransactionModal'
 import { AddShowModal } from '@/components/finance/AddShowModal'
 import { DeleteTransactionButton } from '@/components/finance/DeleteTransactionButton'
+import { ExportModal } from '@/components/finance/ExportModal'
 import { cn } from '@/lib/utils'
 
 function fmt(n: number) {
@@ -18,9 +19,9 @@ function sign(n: number) {
 
 export default async function FinancePage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  const [profiles, { data: txns }, { data: shows }] = await Promise.all([
+  const [{ data: { user } }, profiles, { data: txns }, { data: shows }] = await Promise.all([
+    getCachedUser(),
     getCachedAllProfiles(),
     supabase.from('finance_transactions').select('*').order('created_at', { ascending: false }),
     supabase.from('finance_shows').select('*').order('show_date', { ascending: false }),
@@ -67,6 +68,10 @@ export default async function FinancePage() {
         <div className="flex flex-wrap gap-2">
           <AddShowModal />
           <AddTransactionModal members={memberOptions} />
+          <ExportModal members={profiles.map(p => ({ id: p.id, name: p.display_name ?? 'Member' }))} />
+          <Button variant="secondary" asChild>
+            <Link href="/finance/import">Import</Link>
+          </Button>
           {unsplitShows.length > 0 && (
             <Button asChild>
               <Link href="/finance/split">

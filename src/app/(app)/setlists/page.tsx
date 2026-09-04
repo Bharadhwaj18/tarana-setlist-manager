@@ -1,15 +1,12 @@
 import Link from 'next/link'
 import { Plus, ListMusic } from 'lucide-react'
-import { createClient } from '@/lib/supabase/server'
-import { getCachedSetlists, getCachedSetlistSongCounts, getCachedAllProfiles } from '@/lib/data'
+import { getCachedSetlists, getCachedSetlistSongCounts, getCachedAllProfiles, getCachedUser } from '@/lib/data'
 import { SetlistSearchList } from '@/components/setlists/SetlistSearchList'
 import { Button } from '@/components/ui/Button'
 
 export default async function SetlistsPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  const [setlists, counts, profiles] = await Promise.all([
+  const [{ data: { user } }, setlists, counts, profiles] = await Promise.all([
+    getCachedUser(),
     getCachedSetlists(),
     getCachedSetlistSongCounts(),
     getCachedAllProfiles(),

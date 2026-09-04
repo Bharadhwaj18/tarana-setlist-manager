@@ -2,8 +2,7 @@ import { notFound } from 'next/navigation'
 import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { ChevronLeft, Pencil, Clock, Hash, Music } from 'lucide-react'
-import { createClient } from '@/lib/supabase/server'
-import { getCachedSong, getCachedAllProfiles, getCachedSetlistSongs } from '@/lib/data'
+import { getCachedSong, getCachedAllProfiles, getCachedSetlistSongs, getCachedUser } from '@/lib/data'
 import { ChordViewer } from '@/components/songs/ChordViewer'
 import { ActiveSetlistSync } from '@/components/setlists/ActiveSetlistSync'
 import { Button } from '@/components/ui/Button'
@@ -31,11 +30,10 @@ export default async function SongPage({ params, searchParams }: Props) {
   const setlistId = explicitSetlistId ?? cookieSetlistId
   const canonicalFrom = setlistId ? `/setlists/${setlistId}` : null
 
-  const supabase = await createClient()
   const [song, profiles, { data: { user } }, setlistSongs] = await Promise.all([
     getCachedSong(id),
     getCachedAllProfiles(),
-    supabase.auth.getUser(),
+    getCachedUser(),
     setlistId ? getCachedSetlistSongs(setlistId) : Promise.resolve([]),
   ])
 

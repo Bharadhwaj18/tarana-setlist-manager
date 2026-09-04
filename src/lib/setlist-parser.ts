@@ -55,3 +55,37 @@ export function parseSetlistText(text: string): ParsedSong[] {
 
   return songs
 }
+
+export interface SetlistTextSong {
+  title: string
+  song_key?: string | null
+  section?: string | null
+}
+
+// Inverse of parseSetlistText — regenerates the same bulk-import-style text
+// from a setlist's current songs, so it can be shown back for editing (e.g.
+// to fix a section that was actually a mis-parsed song title). A song with
+// no section is written under the same "Main Set" default parseSetlistText
+// itself falls back to, so re-parsing the unedited text reproduces the
+// exact same structure — this is a deliberate, lossy-by-design choice, not
+// an oversight (there's no way to write "no section" in this format).
+export function serializeSetlistText(songs: SetlistTextSong[]): string {
+  const lines: string[] = []
+  let lastSection: string | null = null
+  let n = 0
+
+  for (const song of songs) {
+    const section = song.section?.trim() || DEFAULT_SECTION
+    if (section !== lastSection) {
+      if (lines.length > 0) lines.push('')
+      lines.push(section)
+      lastSection = section
+      n = 0
+    }
+    n++
+    const keySuffix = song.song_key ? ` ${song.song_key}` : ''
+    lines.push(`${n}. ${song.title}${keySuffix}`)
+  }
+
+  return lines.join('\n')
+}

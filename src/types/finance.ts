@@ -2,6 +2,7 @@ import type { Database } from './database'
 
 export type FinanceShow = Database['public']['Tables']['finance_shows']['Row']
 export type FinanceTransaction = Database['public']['Tables']['finance_transactions']['Row']
+export type FinanceShowExpense = Database['public']['Tables']['finance_show_expenses']['Row']
 
 export interface MemberBalance {
   member_id: string | null  // null = band fund
