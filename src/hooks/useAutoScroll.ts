@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, type RefObject } from 'react'
+import { useState, useEffect, useRef, useCallback, type RefObject } from 'react'
 
 export function useAutoScroll(scrollRef: RefObject<HTMLElement | null>) {
   const [isScrolling, setIsScrolling] = useState(false)
@@ -34,11 +34,13 @@ export function useAutoScroll(scrollRef: RefObject<HTMLElement | null>) {
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
   }, [isScrolling, speed, scrollRef])
 
-  const resetScroll = () => {
+  // Stable identity (unlike a plain inline function) so callers can safely
+  // put it in their own effect/useCallback dependency arrays.
+  const resetScroll = useCallback(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0
     setIsScrolling(false)
     lastTimeRef.current = null
-  }
+  }, [scrollRef])
 
   return { isScrolling, setIsScrolling, speed, setSpeed, resetScroll }
 }

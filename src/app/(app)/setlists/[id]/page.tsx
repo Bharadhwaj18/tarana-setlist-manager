@@ -7,6 +7,7 @@ import { SetlistSongList } from '@/components/setlists/SetlistSongList'
 import { AddSongToSetlistModal } from '@/components/setlists/AddSongToSetlistModal'
 import { BulkImportModal } from '@/components/setlists/BulkImportModal'
 import { DeleteSetlistButton } from '@/components/setlists/DeleteSetlistButton'
+import { ActiveSetlistSync } from '@/components/setlists/ActiveSetlistSync'
 import { SetlistPdfExport } from '@/components/pdf/SetlistPdfExport'
 import { SaveOfflineButton } from '@/components/setlists/SaveOfflineButton'
 import { Button } from '@/components/ui/Button'
@@ -45,6 +46,8 @@ export default async function SetlistPage({ params }: Props) {
 
   return (
     <div className="max-w-2xl">
+      <ActiveSetlistSync setlistId={id} />
+
       <Link href="/setlists" className="mb-6 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
         <ChevronLeft className="h-4 w-4" /> Setlists
       </Link>

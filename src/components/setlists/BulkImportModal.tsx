@@ -42,6 +42,12 @@ export function BulkImportModal({ setlistId, existingSongs, currentSongTitles }:
     () => new Set(currentSongTitles.map(t => t.toLowerCase().trim())),
     [currentSongTitles]
   )
+  // Every song already in this setlist is by definition also in the
+  // library, so this can be derived from existingSongs without a new prop.
+  const currentSongsInLibrary = useMemo(
+    () => existingSongs.filter(s => currentTitleSet.has(s.title.toLowerCase().trim())),
+    [existingSongs, currentTitleSet]
+  )
 
   const parsed: ParsedSong[] = useMemo(
     () => (text.trim() ? parseSetlistText(text) : []),
@@ -148,6 +154,25 @@ export function BulkImportModal({ setlistId, existingSongs, currentSongTitles }:
         {/* ── Step 1: Input + Preview ─────────────────────── */}
         {step === 'input' && (
           <div className="space-y-4">
+            {currentSongsInLibrary.length > 0 && (
+              <details className="rounded-lg border border-brand-200 bg-brand-50">
+                <summary className="cursor-pointer select-none px-4 py-2.5 text-xs font-medium text-brand-700">
+                  Already in this setlist ({currentSongsInLibrary.length})
+                </summary>
+                <div className="flex flex-wrap gap-1.5 border-t border-brand-200 p-3">
+                  {currentSongsInLibrary.map(s => (
+                    <span
+                      key={s.id}
+                      className="flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-medium text-gray-700 ring-1 ring-brand-200"
+                    >
+                      {s.title}
+                      {s.song_key && <span className="text-brand-500">{s.song_key}</span>}
+                    </span>
+                  ))}
+                </div>
+              </details>
+            )}
+
             <textarea
               className="w-full rounded-md border border-brand-200 bg-white px-3 py-2.5 font-mono text-sm leading-relaxed placeholder-gray-400 focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
               rows={10}

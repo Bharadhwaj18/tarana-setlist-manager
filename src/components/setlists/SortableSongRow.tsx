@@ -2,20 +2,27 @@
 
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Trash2 } from 'lucide-react'
+import { GripVertical, Trash2, Tag } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import type { Song } from '@/types'
+
+const NO_SECTION = ''
 
 interface SortableSongRowProps {
   id: string
   song: Song
   index: number
   setlistId: string
+  section: string | null
+  availableSections: string[]
   onRemove: () => void
+  onSectionChange: (section: string | null) => void
 }
 
-export function SortableSongRow({ id, song, index, setlistId, onRemove }: SortableSongRowProps) {
+export function SortableSongRow({
+  id, song, index, setlistId, section, availableSections, onRemove, onSectionChange,
+}: SortableSongRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
 
   const style = {
@@ -23,12 +30,18 @@ export function SortableSongRow({ id, song, index, setlistId, onRemove }: Sortab
     transition,
   }
 
+  // Always offer the song's own current section even if it's since become
+  // orphaned (e.g. every other song under it was already cleared).
+  const sectionOptions = section && !availableSections.includes(section)
+    ? [...availableSections, section]
+    : availableSections
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={cn(
-        'flex items-center gap-3 rounded-lg border border-brand-200 bg-white px-4 py-3 shadow-sm',
+        'flex flex-wrap items-center gap-3 rounded-lg border border-brand-200 bg-white px-4 py-3 shadow-sm',
         isDragging && 'opacity-50 shadow-lg ring-2 ring-brand-400'
       )}
     >
@@ -57,6 +70,22 @@ export function SortableSongRow({ id, song, index, setlistId, onRemove }: Sortab
           </span>
         )}
       </Link>
+
+      {/* Section — reassign or clear a wrong/mis-parsed section right here */}
+      <div className="flex shrink-0 items-center gap-1" title="Section">
+        <Tag className="h-3.5 w-3.5 text-brand-300" />
+        <select
+          value={section ?? NO_SECTION}
+          onChange={e => onSectionChange(e.target.value === NO_SECTION ? null : e.target.value)}
+          className="rounded-md border border-brand-200 bg-white py-1 pl-1.5 pr-6 text-xs text-gray-600 focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
+          aria-label={`Section for ${song.title}`}
+        >
+          <option value={NO_SECTION}>No section</option>
+          {sectionOptions.map(sec => (
+            <option key={sec} value={sec}>{sec}</option>
+          ))}
+        </select>
+      </div>
 
       {/* Actions */}
       <button

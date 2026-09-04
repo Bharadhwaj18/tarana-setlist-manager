@@ -1,12 +1,15 @@
 import { notFound } from 'next/navigation'
+import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { ChevronLeft, Pencil, Clock, Hash, Music } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedSong, getCachedAllProfiles, getCachedSetlistSongs } from '@/lib/data'
 import { ChordViewer } from '@/components/songs/ChordViewer'
+import { ActiveSetlistSync } from '@/components/setlists/ActiveSetlistSync'
 import { Button } from '@/components/ui/Button'
 import { DeleteSongButton } from '@/components/songs/DeleteSongButton'
 import { SongPdfExport } from '@/components/pdf/SongPdfExport'
+import { ACTIVE_SETLIST_COOKIE } from '@/lib/setlist-context'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -17,7 +20,16 @@ export default async function SongPage({ params, searchParams }: Props) {
   const { id } = await params
   const { from } = await searchParams
 
-  const setlistId = from?.match(/^\/setlists\/([^/]+)$/)?.[1] ?? null
+  // `from` in the URL is the explicit, authoritative source. When it's
+  // missing — browser back/forward, a bookmarked/shared link, or any link
+  // that simply forgot to carry it — fall back to the last setlist we know
+  // was active, so context isn't lost just because one hop dropped it.
+  const explicitSetlistId = from?.match(/^\/setlists\/([^/]+)$/)?.[1] ?? null
+  const cookieSetlistId = explicitSetlistId
+    ? null
+    : (await cookies()).get(ACTIVE_SETLIST_COOKIE)?.value ?? null
+  const setlistId = explicitSetlistId ?? cookieSetlistId
+  const canonicalFrom = setlistId ? `/setlists/${setlistId}` : null
 
   const supabase = await createClient()
   const [song, profiles, { data: { user } }, setlistSongs] = await Promise.all([
@@ -34,8 +46,10 @@ export default async function SongPage({ params, searchParams }: Props) {
 
   return (
     <div className="max-w-3xl">
-      <Link href={from ?? '/songs'} className="mb-6 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
-        <ChevronLeft className="h-4 w-4" /> {from ? 'Back to setlist' : 'Songs'}
+      <ActiveSetlistSync setlistId={setlistId} />
+
+      <Link href={canonicalFrom ?? '/songs'} className="mb-6 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
+        <ChevronLeft className="h-4 w-4" /> {canonicalFrom ? 'Back to setlist' : 'Songs'}
       </Link>
 
       {/* Header */}
@@ -64,7 +78,7 @@ export default async function SongPage({ params, searchParams }: Props) {
         <div className="flex shrink-0 items-center gap-2">
           <SongPdfExport song={song} />
           <Button variant="secondary" size="sm" asChild>
-            <Link href={from ? `/songs/${id}/edit?from=${encodeURIComponent(from)}` : `/songs/${id}/edit`}>
+            <Link href={canonicalFrom ? `/songs/${id}/edit?from=${encodeURIComponent(canonicalFrom)}` : `/songs/${id}/edit`}>
               <Pencil className="h-4 w-4" /> Edit
             </Link>
           </Button>
@@ -88,8 +102,11 @@ export default async function SongPage({ params, searchParams }: Props) {
         </div>
       )}
 
-      {/* Chord chart */}
+      {/* Chord chart — keyed by song id so navigating between songs (e.g. via
+          setlist prev/next, which reuse this same route) remounts with fresh
+          state instead of needing an effect to manually reset it. */}
       <ChordViewer
+        key={id}
         chordChart={song.chord_chart ?? ''}
         songKey={song.song_key}
         songId={id}

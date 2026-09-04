@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { Music2, ListMusic, Wallet, LogOut, Menu, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
+import { ACTIVE_SETLIST_COOKIE } from '@/lib/setlist-context'
 import { useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 
@@ -50,13 +51,27 @@ export function Sidebar({ user }: SidebarProps) {
     router.push('/login')
   }
 
+  // Explicitly leaving to browse the song library — clears which setlist is
+  // "active" so a song opened from here doesn't keep inheriting stale
+  // setlist context. Any other nav item leaves it alone; opening a
+  // different setlist's song naturally overwrites it anyway.
+  const handleNavClick = (href: string) => {
+    setMobileOpen(false)
+    if (href === '/songs') {
+      // Plain DOM/browser API write from an event handler — not a render or
+      // effect — which is exactly where React's docs say this belongs.
+      // eslint-disable-next-line react-hooks/immutability
+      document.cookie = `${ACTIVE_SETLIST_COOKIE}=; path=/; max-age=0`
+    }
+  }
+
   const nav = (
     <nav className="flex flex-1 flex-col gap-1 py-4">
       {navItems.map(({ href, label, icon: Icon }) => (
         <Link
           key={href}
           href={href}
-          onClick={() => setMobileOpen(false)}
+          onClick={() => handleNavClick(href)}
           className={cn(
             'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
             pathname.startsWith(href)

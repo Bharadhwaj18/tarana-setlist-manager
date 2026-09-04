@@ -31,7 +31,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   if (!profileError && !profile?.display_name?.trim()) redirect('/setup')
 
   return (
-    <div className="flex h-full min-h-screen">
+    <div className="flex h-screen">
       <OfflineUserSync email={effectiveUser.email ?? ''} displayName={profile?.display_name ?? ''} />
       <Sidebar user={effectiveUser} />
       <main className="flex-1 overflow-y-auto">

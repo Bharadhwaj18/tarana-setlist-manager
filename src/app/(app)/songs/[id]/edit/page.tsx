@@ -1,9 +1,11 @@
 import { notFound } from 'next/navigation'
+import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { SongForm } from '@/components/songs/SongForm'
 import { updateSong } from '@/actions/songs'
+import { ACTIVE_SETLIST_COOKIE } from '@/lib/setlist-context'
 import type { SongFormData } from '@/lib/validators'
 
 interface Props {
@@ -19,14 +21,27 @@ export default async function EditSongPage({ params, searchParams }: Props) {
 
   if (!song) notFound()
 
+  // Same fallback as the song view page — an explicit `from` wins, otherwise
+  // fall back to the last active setlist so editing a song doesn't itself
+  // become a way to lose setlist context.
+  const explicitSetlistId = from?.match(/^\/setlists\/([^/]+)$/)?.[1] ?? null
+  const cookieSetlistId = explicitSetlistId
+    ? null
+    : (await cookies()).get(ACTIVE_SETLIST_COOKIE)?.value ?? null
+  const canonicalFrom = explicitSetlistId
+    ? from!
+    : cookieSetlistId
+      ? `/setlists/${cookieSetlistId}`
+      : null
+
   const handleUpdate = async (data: SongFormData) => {
     'use server'
-    const backTo = from ? `/songs/${id}?from=${encodeURIComponent(from)}` : `/songs/${id}`
+    const backTo = canonicalFrom ? `/songs/${id}?from=${encodeURIComponent(canonicalFrom)}` : `/songs/${id}`
     await updateSong(id, data, backTo)
   }
 
-  const backHref = from
-    ? `/songs/${id}?from=${encodeURIComponent(from)}`
+  const backHref = canonicalFrom
+    ? `/songs/${id}?from=${encodeURIComponent(canonicalFrom)}`
     : `/songs/${id}`
 
   return (

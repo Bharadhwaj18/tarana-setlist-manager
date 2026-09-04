@@ -194,6 +194,35 @@ export async function quickCreateSongAndAdd(
   return { song: newSong }
 }
 
+export async function setSongSection(setlistId: string, songId: string, section: string | null) {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('setlist_songs')
+    .update({ section })
+    .eq('setlist_id', setlistId)
+    .eq('song_id', songId)
+
+  if (error) throw new Error(error.message)
+  revalidatePath(`/setlists/${setlistId}`)
+}
+
+// Bulk-clears a section label off every song currently under it — for
+// fixing a section that was actually a mis-parsed song title from a bulk
+// import (a line without a leading number gets read as a section header).
+export async function clearSection(setlistId: string, section: string) {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('setlist_songs')
+    .update({ section: null })
+    .eq('setlist_id', setlistId)
+    .eq('section', section)
+
+  if (error) throw new Error(error.message)
+  revalidatePath(`/setlists/${setlistId}`)
+}
+
 export async function reorderSetlistSongs(
   setlistId: string,
   orderedItems: { songId: string; section: string | null }[]

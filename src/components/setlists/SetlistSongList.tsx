@@ -16,9 +16,9 @@ import {
   verticalListSortingStrategy,
   arrayMove,
 } from '@dnd-kit/sortable'
-import { Tag } from 'lucide-react'
+import { Tag, X } from 'lucide-react'
 import { SortableSongRow } from './SortableSongRow'
-import { reorderSetlistSongs, removeSongFromSetlist } from '@/actions/setlists'
+import { reorderSetlistSongs, removeSongFromSetlist, setSongSection, clearSection } from '@/actions/setlists'
 import { useToast } from '@/components/ui/Toaster'
 import type { SetlistSongWithSong } from '@/types'
 
@@ -75,6 +75,32 @@ export function SetlistSongList({ setlistId, initialItems }: SetlistSongListProp
     }
   }
 
+  // Reassign or clear one song's section — e.g. fixing a song that ended up
+  // tagged with a section that was actually a mis-parsed title from a
+  // bulk-imported line missing its leading number.
+  const handleSectionChange = async (songId: string, section: string | null) => {
+    const prev = items
+    setItems(cur => cur.map(i => i.song_id === songId ? { ...i, section } : i))
+    try {
+      await setSongSection(setlistId, songId, section)
+    } catch {
+      setItems(prev)
+      toast('Failed to update section', 'error')
+    }
+  }
+
+  // Bulk-clear a whole bogus section label off every song under it at once.
+  const handleClearSection = async (section: string) => {
+    const prev = items
+    setItems(cur => cur.map(i => i.section === section ? { ...i, section: null } : i))
+    try {
+      await clearSection(setlistId, section)
+    } catch {
+      setItems(prev)
+      toast('Failed to clear section', 'error')
+    }
+  }
+
   if (!items.length) {
     return (
       <div className="rounded-lg border-2 border-dashed border-gray-200 py-12 text-center text-sm text-gray-400">
@@ -82,6 +108,12 @@ export function SetlistSongList({ setlistId, initialItems }: SetlistSongListProp
       </div>
     )
   }
+
+  // Every distinct section currently in use — offered as options on each
+  // row's section picker, not just neighbors of the same contiguous block.
+  const availableSections = [...new Set(
+    items.map(i => i.section).filter((s): s is string => !!s)
+  )]
 
   // Build a flat render list that inserts section headers between section changes
   const renderItems: Array<{ type: 'header'; label: string } | { type: 'song'; item: SetlistSongWithSong; index: number }> = []
@@ -115,6 +147,13 @@ export function SetlistSongList({ setlistId, initialItems }: SetlistSongListProp
                     {entry.label}
                   </span>
                   <div className="h-px flex-1 bg-brand-200" />
+                  <button
+                    onClick={() => handleClearSection(entry.label)}
+                    className="shrink-0 rounded p-0.5 text-brand-300 hover:bg-brand-100 hover:text-brand-600"
+                    title={`Clear "${entry.label}" section from all its songs (e.g. if this was actually a song title, not a section)`}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
                 </div>
               )
             }
@@ -125,7 +164,10 @@ export function SetlistSongList({ setlistId, initialItems }: SetlistSongListProp
                 song={entry.item.song}
                 index={entry.index}
                 setlistId={setlistId}
+                section={entry.item.section ?? null}
+                availableSections={availableSections}
                 onRemove={() => handleRemove(entry.item.song_id)}
+                onSectionChange={section => handleSectionChange(entry.item.song_id, section)}
               />
             )
           })}
