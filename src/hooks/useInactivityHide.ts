@@ -13,9 +13,11 @@ export function useInactivityHide(timeoutMs = 4000) {
   }, [timeoutMs])
 
   useEffect(() => {
-    showControls()
+    // controlsVisible already starts true — just arm the hide timer,
+    // no need to re-set state the initial render already has.
+    timerRef.current = setTimeout(() => setControlsVisible(false), timeoutMs)
     return () => { if (timerRef.current) clearTimeout(timerRef.current) }
-  }, [showControls])
+  }, [timeoutMs])
 
   return { controlsVisible, showControls }
 }

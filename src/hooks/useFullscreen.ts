@@ -2,6 +2,11 @@
 
 import { useState, useEffect, type RefObject } from 'react'
 
+// Safari (desktop & iOS) still only exposes the vendor-prefixed method.
+interface WebkitFullscreenElement extends HTMLElement {
+  webkitRequestFullscreen?: () => Promise<void>
+}
+
 export function useFullscreen(ref: RefObject<HTMLElement | null>) {
   const [isFullscreen, setIsFullscreen] = useState(false)
 
@@ -12,11 +17,11 @@ export function useFullscreen(ref: RefObject<HTMLElement | null>) {
   }, [])
 
   const enter = async () => {
-    const el = ref.current
+    const el = ref.current as WebkitFullscreenElement | null
     if (!el) return
     try {
       if (el.requestFullscreen) await el.requestFullscreen()
-      else if ((el as any).webkitRequestFullscreen) await (el as any).webkitRequestFullscreen()
+      else if (el.webkitRequestFullscreen) await el.webkitRequestFullscreen()
     } catch {}
   }
 

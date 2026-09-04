@@ -179,7 +179,7 @@ export function AddSongToSetlistModal({ setlistId, allSongs, currentSongIds, ava
               >
                 <PlusCircle className="h-4 w-4 shrink-0" />
                 <span>
-                  {creating ? 'Creating…' : <>Create <span className="font-semibold">"{q}"</span> and add to setlist</>}
+                  {creating ? 'Creating…' : <>Create <span className="font-semibold">&quot;{q}&quot;</span> and add to setlist</>}
                 </span>
               </button>
             </div>

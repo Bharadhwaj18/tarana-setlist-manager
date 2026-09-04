@@ -25,7 +25,7 @@ export function parseSetlistText(text: string): ParsedSong[] {
     const itemMatch = line.match(NUMBERED_ITEM_RE)
     if (itemMatch) {
       // It's a song entry
-      let rawTitle = itemMatch[1].trim()
+      const rawTitle = itemMatch[1].trim()
 
       // Strip trailing punctuation before key detection
       const stripped = rawTitle.replace(/[!?]+$/, '').trim()

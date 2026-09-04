@@ -10,7 +10,7 @@ import { PerformanceControls } from './PerformanceControls'
 import { formatSong } from '@/lib/chords/formatter'
 import { parseSong } from '@/lib/chords/parser'
 import { transposeSong, transposeKey } from '@/lib/chords/transposer'
-import { cn } from '@/lib/utils'
+import { getPerfChordSheetCss } from '@/lib/chords/theme'
 import type { Song as ChordsheetSong } from 'chordsheetjs'
 
 export interface SetlistNavSong {
@@ -34,37 +34,9 @@ interface PerformanceModeProps {
 
 const PERF_CSS_ID = 'tarana-perf-css'
 
-function getPerfCss(fontSize: number) {
-  return `
-    .perf-sheet .chord-sheet {
-      font-family: 'Courier New', monospace;
-      font-size: ${fontSize}px;
-      line-height: 2.2;
-      color: #e5e7eb;
-    }
-    .perf-sheet .chord {
-      color: #fbbf24;
-      font-weight: 700;
-      font-size: ${Math.round(fontSize * 0.88)}px;
-    }
-    .perf-sheet .paragraph { margin-bottom: 2.5rem; }
-    .perf-sheet .row { display: flex; flex-wrap: wrap; }
-    .perf-sheet .column { display: flex; flex-direction: column; margin-right: 0.3rem; }
-    .perf-sheet .section-label {
-      color: #6ee7b7;
-      font-size: 0.75rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      margin-bottom: 0.5rem;
-    }
-    .perf-sheet .comment { color: #4b5563; font-style: italic; }
-  `
-}
-
 export function PerformanceMode({
   song: initialSong, songKey: initialKey, songId, songTitle, bpm: initialBpm,
-  setlistSongs, setlistId, onClose,
+  setlistSongs, onClose,
 }: PerformanceModeProps) {
   const startIdx = setlistSongs?.findIndex(s => s.id === songId) ?? -1
   const [currentIdx, setCurrentIdx] = useState(startIdx)
@@ -88,11 +60,15 @@ export function PerformanceMode({
   const { controlsVisible, showControls } = useInactivityHide(5000)
 
   useEffect(() => {
+    // createPortal needs document.body, which doesn't exist during SSR —
+    // this is the standard client-mount-detection idiom, gating the portal
+    // render below (`if (!mounted) return null`) until after mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true)
     enter()
-    let wakeLock: any = null
+    let wakeLock: WakeLockSentinel | null = null
     if ('wakeLock' in navigator) {
-      (navigator as any).wakeLock.request('screen').then((wl: any) => { wakeLock = wl }).catch(() => {})
+      navigator.wakeLock.request('screen').then(wl => { wakeLock = wl }).catch(() => {})
     }
     return () => { wakeLock?.release().catch(() => {}) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -101,7 +77,7 @@ export function PerformanceMode({
   useEffect(() => {
     let el = document.getElementById(PERF_CSS_ID)
     if (!el) { el = document.createElement('style'); el.id = PERF_CSS_ID; document.head.appendChild(el) }
-    el.textContent = getPerfCss(fontSize)
+    el.textContent = getPerfChordSheetCss(fontSize)
   }, [fontSize])
 
   useEffect(() => { return () => { document.getElementById(PERF_CSS_ID)?.remove() } }, [])
@@ -139,7 +115,7 @@ export function PerformanceMode({
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement) return
       switch (e.key) {
-        case ' ': e.preventDefault(); isScrolling ? setIsScrolling(false) : setIsScrolling(true); break
+        case ' ': e.preventDefault(); setIsScrolling(!isScrolling); break
         case 'ArrowRight': case 'ArrowDown': e.preventDefault(); handleNavigate(currentIdx + 1); break
         case 'ArrowLeft': case 'ArrowUp': e.preventDefault(); handleNavigate(currentIdx - 1); break
         case 'Escape': handleClose(); break

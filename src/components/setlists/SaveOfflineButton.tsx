@@ -137,6 +137,11 @@ export function SaveOfflineButton({ setlistId, setlistTitle, showDate, venue, it
   const toast = useToast()
 
   useEffect(() => {
+    // isSetlistSavedOffline reads localStorage — a browser-only external
+    // system that must be checked after mount, not during the initial
+    // (server) render. This is the sanctioned "synchronize with an
+    // external system" use of an effect, not derived-state-from-props.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSaved(isSetlistSavedOffline(setlistId))
   }, [setlistId])
 

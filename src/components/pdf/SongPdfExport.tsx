@@ -5,6 +5,7 @@ import { FileDown } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { parseSong } from '@/lib/chords/parser'
 import { formatSong, getCss } from '@/lib/chords/formatter'
+import { getPrintChordSheetCss } from '@/lib/chords/theme'
 import { useToast } from '@/components/ui/Toaster'
 import type { Song } from '@/types'
 
@@ -41,12 +42,7 @@ function buildSongPrintHtml(song: Song): string {
     .meta { font-family: sans-serif; font-size: 12px; color: #888; margin-bottom: 4px; }
     .notes { font-family: sans-serif; font-size: 12px; color: #555; font-style: italic; margin-bottom: 16px; border-left: 3px solid #d4a373; padding-left: 8px; }
     hr { border: none; border-top: 1px solid #ddd; margin: 12px 0 16px; }
-    .chord { color: #c08d62; font-weight: 700; }
-    .paragraph { margin-bottom: 1.25rem; }
-    .row { display: flex; flex-wrap: wrap; }
-    .column { display: flex; flex-direction: column; margin-right: 0.2rem; }
-    .comment { color: #6b7280; font-style: italic; margin-bottom: 0.5rem; }
-    .section-label { font-weight: 600; color: #374151; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
+    ${getPrintChordSheetCss()}
   </style>
 </head>
 <body>

@@ -253,7 +253,7 @@ export function BulkImportModal({ setlistId, existingSongs, currentSongTitles }:
                   <div key={parsedTitle} className="rounded-lg border border-brand-200 bg-brand-50 p-3">
                     {/* Song from paste */}
                     <div className="mb-2 flex items-center gap-2">
-                      <span className="text-sm font-semibold text-gray-900">"{parsedTitle}"</span>
+                      <span className="text-sm font-semibold text-gray-900">&quot;{parsedTitle}&quot;</span>
                       {parsedKey && (
                         <span className="rounded bg-brand-100 px-1.5 py-0.5 text-xs font-bold text-brand-700">{parsedKey}</span>
                       )}
@@ -325,7 +325,7 @@ export function BulkImportModal({ setlistId, existingSongs, currentSongTitles }:
                         )}
 
                         <p className="text-xs text-gray-400 px-1">
-                          Leave blank to create <span className="font-medium text-gray-600">"{parsedTitle}"</span> as a new song
+                          Leave blank to create <span className="font-medium text-gray-600">&quot;{parsedTitle}&quot;</span> as a new song
                         </p>
                       </>
                     )}

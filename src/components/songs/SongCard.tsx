@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Music2, Clock, Hash } from 'lucide-react'
+import { Clock, Hash } from 'lucide-react'
 import type { Song } from '@/types'
 
 interface SongCardProps {
