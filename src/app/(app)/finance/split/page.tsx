@@ -4,16 +4,16 @@ import { ChevronLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedAllProfiles, getCachedUser } from '@/lib/data'
 import { SplitWizard } from '@/components/finance/SplitWizard'
-import type { FinanceShowExpense } from '@/types/finance'
+import type { FinanceTransaction } from '@/types/finance'
 
 export default async function SplitPage() {
   const supabase = await createClient()
 
-  const [{ data: { user } }, profiles, { data: shows }, { data: expenses }] = await Promise.all([
+  const [{ data: { user } }, profiles, { data: shows }, { data: allTxns }] = await Promise.all([
     getCachedUser(),
     getCachedAllProfiles(),
     supabase.from('finance_shows').select('*').is('split_at', null).order('show_date', { ascending: false }),
-    supabase.from('finance_show_expenses').select('*'),
+    supabase.from('finance_transactions').select('*'),
   ])
 
   if (!shows?.length) notFound()
@@ -23,19 +23,36 @@ export default async function SplitPage() {
     name: p.id === user?.id ? 'You' : (p.display_name ?? 'Member'),
   }))
 
-  const expensesByShow: Record<string, FinanceShowExpense[]> = {}
-  for (const e of expenses ?? []) {
-    if (!expensesByShow[e.show_id]) expensesByShow[e.show_id] = []
-    expensesByShow[e.show_id].push(e)
+  const showIds = new Set(shows.map(s => s.id))
+  const txnsByShow: Record<string, FinanceTransaction[]> = {}
+  for (const t of allTxns ?? []) {
+    if (!t.show_id || !showIds.has(t.show_id)) continue
+    if (!txnsByShow[t.show_id]) txnsByShow[t.show_id] = []
+    txnsByShow[t.show_id].push(t)
+  }
+
+  // Each member's current overall balance — the "standing balance" the
+  // reimbursement floor checks against. Transactions tagged to shows in
+  // *this* unsplit batch get backed out client-side per show, since those
+  // haven't been settled yet and shouldn't count as pre-existing balance.
+  const balances: Record<string, number> = {}
+  for (const t of allTxns ?? []) {
+    if (!t.member_id) continue
+    balances[t.member_id] = (balances[t.member_id] ?? 0) + t.amount
   }
 
   return (
-    <div className="max-w-xl">
+    <div className="max-w-2xl">
       <Link href="/finance" className="mb-6 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
         <ChevronLeft className="h-4 w-4" /> Finance
       </Link>
       <h1 className="mb-6 text-2xl font-bold text-gray-900">Split Show Money</h1>
-      <SplitWizard shows={shows} members={members} initialExpenses={expensesByShow} />
+      <SplitWizard
+        shows={shows}
+        members={members}
+        txnsByShow={txnsByShow}
+        memberBalances={balances}
+      />
     </div>
   )
 }

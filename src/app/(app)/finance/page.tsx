@@ -1,12 +1,11 @@
 import Link from 'next/link'
-import { TrendingUp, TrendingDown, ArrowRightLeft, Landmark } from 'lucide-react'
+import { TrendingUp, TrendingDown } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedAllProfiles, getCachedUser } from '@/lib/data'
-import { Button } from '@/components/ui/Button'
 import { AddTransactionModal } from '@/components/finance/AddTransactionModal'
-import { AddShowModal } from '@/components/finance/AddShowModal'
 import { DeleteTransactionButton } from '@/components/finance/DeleteTransactionButton'
 import { ExportModal } from '@/components/finance/ExportModal'
+import { FinanceFloatingNav } from '@/components/finance/FinanceFloatingNav'
 import { cn } from '@/lib/utils'
 
 function fmt(n: number) {
@@ -27,11 +26,13 @@ export default async function FinancePage() {
     supabase.from('finance_shows').select('*').order('show_date', { ascending: false }),
   ])
 
-  // Compute balances
-  const balanceMap: Record<string, number> = { '__fund__': 0 }
+  // Balance per member. There's no separate Band Fund bucket — whatever a
+  // member is holding, including a retained Band Fund cut from a split, is
+  // just their balance, same as anything else.
+  const balanceMap: Record<string, number> = {}
   for (const t of txns ?? []) {
-    const key = t.member_id ?? '__fund__'
-    balanceMap[key] = (balanceMap[key] ?? 0) + t.amount
+    if (!t.member_id) continue
+    balanceMap[t.member_id] = (balanceMap[t.member_id] ?? 0) + t.amount
   }
 
   const members = profiles.map(p => ({
@@ -40,20 +41,18 @@ export default async function FinancePage() {
     balance: balanceMap[p.id] ?? 0,
   })).sort((a, b) => b.balance - a.balance)
 
-  const bandFund = balanceMap['__fund__'] ?? 0
   const memberTotal = members.reduce((s, m) => s + m.balance, 0)
-  const maxBal = Math.max(...members.map(m => Math.abs(m.balance)), Math.abs(bandFund), 1)
+  const maxBal = Math.max(...members.map(m => Math.abs(m.balance)), 1)
+
+  const netForShow = (showId: string) =>
+    (txns ?? []).filter(t => t.show_id === showId).reduce((s, t) => s + t.amount, 0)
 
   const unsplitShows = (shows ?? []).filter(s => !s.split_at)
-  const pendingTotal = unsplitShows.reduce((s, show) => s + show.gross_income, 0)
   const recentTxns = (txns ?? []).slice(0, 15)
   const nameOf = (id: string | null) =>
-    id === null ? 'Band Fund' : id === user?.id ? 'You' : (profiles.find(p => p.id === id)?.display_name ?? 'Member')
+    id === null ? 'Unattributed' : id === user?.id ? 'You' : (profiles.find(p => p.id === id)?.display_name ?? 'Member')
 
-  const memberOptions = [
-    ...profiles.map(p => ({ id: p.id, name: p.id === user?.id ? 'You' : (p.display_name ?? 'Member') })),
-    { id: null as unknown as string, name: 'Band Fund' },
-  ]
+  const memberOptions = profiles.map(p => ({ id: p.id, name: p.id === user?.id ? 'You' : (p.display_name ?? 'Member') }))
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -62,23 +61,12 @@ export default async function FinancePage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Finance</h1>
           <p className="mt-0.5 text-sm text-gray-500">
-            Total band fund: <span className="font-semibold text-gray-800">{fmt(memberTotal + pendingTotal)}</span>
+            Total band fund: <span className="font-semibold text-gray-800">{fmt(memberTotal)}</span>
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <AddShowModal />
-          <AddTransactionModal members={memberOptions} />
+          <AddTransactionModal members={memberOptions} shows={shows ?? []} />
           <ExportModal members={profiles.map(p => ({ id: p.id, name: p.display_name ?? 'Member' }))} />
-          <Button variant="secondary" asChild>
-            <Link href="/finance/import">Import</Link>
-          </Button>
-          {unsplitShows.length > 0 && (
-            <Button asChild>
-              <Link href="/finance/split">
-                <ArrowRightLeft className="h-4 w-4" /> Split Show Money
-              </Link>
-            </Button>
-          )}
         </div>
       </div>
 
@@ -102,25 +90,6 @@ export default async function FinancePage() {
               </span>
             </div>
           ))}
-
-          {/* Band fund row */}
-          <div className="mt-1 flex items-center gap-3 border-t border-brand-100 pt-3">
-              <span className="flex w-20 shrink-0 items-center gap-1.5 text-sm font-medium text-brand-600">
-                <Landmark className="h-3.5 w-3.5" /> Fund
-              </span>
-              <div className="flex-1">
-                <div className="h-2 overflow-hidden rounded-full bg-gray-100">
-                  <div
-                    className="h-full rounded-full bg-brand-300"
-                    style={{ width: `${Math.round((Math.abs(bandFund) / maxBal) * 100)}%` }}
-                  />
-                </div>
-              </div>
-              <span className="w-24 text-right text-sm font-bold tabular-nums text-brand-700">
-                {fmt(bandFund)}
-              </span>
-            </div>
-
         </div>
       </section>
 
@@ -141,7 +110,7 @@ export default async function FinancePage() {
                 <span className="font-medium text-amber-900">{s.title}</span>
                 <div className="flex items-center gap-3">
                   {s.show_date && <span className="text-amber-600">{new Date(s.show_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>}
-                  <span className="font-bold text-amber-800">{fmt(s.gross_income)}</span>
+                  <span className="font-bold text-amber-800">{fmt(netForShow(s.id))}</span>
                 </div>
               </div>
             ))}
@@ -177,6 +146,7 @@ export default async function FinancePage() {
                   <span className={cn('shrink-0 text-sm font-bold tabular-nums', isCredit ? 'text-green-600' : 'text-red-500')}>
                     {sign(t.amount)}{fmt(t.amount)}
                   </span>
+                  <AddTransactionModal members={memberOptions} shows={shows ?? []} transaction={t} />
                   <DeleteTransactionButton id={t.id} />
                 </div>
               )
@@ -184,6 +154,8 @@ export default async function FinancePage() {
           </div>
         )}
       </section>
+
+      <FinanceFloatingNav hasUnsplitShows={unsplitShows.length > 0} />
     </div>
   )
 }

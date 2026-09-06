@@ -13,16 +13,19 @@ export type Database = {
         Row: {
           id: string
           display_name: string | null
+          role: string
           created_at: string
         }
         Insert: {
           id: string
           display_name?: string | null
+          role?: string
           created_at?: string
         }
         Update: {
           id?: string
           display_name?: string | null
+          role?: string
           created_at?: string
         }
         Relationships: []
@@ -156,7 +159,6 @@ export type Database = {
           title: string
           show_date: string | null
           venue: string | null
-          gross_income: number
           split_at: string | null
           created_by: string
           created_at: string
@@ -166,7 +168,6 @@ export type Database = {
           title: string
           show_date?: string | null
           venue?: string | null
-          gross_income?: number
           split_at?: string | null
           created_by: string
           created_at?: string
@@ -176,7 +177,6 @@ export type Database = {
           title?: string
           show_date?: string | null
           venue?: string | null
-          gross_income?: number
           split_at?: string | null
           created_by?: string
           created_at?: string
@@ -189,6 +189,7 @@ export type Database = {
           member_id: string | null
           amount: number
           description: string
+          category: string | null
           show_id: string | null
           date: string
           recorded_by: string
@@ -199,6 +200,7 @@ export type Database = {
           member_id?: string | null
           amount: number
           description: string
+          category?: string | null
           show_id?: string | null
           date?: string
           recorded_by: string
@@ -209,43 +211,8 @@ export type Database = {
           member_id?: string | null
           amount?: number
           description?: string
+          category?: string | null
           show_id?: string | null
-          date?: string
-          recorded_by?: string
-          created_at?: string
-        }
-        Relationships: []
-      }
-      finance_show_expenses: {
-        Row: {
-          id: string
-          show_id: string
-          description: string
-          amount: number
-          paid_by: string
-          category: string
-          date: string
-          recorded_by: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          show_id: string
-          description: string
-          amount: number
-          paid_by: string
-          category?: string
-          date?: string
-          recorded_by: string
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          show_id?: string
-          description?: string
-          amount?: number
-          paid_by?: string
-          category?: string
           date?: string
           recorded_by?: string
           created_at?: string
