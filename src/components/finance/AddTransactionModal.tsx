@@ -16,18 +16,20 @@ interface Props {
   shows: FinanceShow[]
   /** Present = edit this transaction instead of creating a new one. */
   transaction?: FinanceTransaction
+  /** Present = pin this transaction to one specific show — used for "add a missed expense" from inside that show's own review (e.g. the Split screen). Hides the Tag/Which-show pickers since both are already implied. */
+  lockedShow?: { id: string; title: string }
 }
 
 const inputCls = 'w-full rounded-md border border-brand-200 bg-white px-3 py-2.5 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400'
 const NEW_SHOW = '__new__'
 const AUTO = '__auto__'
 
-function fieldsFrom(transaction: FinanceTransaction | undefined, unsplitShows: FinanceShow[]) {
+function fieldsFrom(transaction: FinanceTransaction | undefined, unsplitShows: FinanceShow[], lockedShow?: { id: string; title: string }) {
   if (!transaction) {
     return {
-      tag: null as 'misc' | 'show' | null,
+      tag: (lockedShow ? 'show' : null) as 'misc' | 'show' | null,
       category: TRANSACTION_CATEGORIES[0],
-      showId: unsplitShows[0]?.id ?? NEW_SHOW,
+      showId: lockedShow?.id ?? unsplitShows[0]?.id ?? NEW_SHOW,
       memberId: AUTO,
       amount: '',
       dir: 'credit' as 'credit' | 'debit',
@@ -47,7 +49,7 @@ function fieldsFrom(transaction: FinanceTransaction | undefined, unsplitShows: F
   }
 }
 
-export function AddTransactionModal({ members, shows, transaction }: Props) {
+export function AddTransactionModal({ members, shows, transaction, lockedShow }: Props) {
   const isEdit = !!transaction
   const unsplitShows = shows.filter(s => !s.split_at)
   // Editing a transaction tagged to an already-split show still needs that
@@ -58,7 +60,7 @@ export function AddTransactionModal({ members, shows, transaction }: Props) {
     : unsplitShows
 
   const [open, setOpen] = useState(false)
-  const [fields, setFields] = useState(() => fieldsFrom(transaction, unsplitShows))
+  const [fields, setFields] = useState(() => fieldsFrom(transaction, unsplitShows, lockedShow))
   const [newShowTitle, setNewShowTitle] = useState('')
   const [isPending, startTransition] = useTransition()
   const toast = useToast()
@@ -68,7 +70,7 @@ export function AddTransactionModal({ members, shows, transaction }: Props) {
     setFields(prev => ({ ...prev, [key]: value }))
 
   const openModal = () => {
-    setFields(fieldsFrom(transaction, unsplitShows))
+    setFields(fieldsFrom(transaction, unsplitShows, lockedShow))
     setNewShowTitle('')
     setOpen(true)
   }
@@ -128,31 +130,38 @@ export function AddTransactionModal({ members, shows, transaction }: Props) {
         >
           <Pencil className="h-3.5 w-3.5" />
         </button>
+      ) : lockedShow ? (
+        <Button variant="secondary" size="sm" onClick={openModal}>
+          <Plus className="h-4 w-4" /> Add expense
+        </Button>
       ) : (
         <Button variant="secondary" onClick={openModal}>
           <Plus className="h-4 w-4" /> Transaction
         </Button>
       )}
 
-      <Modal open={open} onOpenChange={setOpen} title={isEdit ? 'Edit Transaction' : 'Record Transaction'}>
+      <Modal open={open} onOpenChange={setOpen} title={isEdit ? 'Edit Transaction' : lockedShow ? `Add Expense — ${lockedShow.title}` : 'Record Transaction'}>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Tag — mandatory, nothing pre-selected */}
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Tag *</label>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => set('tag', 'misc')}
-                className={cn('flex-1 rounded-md py-2 text-sm font-semibold transition-colors', tag === 'misc' ? 'bg-brand-400 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200')}>
-                Misc
-              </button>
-              <button type="button" onClick={() => set('tag', 'show')}
-                className={cn('flex-1 rounded-md py-2 text-sm font-semibold transition-colors', tag === 'show' ? 'bg-brand-400 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200')}>
-                Show Related
-              </button>
+          {/* Tag — mandatory, nothing pre-selected. Skipped entirely when
+              the transaction is already pinned to one show. */}
+          {!lockedShow && (
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">Tag *</label>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => set('tag', 'misc')}
+                  className={cn('flex-1 rounded-md py-2 text-sm font-semibold transition-colors', tag === 'misc' ? 'bg-brand-400 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200')}>
+                  Misc
+                </button>
+                <button type="button" onClick={() => set('tag', 'show')}
+                  className={cn('flex-1 rounded-md py-2 text-sm font-semibold transition-colors', tag === 'show' ? 'bg-brand-400 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200')}>
+                  Show Related
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Show sub-selection: which show, with inline creation */}
-          {tag === 'show' && (
+          {tag === 'show' && !lockedShow && (
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Which show *</label>
               <select value={showId} onChange={e => set('showId', e.target.value)} className={inputCls}>

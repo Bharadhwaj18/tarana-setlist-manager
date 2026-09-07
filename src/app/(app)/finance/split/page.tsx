@@ -22,6 +22,11 @@ export default async function SplitPage() {
     id: p.id,
     name: p.id === user?.id ? 'You' : (p.display_name ?? 'Member'),
   }))
+  // A separate, "You"-free name list — anything that becomes a permanent
+  // record other people read later (a saved transaction description, the
+  // downloadable report) should always show whose it actually is, not
+  // "You" relative to whoever happened to confirm the split.
+  const realNames = profiles.map(p => ({ id: p.id, name: p.display_name ?? 'Member' }))
 
   const showIds = new Set(shows.map(s => s.id))
   const txnsByShow: Record<string, FinanceTransaction[]> = {}
@@ -58,6 +63,7 @@ export default async function SplitPage() {
       <SplitWizard
         shows={shows}
         members={members}
+        realNames={realNames}
         txnsByShow={txnsByShow}
         memberBalances={balances}
         memberFundBalances={fundBalances}

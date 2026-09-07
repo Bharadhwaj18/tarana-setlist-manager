@@ -1,19 +1,22 @@
 'use client'
 
-import { useState, useTransition, useMemo, useRef } from 'react'
+import { useState, useTransition, useMemo } from 'react'
 import { Check, ArrowRight, Download, X, Plus } from 'lucide-react'
 import { splitShows, type ShowSplitInput, type SplitPayment } from '@/actions/finance'
 import { computeEntitlements, computeAbsorbedAmount, computeShowSettlement, poolShowSettlements, routeSettlement, type Payment } from '@/lib/finance/settlement'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toaster'
 import { cn } from '@/lib/utils'
-import { exportElementToPdf } from '@/lib/pdf/exportPdf'
+import { buildSplitReportPdf, type SplitReportLine, type SplitReportRow, type SplitReportShow } from '@/lib/pdf/financeReports'
+import { AddTransactionModal } from '@/components/finance/AddTransactionModal'
 import type { FinanceShow, FinanceTransaction } from '@/types/finance'
 
 interface Member { id: string; name: string }
 interface Props {
   shows: FinanceShow[]
   members: Member[]
+  /** Same members, but with the current user's own display name instead of "You" — used for anything that becomes a permanent record other people read later (a saved transaction description, the downloadable report), never for on-screen labels. */
+  realNames: Member[]
   txnsByShow: Record<string, FinanceTransaction[]>
   memberBalances: Record<string, number>
   /** Each member's current tagged Band Fund balance (category 'fund' only) — used to decide who can safely absorb another payer's share without a real payment existing for it. */
@@ -47,7 +50,7 @@ function descriptionFor(payment: Payment, nameOf: (id: string) => string, showTi
     : `Paid ${nameOf(payment.to)}'s share — ${showTitles}`
 }
 
-export function SplitWizard({ shows, members, txnsByShow, memberBalances, memberFundBalances }: Props) {
+export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalances, memberFundBalances }: Props) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(shows.length === 1 ? [shows[0].id] : []))
   const [bandPct, setBandPct] = useState(20)
   const [involvedByShow, setInvolvedByShow] = useState<Record<string, Set<string>>>(
@@ -269,6 +272,10 @@ export function SplitWizard({ shows, members, txnsByShow, memberBalances, member
   const canConfirm = showsReady && (mode === 'auto' || manualFullyAssigned)
 
   const nameOf = (id: string) => members.find(m => m.id === id)?.name ?? 'Unknown'
+  // "You" only ever makes sense to whoever's looking at the screen right
+  // now — a saved transaction description gets read by every band member,
+  // forever, so it always uses the real display name instead.
+  const realNameOf = (id: string) => realNames.find(m => m.id === id)?.name ?? 'Unknown'
 
   const handleSplit = () => {
     if (!canConfirm) return
@@ -277,18 +284,16 @@ export function SplitWizard({ shows, members, txnsByShow, memberBalances, member
     const activePayments = mode === 'auto' ? payments : manualPayments
     const splitPayments: SplitPayment[] = activePayments
       .filter(p => p.amount > 0)
-      .map(p => ({ from: p.from, to: p.to, amount: round2(p.amount), description: descriptionFor(p, nameOf, showTitles) }))
+      .map(p => ({ from: p.from, to: p.to, amount: round2(p.amount), description: descriptionFor(p, realNameOf, showTitles) }))
     startTransition(async () => {
       const result = await splitShows(shows_, splitPayments)
       if (result && 'error' in result && result.error) toast(result.error, 'error')
     })
   }
 
-  const pdfRef = useRef<HTMLDivElement>(null)
   const [isDownloading, setIsDownloading] = useState(false)
 
-  const handleDownloadReport = async () => {
-    if (!pdfRef.current) return
+  const handleDownloadReport = () => {
     setIsDownloading(true)
     try {
       // Reflect whichever mode is active — the manual assignments if
@@ -307,12 +312,12 @@ export function SplitWizard({ shows, members, txnsByShow, memberBalances, member
         const paidOut = round2(activePayments.filter(p => p.from === id).reduce((s, p) => s + p.amount, 0))
         const newFundBalance = round2((memberBalances[id] ?? 0) - paidOut)
         return {
-          name: nameOf(id),
+          name: realNameOf(id),
           lines,
           owed: amountOwedFor(id),
           selfPaid: self?.amount ?? 0,
-          outgoing: outgoing.map(p => ({ to: nameOf(p.to), amount: p.amount })),
-          incoming: incoming.map(p => ({ from: nameOf(p.from), amount: p.amount })),
+          outgoing: outgoing.map(p => ({ to: realNameOf(p.to), amount: p.amount })),
+          incoming: incoming.map(p => ({ from: realNameOf(p.from), amount: p.amount })),
           newFundBalance,
         }
       })
@@ -320,26 +325,32 @@ export function SplitWizard({ shows, members, txnsByShow, memberBalances, member
       // One card per show — the exact same shape as the on-screen show
       // preview (title, net, its own transactions, each person's plain cut
       // and the plain Band Fund %), so the report reads as a full record
-      // of every show that went into this split.
+      // of every show that went into this split. Every name here is a real
+      // display name — a downloaded report has no "current viewer" for
+      // "You" to be relative to.
       const showDetails: SplitReportShow[] = perShow.map(p => ({
         showTitle: p.show.title,
         net: p.net,
         transactions: (txnsByShow[p.show.id] ?? []).map(t => ({
           description: t.description,
-          memberName: t.member_id ? nameOf(t.member_id) : null,
+          memberName: t.member_id ? realNameOf(t.member_id) : null,
           amount: t.amount,
         })),
-        cuts: p.involved.map(id => ({ name: nameOf(id), cut: p.memberShares[id] ?? 0 })),
-        bandFundHolderName: nameOf(p.bandFundHolderId),
+        cuts: p.involved.map(id => ({ name: realNameOf(id), cut: p.memberShares[id] ?? 0 })),
+        bandFundHolderName: realNameOf(p.bandFundHolderId),
         bandFundAmount: p.bandFundAmount,
       }))
 
-      const el = pdfRef.current
-      el.innerHTML = buildSplitReportHtml(selectedShows.map(s => s.title), bandPct, showDetails, rows, totalNet, totalBandFund)
-      el.style.display = 'block'
-      await exportElementToPdf(el, `tarana-split-${new Date().toISOString().slice(0, 10)}.pdf`)
-      el.style.display = 'none'
-      el.innerHTML = ''
+      // Every band member's Band Fund, not just whoever's involved in this
+      // split — same spare-capacity formula as the involved-only rows
+      // above, just over the full roster so someone who sat this batch out
+      // still shows their current, unchanged balance.
+      const allBalances = realNames.map(m => {
+        const paidOut = round2(activePayments.filter(p => p.from === m.id).reduce((s, p) => s + p.amount, 0))
+        return { name: m.name, balance: round2((memberBalances[m.id] ?? 0) - paidOut) }
+      })
+
+      buildSplitReportPdf(selectedShows.map(s => s.title), bandPct, showDetails, rows, totalNet, totalBandFund, allBalances)
       toast('Report downloaded', 'success')
     } finally {
       setIsDownloading(false)
@@ -348,9 +359,6 @@ export function SplitWizard({ shows, members, txnsByShow, memberBalances, member
 
   return (
     <div className="space-y-6">
-      {/* Hidden PDF render target */}
-      <div ref={pdfRef} style={{ display: 'none', position: 'fixed', left: '-9999px', top: 0, width: '794px', background: '#fff', padding: '32px', fontFamily: 'sans-serif', fontSize: '13px' }} />
-
       {/* Show selection */}
       <section className="rounded-xl border border-brand-200 bg-white p-5 shadow-sm">
         <h2 className="mb-3 text-sm font-semibold text-gray-700">Select shows to split together</h2>
@@ -394,6 +402,14 @@ export function SplitWizard({ shows, members, txnsByShow, memberBalances, member
                         ))}
                       </div>
                     )}
+
+                    {/* Missed something? Add it straight to this show, right here. */}
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-gray-400">
+                        {txns.length === 0 ? 'No expenses logged for this show yet.' : 'Missing an expense?'}
+                      </p>
+                      <AddTransactionModal members={members} shows={shows} lockedShow={{ id: s.id, title: s.title }} />
+                    </div>
 
                     {/* Involved members */}
                     <div>
@@ -702,152 +718,4 @@ export function SplitWizard({ shows, members, txnsByShow, memberBalances, member
       </div>
     </div>
   )
-}
-
-interface SplitReportLine {
-  showTitle: string
-  entitlement: number
-  cashPosition: number
-  reimbursed: number
-  isBandFundHolder: boolean
-  bandFundAmount: number
-  owedFromShow: number
-}
-
-interface SplitReportRow {
-  name: string
-  lines: SplitReportLine[]
-  owed: number
-  selfPaid: number
-  outgoing: { to: string; amount: number }[]
-  incoming: { from: string; amount: number }[]
-  /** Their Band Fund specifically — real balance minus whatever they're paying out. */
-  newFundBalance: number
-}
-
-interface SplitReportShow {
-  showTitle: string
-  net: number
-  transactions: { description: string; memberName: string | null; amount: number }[]
-  cuts: { name: string; cut: number }[]
-  bandFundHolderName: string
-  bandFundAmount: number
-}
-
-function buildSplitReportHtml(
-  showTitles: string[],
-  bandPct: number,
-  shows: SplitReportShow[],
-  rows: SplitReportRow[],
-  totalNet: number,
-  totalBandFund: number
-): string {
-  const sign = (n: number) => n >= 0 ? '+' : '−'
-  const fmt = (n: number) => `₹${Math.abs(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
-
-  return `
-    <div>
-      <h1 style="font-size:20px;font-weight:bold;margin-bottom:4px;">Tarana Split Report</h1>
-      <p style="color:#666;margin-bottom:4px;">${showTitles.join(', ')}</p>
-      <p style="color:#666;margin-bottom:20px;font-size:12px;">Band Fund ${bandPct}% · Generated ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-
-      <h2 style="font-size:13px;font-weight:bold;margin:0 0 8px;color:#333;">How this was worked out</h2>
-      <p style="font-size:11px;color:#666;line-height:1.6;margin:0 0 20px;">
-        Each show's money is split ${bandPct}% to the Band Fund and the rest equally among everyone who played it.
-        Anyone who spent their own money on the show gets it back — but only the part that would've taken their own
-        balance below ₹0; if their existing balance already covers it, no cash needs to move for that part. Every
-        payment (including someone covering their own share from their own Band Fund) is a straightforward payer to
-        recipient — nobody's payment ever gets split between two people unless it's truly unavoidable.
-      </p>
-
-      <h2 style="font-size:13px;font-weight:bold;margin:0 0 10px;color:#333;">Every show in this split</h2>
-      ${shows.map(s => `
-        <div style="border:1px solid #eee;border-radius:8px;padding:14px;margin-bottom:12px;">
-          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
-            <p style="font-weight:bold;font-size:13px;margin:0;">${s.showTitle}</p>
-            <p style="font-weight:bold;font-size:13px;margin:0;">${fmt(s.net)}</p>
-          </div>
-          ${s.transactions.length > 0 ? `
-            <div style="font-size:11px;color:#666;margin-bottom:8px;">
-              ${s.transactions.map(t => `
-                <div style="display:flex;justify-content:space-between;">
-                  <span>${t.description}${t.memberName ? ` (${t.memberName})` : ''}</span>
-                  <span style="color:${t.amount >= 0 ? '#16a34a' : '#dc2626'};">${t.amount >= 0 ? '+' : '−'}${fmt(t.amount)}</span>
-                </div>
-              `).join('')}
-            </div>
-          ` : ''}
-          <table style="width:100%;border-collapse:collapse;font-size:12px;">
-            <tbody>
-              ${s.cuts.map((c, i) => `
-                <tr style="background:${i % 2 === 0 ? '#fff' : '#fafafa'}">
-                  <td style="padding:5px 10px;">${c.name}</td>
-                  <td style="padding:5px 10px;text-align:right;font-weight:600;">${fmt(c.cut)}</td>
-                </tr>
-              `).join('')}
-              <tr>
-                <td style="padding:5px 10px;color:#7c3aed;">Band Fund (${bandPct}%) <span style="color:#999;">kept by ${s.bandFundHolderName}</span></td>
-                <td style="padding:5px 10px;text-align:right;font-weight:600;color:#7c3aed;">${fmt(s.bandFundAmount)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      `).join('')}
-
-      <h2 style="font-size:13px;font-weight:bold;margin:20px 0 8px;color:#333;">At a glance</h2>
-      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:24px;">
-        <thead>
-          <tr style="background:#f5f0ff;">
-            <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #d4c8f4;">Member</th>
-            <th style="padding:8px 10px;text-align:right;border-bottom:2px solid #d4c8f4;">Owed (all shows)</th>
-            <th style="padding:8px 10px;text-align:right;border-bottom:2px solid #d4c8f4;">Band Fund left</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rows.map((r, i) => `
-            <tr style="background:${i % 2 === 0 ? '#fff' : '#fafafa'}">
-              <td style="padding:6px 10px;">${r.name}</td>
-              <td style="padding:6px 10px;text-align:right;font-weight:600;">${fmt(r.owed)}</td>
-              <td style="padding:6px 10px;text-align:right;font-weight:600;color:#7c3aed;">${fmt(r.newFundBalance)}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-
-      <h2 style="font-size:13px;font-weight:bold;margin:0 0 10px;color:#333;">Full breakdown, person by person</h2>
-      ${rows.map(r => `
-        <div style="border:1px solid #eee;border-radius:8px;padding:14px;margin-bottom:12px;">
-          <p style="font-weight:bold;font-size:13px;margin:0 0 8px;">${r.name}</p>
-          ${r.lines.map(l => `
-            <div style="font-size:11px;margin-bottom:6px;">
-              <p style="margin:0 0 3px;color:#666;font-weight:600;">${l.showTitle}</p>
-              <div style="padding-left:8px;color:#555;">
-                <div style="display:flex;justify-content:space-between;"><span>Your cut — ${bandPct}% goes to Band Fund, the rest split equally</span><span>+${fmt(l.entitlement)}</span></div>
-                ${l.cashPosition < 0 ? `<div style="display:flex;justify-content:space-between;color:#999;"><span>You paid this out of your own pocket for the show</span><span>−${fmt(l.cashPosition)}</span></div>` : ''}
-                ${l.reimbursed > 0 ? `<div style="display:flex;justify-content:space-between;color:#16a34a;"><span>Paid back — the part that would've dropped your balance below ₹0</span><span>+${fmt(l.reimbursed)}</span></div>` : ''}
-                ${l.cashPosition > 0 ? `<div style="display:flex;justify-content:space-between;color:#dc2626;"><span>Cash you collected for the show, beyond your own cut — needs to go back</span><span>−${fmt(l.cashPosition)}</span></div>` : ''}
-                ${l.isBandFundHolder ? `<div style="display:flex;justify-content:space-between;color:#7c3aed;"><span>You're holding this show's Band Fund cut</span><span>+${fmt(l.bandFundAmount)}</span></div>` : ''}
-                <div style="display:flex;justify-content:space-between;font-weight:600;border-top:1px solid #eee;padding-top:2px;margin-top:2px;"><span>Owed from this show</span><span>+${fmt(l.owedFromShow)}</span></div>
-              </div>
-            </div>
-          `).join('')}
-          <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:12px;border-top:1px solid #eee;padding-top:6px;margin-top:6px;">
-            <span>Total owed</span>
-            <span style="color:#16a34a;">${fmt(r.owed)}</span>
-          </div>
-          ${r.selfPaid > 0 ? `<p style="font-size:11px;color:#666;margin:4px 0 0;">Keeps ${fmt(r.selfPaid)} of their own share from Band Fund</p>` : ''}
-          ${r.outgoing.map(p => `<p style="font-size:11px;color:#666;margin:2px 0 0;">→ Pays ${p.to} ${fmt(p.amount)}</p>`).join('')}
-          ${r.incoming.map(p => `<p style="font-size:11px;color:#666;margin:2px 0 0;">← Gets ${fmt(p.amount)} from ${p.from}</p>`).join('')}
-          <div style="border-top:1px dashed #eee;padding-top:6px;margin-top:6px;font-size:11px;">
-            <div style="display:flex;justify-content:space-between;font-weight:600;color:#7c3aed;"><span>Band Fund you're left holding</span><span>${fmt(r.newFundBalance)}</span></div>
-          </div>
-        </div>
-      `).join('')}
-
-      <div style="background:#f5f0ff;border-radius:6px;padding:10px 14px;font-size:12px;margin-top:8px;">
-        <p style="margin:0 0 4px;"><b>Total from these shows:</b> ${sign(totalNet)}${fmt(totalNet)}</p>
-        <p style="margin:0;"><b>Band Fund:</b> ${fmt(totalBandFund)} &nbsp;·&nbsp; <b>To artists:</b> ${fmt(totalNet - totalBandFund)}</p>
-      </div>
-    </div>
-  `
 }

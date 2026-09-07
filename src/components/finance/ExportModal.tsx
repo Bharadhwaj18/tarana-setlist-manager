@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useTransition, useRef } from 'react'
+import { useState, useTransition } from 'react'
 import { Download } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { exportTransactions } from '@/actions/finance'
 import { useToast } from '@/components/ui/Toaster'
-import { exportElementToPdf } from '@/lib/pdf/exportPdf'
+import { buildTransactionStatementPdf } from '@/lib/pdf/financeReports'
 
 interface Member { id: string; name: string }
 
@@ -33,7 +33,6 @@ export function ExportModal({ members }: { members: Member[] }) {
   const [memberId, setMemberId] = useState<string>('all')
   const [format, setFormat] = useState<'csv' | 'pdf'>('csv')
   const [isPending, startTransition] = useTransition()
-  const pdfRef = useRef<HTMLDivElement>(null)
   const toast = useToast()
 
   const getFilters = () => {
@@ -45,6 +44,9 @@ export function ExportModal({ members }: { members: Member[] }) {
     if (p.days === 0) return { memberId }  // all time
     return { dateFrom: toDateStr(addDays(today, p.days)), dateTo: toDateStr(today), memberId }
   }
+
+  const memberLabel = (id: string) =>
+    id === 'all' ? 'All members' : id === 'fund' ? 'Band fund' : (members.find(m => m.id === id)?.name ?? id)
 
   const handleExport = () => {
     startTransition(async () => {
@@ -77,14 +79,7 @@ export function ExportModal({ members }: { members: Member[] }) {
         toast('CSV downloaded', 'success')
         setOpen(false)
       } else {
-        // Render PDF in hidden div
-        if (!pdfRef.current) return
-        const el = pdfRef.current
-        el.innerHTML = buildPdfHtml(rows, preset, memberId, members)
-        el.style.display = 'block'
-        await exportElementToPdf(el, `tarana-finance-${toDateStr(new Date())}.pdf`)
-        el.style.display = 'none'
-        el.innerHTML = ''
+        buildTransactionStatementPdf(rows, preset, memberLabel(memberId))
         toast('PDF downloaded', 'success')
         setOpen(false)
       }
@@ -96,9 +91,6 @@ export function ExportModal({ members }: { members: Member[] }) {
       <Button variant="secondary" onClick={() => setOpen(true)}>
         <Download className="h-4 w-4" /> Export
       </Button>
-
-      {/* Hidden PDF render target */}
-      <div ref={pdfRef} style={{ display: 'none', position: 'fixed', left: '-9999px', top: 0, width: '794px', background: '#fff', padding: '32px', fontFamily: 'sans-serif', fontSize: '13px' }} />
 
       <Modal open={open} onOpenChange={setOpen} title="Export Transactions">
         <div className="space-y-4">
@@ -170,50 +162,4 @@ export function ExportModal({ members }: { members: Member[] }) {
       </Modal>
     </>
   )
-}
-
-function buildPdfHtml(
-  rows: { date: string; member: string; description: string; amount: number }[],
-  preset: string,
-  memberId: string,
-  members: Member[]
-): string {
-  const memberLabel = memberId === 'all' ? 'All members' : memberId === 'fund' ? 'Band fund' : (members.find(m => m.id === memberId)?.name ?? memberId)
-  const total = rows.reduce((s, r) => s + r.amount, 0)
-  const sign = (n: number) => n >= 0 ? '+' : '−'
-  const fmt = (n: number) => `₹${Math.abs(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
-
-  return `
-    <div>
-      <h1 style="font-size:20px;font-weight:bold;margin-bottom:4px;">Tarana Finance Statement</h1>
-      <p style="color:#666;margin-bottom:4px;">${preset} · ${memberLabel}</p>
-      <p style="color:#666;margin-bottom:24px;font-size:12px;">Generated ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-      <table style="width:100%;border-collapse:collapse;font-size:12px;">
-        <thead>
-          <tr style="background:#f5f0ff;">
-            <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #d4c8f4;">Date</th>
-            <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #d4c8f4;">Member</th>
-            <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #d4c8f4;">Description</th>
-            <th style="padding:8px 10px;text-align:right;border-bottom:2px solid #d4c8f4;">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rows.map((r, i) => `
-            <tr style="background:${i % 2 === 0 ? '#fff' : '#fafafa'}">
-              <td style="padding:6px 10px;color:#666;">${r.date}</td>
-              <td style="padding:6px 10px;">${r.member}</td>
-              <td style="padding:6px 10px;">${r.description}</td>
-              <td style="padding:6px 10px;text-align:right;font-weight:600;color:${r.amount >= 0 ? '#16a34a' : '#dc2626'};">${sign(r.amount)}${fmt(r.amount)}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-        <tfoot>
-          <tr style="background:#f5f0ff;">
-            <td colspan="3" style="padding:8px 10px;font-weight:bold;">Total (${rows.length} transactions)</td>
-            <td style="padding:8px 10px;text-align:right;font-weight:bold;color:${total >= 0 ? '#16a34a' : '#dc2626'};">${sign(total)}${fmt(total)}</td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-  `
 }
