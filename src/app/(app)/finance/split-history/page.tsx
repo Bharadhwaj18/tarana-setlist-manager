@@ -14,7 +14,7 @@ export default async function SplitHistoryPage() {
 
   const [profiles, { data: shows }, { data: allTxns }] = await Promise.all([
     getCachedAllProfiles(),
-    supabase.from('finance_shows').select('*').not('split_at', 'is', null).order('split_at', { ascending: false }),
+    supabase.from('shows').select('*').not('split_at', 'is', null).order('split_at', { ascending: false }),
     supabase.from('finance_transactions').select('*').in('category', ['split', 'fund']),
   ])
 

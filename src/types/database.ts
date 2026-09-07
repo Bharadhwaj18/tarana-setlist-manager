@@ -84,6 +84,7 @@ export type Database = {
           show_date: string | null
           venue: string | null
           notes: string | null
+          show_id: string | null
           created_at: string
           updated_at: string
         }
@@ -95,6 +96,7 @@ export type Database = {
           show_date?: string | null
           venue?: string | null
           notes?: string | null
+          show_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -106,10 +108,19 @@ export type Database = {
           show_date?: string | null
           venue?: string | null
           notes?: string | null
+          show_id?: string | null
           created_at?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'setlists_show_id_fkey'
+            columns: ['show_id']
+            isOneToOne: false
+            referencedRelation: 'shows'
+            referencedColumns: ['id']
+          }
+        ]
       }
       setlist_songs: {
         Row: {
@@ -153,15 +164,25 @@ export type Database = {
           }
         ]
       }
-      finance_shows: {
+      shows: {
         Row: {
           id: string
           title: string
           show_date: string | null
           venue: string | null
           split_at: string | null
+          fee: number | null
+          fee_received: boolean
+          payment_reference: string | null
+          tds_applicable: boolean
+          tds_amount: number | null
+          tds_filed: boolean
+          tds_certificate_received: boolean
+          notes: string | null
           created_by: string
+          updated_by: string | null
           created_at: string
+          updated_at: string
         }
         Insert: {
           id?: string
@@ -169,8 +190,18 @@ export type Database = {
           show_date?: string | null
           venue?: string | null
           split_at?: string | null
+          fee?: number | null
+          fee_received?: boolean
+          payment_reference?: string | null
+          tds_applicable?: boolean
+          tds_amount?: number | null
+          tds_filed?: boolean
+          tds_certificate_received?: boolean
+          notes?: string | null
           created_by: string
+          updated_by?: string | null
           created_at?: string
+          updated_at?: string
         }
         Update: {
           id?: string
@@ -178,8 +209,48 @@ export type Database = {
           show_date?: string | null
           venue?: string | null
           split_at?: string | null
+          fee?: number | null
+          fee_received?: boolean
+          payment_reference?: string | null
+          tds_applicable?: boolean
+          tds_amount?: number | null
+          tds_filed?: boolean
+          tds_certificate_received?: boolean
+          notes?: string | null
           created_by?: string
+          updated_by?: string | null
           created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      notes: {
+        Row: {
+          id: string
+          title: string
+          content: string | null
+          created_by: string
+          updated_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          content?: string | null
+          created_by: string
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          content?: string | null
+          created_by?: string
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
         }
         Relationships: []
       }

@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
-import { getCachedSetlistSongs, getCachedSongs } from '@/lib/data'
+import { getCachedSetlistSongs, getCachedSongs, getCachedShow } from '@/lib/data'
 import { SetlistForm } from '@/components/setlists/SetlistForm'
 import { SetlistTextEditor } from '@/components/setlists/SetlistTextEditor'
 import { updateSetlist } from '@/actions/setlists'
@@ -24,6 +24,8 @@ export default async function EditSetlistPage({ params }: Props) {
 
   if (!setlist) notFound()
 
+  const linkedShow = setlist.show_id ? await getCachedShow(setlist.show_id) : null
+
   const setlistText = serializeSetlistText(
     setlistSongs.map(ss => ({
       title: ss.song.title,
@@ -43,7 +45,11 @@ export default async function EditSetlistPage({ params }: Props) {
         <ChevronLeft className="h-4 w-4" /> {setlist.title}
       </Link>
       <h1 className="mb-8 text-2xl font-bold text-gray-900">Edit Setlist</h1>
-      <SetlistForm setlist={setlist} onSubmit={handleUpdate} />
+      <SetlistForm
+        setlist={setlist}
+        onSubmit={handleUpdate}
+        linkedShow={linkedShow ? { id: linkedShow.id, title: linkedShow.title, show_date: linkedShow.show_date, venue: linkedShow.venue } : undefined}
+      />
 
       <div className="mt-10 border-t border-brand-200 pt-8">
         <h2 className="mb-1 text-lg font-bold text-gray-900">Setlist text</h2>

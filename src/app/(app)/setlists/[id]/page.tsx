@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronLeft, Pencil, Calendar, MapPin } from 'lucide-react'
-import { getCachedSetlist, getCachedSetlistSongs, getCachedSongs, getCachedAllProfiles, getCachedUser } from '@/lib/data'
+import { ChevronLeft, Pencil, Calendar, MapPin, Link2 } from 'lucide-react'
+import { getCachedSetlist, getCachedSetlistSongs, getCachedSongs, getCachedAllProfiles, getCachedUser, getCachedShow } from '@/lib/data'
 import { SetlistSongList } from '@/components/setlists/SetlistSongList'
 import { AddSongToSetlistModal } from '@/components/setlists/AddSongToSetlistModal'
 import { BulkImportModal } from '@/components/setlists/BulkImportModal'
@@ -28,6 +28,8 @@ export default async function SetlistPage({ params }: Props) {
   ])
 
   if (!setlist) notFound()
+
+  const linkedShow = setlist.show_id ? await getCachedShow(setlist.show_id) : null
 
   const nameOf = (uid: string) =>
     uid === user?.id ? 'You' : (profiles.find(p => p.id === uid)?.display_name ?? 'Band member')
@@ -57,6 +59,11 @@ export default async function SetlistPage({ params }: Props) {
           <div className="mt-2 flex flex-wrap gap-3 text-sm text-gray-500">
             {date && <span className="flex items-center gap-1.5"><Calendar className="h-4 w-4" />{date}</span>}
             {setlist.venue && <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" />{setlist.venue}</span>}
+            {linkedShow && (
+              <Link href={`/shows/${linkedShow.id}`} className="flex items-center gap-1.5 text-brand-600 hover:text-brand-700">
+                <Link2 className="h-4 w-4" /> {linkedShow.title}
+              </Link>
+            )}
           </div>
           {setlist.notes && <p className="mt-2 text-sm text-gray-500 italic">{setlist.notes}</p>}
           <div className="mt-2 flex flex-wrap gap-4 text-xs text-gray-400">

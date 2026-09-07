@@ -9,11 +9,12 @@ import { useToast } from '@/components/ui/Toaster'
 import { cn } from '@/lib/utils'
 import { buildSplitReportPdf, type SplitReportLine, type SplitReportRow, type SplitReportShow } from '@/lib/pdf/financeReports'
 import { AddTransactionModal } from '@/components/finance/AddTransactionModal'
-import type { FinanceShow, FinanceTransaction } from '@/types/finance'
+import type { FinanceTransaction } from '@/types/finance'
+import type { Show } from '@/types/shows'
 
 interface Member { id: string; name: string }
 interface Props {
-  shows: FinanceShow[]
+  shows: Show[]
   members: Member[]
   /** Same members, but with the current user's own display name instead of "You" — used for anything that becomes a permanent record other people read later (a saved transaction description, the downloadable report), never for on-screen labels. */
   realNames: Member[]

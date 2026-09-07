@@ -14,7 +14,7 @@ export default async function FinanceHistoryPage() {
     // be backdated) `date` field — otherwise "latest at top" doesn't match
     // what you just did if any entry has a different logical date.
     supabase.from('finance_transactions').select('*').order('created_at', { ascending: false }),
-    supabase.from('finance_shows').select('*'),
+    supabase.from('shows').select('*'),
   ])
 
   const members = profiles.map(p => ({

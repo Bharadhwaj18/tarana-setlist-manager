@@ -5,13 +5,14 @@ import { TrendingUp, TrendingDown, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AddTransactionModal } from './AddTransactionModal'
 import { DeleteTransactionButton } from './DeleteTransactionButton'
-import type { FinanceShow, FinanceTransaction } from '@/types/finance'
+import type { FinanceTransaction } from '@/types/finance'
+import type { Show } from '@/types/shows'
 
 interface Member { id: string; name: string }
 interface Props {
   transactions: FinanceTransaction[]
   members: Member[]
-  shows: FinanceShow[]
+  shows: Show[]
   showTitleById: Record<string, string>
 }
 

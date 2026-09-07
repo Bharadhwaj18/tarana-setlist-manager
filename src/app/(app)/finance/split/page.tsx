@@ -12,7 +12,7 @@ export default async function SplitPage() {
   const [{ data: { user } }, profiles, { data: shows }, { data: allTxns }] = await Promise.all([
     getCachedUser(),
     getCachedAllProfiles(),
-    supabase.from('finance_shows').select('*').is('split_at', null).order('show_date', { ascending: false }),
+    supabase.from('shows').select('*').is('split_at', null).order('show_date', { ascending: false }),
     supabase.from('finance_transactions').select('*'),
   ])
 

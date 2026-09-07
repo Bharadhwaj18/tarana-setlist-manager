@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Music2, ListMusic, Wallet, LogOut, Menu, X } from 'lucide-react'
+import { Music2, ListMusic, Wallet, LogOut, Menu, X, CalendarDays, StickyNote } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { ACTIVE_SETLIST_COOKIE } from '@/lib/setlist-context'
@@ -35,9 +35,11 @@ interface SidebarProps {
 }
 
 const navItems = [
+  { href: '/shows', label: 'Shows', icon: CalendarDays },
   { href: '/songs', label: 'Songs', icon: Music2 },
   { href: '/setlists', label: 'Setlists', icon: ListMusic },
   { href: '/finance', label: 'Finance', icon: Wallet },
+  { href: '/notes', label: 'Notes', icon: StickyNote },
 ]
 
 export function Sidebar({ user }: SidebarProps) {

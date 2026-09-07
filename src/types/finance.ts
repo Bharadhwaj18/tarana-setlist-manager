@@ -1,7 +1,8 @@
 import type { Database } from './database'
 
-export type FinanceShow = Database['public']['Tables']['finance_shows']['Row']
 export type FinanceTransaction = Database['public']['Tables']['finance_transactions']['Row']
+// The show entity itself lives in '@/types/shows' as `Show` — it's the base
+// table Setlists and Finance both hang off now, not finance-specific.
 
 export interface MemberBalance {
   member_id: string | null  // null = band fund

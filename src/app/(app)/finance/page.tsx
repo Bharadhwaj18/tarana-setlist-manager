@@ -23,7 +23,7 @@ export default async function FinancePage() {
     getCachedUser(),
     getCachedAllProfiles(),
     supabase.from('finance_transactions').select('*').order('created_at', { ascending: false }),
-    supabase.from('finance_shows').select('*').order('show_date', { ascending: false }),
+    supabase.from('shows').select('*').order('show_date', { ascending: false }),
   ])
 
   // Balance per member. There's no separate Band Fund bucket — whatever a

@@ -48,7 +48,7 @@ async function validateTransactionWrite(
   // A show that's already been split is locked — redirect this to a Misc
   // expense instead of reopening the split (per the decided policy).
   if (data.show_id) {
-    const { data: show } = await supabase.from('finance_shows').select('split_at').eq('id', data.show_id).maybeSingle()
+    const { data: show } = await supabase.from('shows').select('split_at').eq('id', data.show_id).maybeSingle()
     if (show?.split_at) {
       return 'This show has already been split. Log this as a Misc expense instead.'
     }
@@ -113,6 +113,10 @@ export async function deleteTransaction(id: string): Promise<{ error?: string }>
   return {}
 }
 
+// Quick inline "+ New show..." creation from AddTransactionModal — just the
+// bare minimum fields. Full show CRUD (fee, TDS, notes, delete) lives in
+// '@/actions/shows', since Shows is now its own base entity, not
+// finance-specific.
 export async function addShow(data: {
   title: string
   show_date?: string | null
@@ -123,23 +127,15 @@ export async function addShow(data: {
   if (!user) return { error: 'Not authenticated' }
 
   const { data: inserted, error } = await supabase
-    .from('finance_shows')
+    .from('shows')
     .insert({ ...data, created_by: user.id })
     .select('id')
     .single()
   if (error) return { error: error.message }
   revalidatePath('/finance')
   revalidatePath('/finance/split')
+  revalidatePath('/shows')
   return { id: inserted?.id }
-}
-
-export async function deleteShow(id: string): Promise<{ error?: string }> {
-  const supabase = await createClient()
-  const { error } = await supabase.from('finance_shows').delete().eq('id', id)
-  if (error) return { error: error.message }
-  revalidatePath('/finance')
-  revalidatePath('/finance/split')
-  return {}
 }
 
 export interface ShowSplitInput {
@@ -199,7 +195,7 @@ export async function splitShows(shows: ShowSplitInput[], payments: SplitPayment
   }
 
   const { error: showErr } = await supabase
-    .from('finance_shows')
+    .from('shows')
     .update({ split_at: now })
     .in('id', shows.map(s => s.showId))
 

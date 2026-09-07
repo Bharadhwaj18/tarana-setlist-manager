@@ -8,12 +8,13 @@ import { addTransaction, updateTransaction, addShow } from '@/actions/finance'
 import { useToast } from '@/components/ui/Toaster'
 import { TRANSACTION_CATEGORIES } from '@/types/finance'
 import { cn } from '@/lib/utils'
-import type { FinanceShow, FinanceTransaction } from '@/types/finance'
+import type { FinanceTransaction } from '@/types/finance'
+import type { Show } from '@/types/shows'
 
 interface Member { id: string; name: string }
 interface Props {
   members: Member[]
-  shows: FinanceShow[]
+  shows: Show[]
   /** Present = edit this transaction instead of creating a new one. */
   transaction?: FinanceTransaction
   /** Present = pin this transaction to one specific show — used for "add a missed expense" from inside that show's own review (e.g. the Split screen). Hides the Tag/Which-show pickers since both are already implied. */
@@ -24,7 +25,7 @@ const inputCls = 'w-full rounded-md border border-brand-200 bg-white px-3 py-2.5
 const NEW_SHOW = '__new__'
 const AUTO = '__auto__'
 
-function fieldsFrom(transaction: FinanceTransaction | undefined, unsplitShows: FinanceShow[], lockedShow?: { id: string; title: string }) {
+function fieldsFrom(transaction: FinanceTransaction | undefined, unsplitShows: Show[], lockedShow?: { id: string; title: string }) {
   if (!transaction) {
     return {
       tag: (lockedShow ? 'show' : null) as 'misc' | 'show' | null,
