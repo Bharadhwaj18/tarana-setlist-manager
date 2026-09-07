@@ -37,34 +37,16 @@ export function computeEntitlements(
 
 /**
  * How much of a fronted show expense a member's own standing balance (from
- * before this show) already covers. This portion is *not* reimbursed
- * through the show settlement below — the settlement always pays back the
- * full amount fronted, keeping its books balanced on their own — instead
- * it's recorded as a separate correction transaction (debiting the member
- * this amount, untagged to the show) alongside the split, since it isn't
- * really the show's cost to bear: the member is just cashing in value they
- * were already recognized as owed from something earlier. Net effect on
- * their final balance is identical either way; keeping it a separate,
- * clearly-labeled entry is what stays auditable and doesn't require
- * reaching into anyone else's settlement math to make the numbers work.
+ * before this show) already covers. This portion doesn't need to be paid
+ * back in real cash — it's already reflected in what they're holding, and
+ * the reimbursement floor is: don't ask anyone to pay back money that
+ * would've just sat in a positive balance anyway. See `computeShowSettlement`
+ * for how the remaining real shortfall (if any) becomes part of what they're
+ * owed.
  */
 export function computeAbsorbedAmount(standingBalanceBeforeShow: number, amountFronted: number): number {
   const reimbursed = computeAutoReimbursement(standingBalanceBeforeShow, amountFronted)
   return round2(Math.max(0, amountFronted - reimbursed))
-}
-
-/**
- * The ledger transaction amount that brings a member's already-recorded cash
- * position (from this show's own transactions) up to their true entitlement.
- * Crediting the flat entitlement on its own would double-count whatever cash
- * they already handled: a member who fronted an expense (negative cash
- * position) needs the difference added back, and one who collected surplus
- * cash (positive cash position) needs the excess taken back. Doesn't apply
- * the reimbursement floor — see computeAbsorbedAmount for that separate,
- * standing-balance-only correction, recorded as its own transaction.
- */
-export function computeSettlementLedgerDelta(entitlement: number, cashPosition: number): number {
-  return round2(entitlement - cashPosition)
 }
 
 export interface Payment {
@@ -139,181 +121,153 @@ function greedySettlement(owed: Balance[], owers: Balance[]): Payment[] {
   return payments
 }
 
-export interface SettlementResult {
-  payments: Payment[]
-  /**
-   * memberId -> amount they fronted on another payer's behalf, out of their
-   * own tagged Band Fund balance, that genuinely doesn't need paying back —
-   * needs a ledger deduction (separate from any specific show) so their
-   * recorded balance matches what they actually still have, since nothing
-   * else accounts for that money having left their pocket.
-   */
-  consolidationAbsorptions: Record<string, number>
-  /**
-   * memberId -> amount they were owed that they covered out of their own
-   * tagged Band Fund balance instead of receiving real cash — the fund they
-   * already hold just gets relabeled as this payout. Needs a ledger
-   * deduction (see splitShows) so their total balance doesn't inflate.
-   */
-  selfSatisfactions: Record<string, number>
-  /**
-   * memberId -> net position after self-satisfaction but before any payment
-   * routing — positive means they still need to pay this much for real,
-   * negative means they still need to receive this much for real. This is
-   * "how much does each person actually owe/get" independent of who ends up
-   * paying whom — useful for a manual, unrouted view of the settlement.
-   */
-  remainingNets: Record<string, number>
-}
-
 /**
- * Consolidates every recipient onto a single payer — whoever currently
- * holds the most tagged Band Fund, since this whole section exists to track
- * that fund and routing through its biggest holder is the most natural fit
- * — instead of splitting a recipient's payment across payers. That hub pays
- * every recipient in full, up front; every other payer then only owes the
- * hub whatever the hub's own fund balance can't already absorb on their
- * behalf, following the same reimbursement-floor rule as fronting a show
- * expense or a recipient self-satisfying: don't ask anyone to pay back
- * money that would've just sat in a fund balance anyway. Whatever the hub
- * does absorb comes back as `consolidationAbsorptions`, for a ledger
- * deduction. Returns null only when there's nobody to consolidate through
- * (fewer than two payers).
+ * Consolidates payments through whoever holds the most pre-existing Band
+ * Fund, instead of splitting a recipient's payment across payers. That hub
+ * pays recipients directly using their own capacity plus whatever they can
+ * safely absorb (via their own fund buffer) from other payers' capacity —
+ * an absorbed portion never becomes a real payment for anyone: the other
+ * payer's share simply isn't assigned to them, and the hub's own direct
+ * payment to the recipient already covers it, permanently, with nothing
+ * paid back to the hub for it. Any of another payer's capacity the hub's
+ * buffer *can't* absorb still gets paid — directly to whichever recipient
+ * needs it, never routed through the hub. Returns null when there's nobody
+ * to consolidate through (fewer than two payers).
  */
-function tryHubSettlement(owed: Balance[], owers: Balance[], fundBalances: Record<string, number>): { payments: Payment[]; consolidationAbsorptions: Record<string, number> } | null {
+function tryHubSettlement(owed: Balance[], owers: Balance[], fundBalances: Record<string, number>): Payment[] | null {
   if (owers.length < 2) return null
 
-  const totalOwed = round2(owed.reduce((s, o) => s + o.amount, 0))
   const hub = owers[0] // owers is already sorted by fund balance descending — the biggest fund holder
-  const gap = round2(totalOwed - hub.amount)
+  let hubCapacity = hub.amount
+  let hubBuffer = fundBalances[hub.memberId] ?? 0
 
-  const payments: Payment[] = []
-  const consolidationAbsorptions: Record<string, number> = {}
-
-  if (gap > EPSILON) {
-    let hubBuffer = fundBalances[hub.memberId] ?? 0
-    for (const other of owers.slice(1)) {
-      if (other.amount <= EPSILON) continue
-      const absorbed = round2(Math.min(hubBuffer, other.amount))
-      const realPayment = round2(other.amount - absorbed)
-      if (absorbed > EPSILON) {
-        consolidationAbsorptions[hub.memberId] = round2((consolidationAbsorptions[hub.memberId] ?? 0) + absorbed)
-        hubBuffer = round2(hubBuffer - absorbed)
-      }
-      if (realPayment > EPSILON) payments.push({ from: other.memberId, to: hub.memberId, amount: realPayment })
-    }
+  const combinedPayers: Balance[] = []
+  for (const other of owers.slice(1)) {
+    const absorbed = round2(Math.min(hubBuffer, other.amount))
+    hubBuffer = round2(hubBuffer - absorbed)
+    hubCapacity = round2(hubCapacity + absorbed)
+    const stillReal = round2(other.amount - absorbed)
+    if (stillReal > EPSILON) combinedPayers.push({ memberId: other.memberId, amount: stillReal })
   }
+  combinedPayers.unshift({ memberId: hub.memberId, amount: hubCapacity })
 
-  for (const recipient of owed) {
-    if (recipient.amount > EPSILON) payments.push({ from: hub.memberId, to: recipient.memberId, amount: round2(recipient.amount) })
-  }
-
-  return { payments, consolidationAbsorptions }
+  return tryExactPartition(owed, combinedPayers) ?? greedySettlement(owed, combinedPayers)
 }
 
 /**
- * Given each real member's net position (positive = holding more cash than
- * they're entitled to, so they need to pay out; negative = short, they need
- * to receive), produces the payments that settle everyone. First lets each
- * recipient self-satisfy out of their own tagged Band Fund balance — no one
- * needs fresh cash for a share they're already sitting on. For what's left,
- * prefers a clean assignment where every recipient is paid by exactly one
- * payer; when that's not directly possible, consolidates through whoever
- * holds the most Band Fund (tryHubSettlement) before ever splitting a
- * recipient's payment across payers. `fundBalances` — each member's current
- * tagged Band Fund balance (`category: 'fund'` transactions only, not their
- * whole balance) — drives both of those; omit it (or pass {}) to skip
- * straight to a direct split whenever a clean assignment isn't possible.
- * Netting positions from multiple shows together before calling this is
- * what makes multi-show batching actually reduce the number of payments.
+ * Routes every involved member's amountOwed to one or more payers, as a
+ * direct debit list — payer -> recipient, amount. Every payment (including
+ * someone covering their own amount, `from === to`) becomes exactly one
+ * ledger debit on the payer; nobody is ever credited, since money paid out
+ * to a recipient becomes personal the moment it's paid and this app only
+ * tracks Band Fund. A member's own spare capacity from this batch's shows,
+ * then their pre-existing Band Fund, both count toward covering their own
+ * amountOwed first (self-pay); whatever's left routes to other payers with
+ * spare capacity — preferring a clean assignment where each recipient is
+ * paid by exactly one payer, then consolidating through whoever holds the
+ * most pre-existing Band Fund (tryHubSettlement), and only splitting a
+ * recipient's payment across payers as a last resort.
  */
-export function minimizeSettlement(nets: Record<string, number>, fundBalances: Record<string, number> = {}): SettlementResult {
-  // Let each recipient cover as much of their own share as their tagged
-  // Band Fund allows before anyone else needs to pay them anything.
-  const selfSatisfactions: Record<string, number> = {}
-  const adjustedNets: Record<string, number> = { ...nets }
-  const availableFund: Record<string, number> = { ...fundBalances }
+export function routeSettlement(
+  amountOwed: Record<string, number>,
+  capacity: Record<string, number>,
+  fundBalances: Record<string, number> = {}
+): Payment[] {
+  const remainingOwed: Record<string, number> = { ...amountOwed }
+  const remainingCapacity: Record<string, number> = { ...capacity }
+  const remainingFund: Record<string, number> = { ...fundBalances }
+  const payments: Payment[] = []
 
-  for (const [id, net] of Object.entries(nets)) {
-    if (net >= -EPSILON) continue // not owed anything
-    const owed = -net
-    const fund = availableFund[id] ?? 0
-    const satisfied = round2(Math.min(fund, owed))
-    if (satisfied > EPSILON) {
-      selfSatisfactions[id] = satisfied
-      adjustedNets[id] = round2(net + satisfied)
-      availableFund[id] = round2(fund - satisfied)
+  // Self-pay: a member's own spare capacity from this batch, then their own
+  // pre-existing Band Fund, cover as much of their own amountOwed as
+  // possible before anyone else needs to be involved at all.
+  for (const id of Object.keys(remainingOwed)) {
+    const owed = remainingOwed[id] ?? 0
+    if (owed <= EPSILON) continue
+
+    const ownCapacity = Math.max(0, remainingCapacity[id] ?? 0)
+    const fromCapacity = round2(Math.min(ownCapacity, owed))
+    remainingCapacity[id] = round2((remainingCapacity[id] ?? 0) - fromCapacity)
+
+    const stillOwed = round2(owed - fromCapacity)
+    const fromFund = stillOwed > EPSILON ? round2(Math.min(remainingFund[id] ?? 0, stillOwed)) : 0
+    if (fromFund > EPSILON) remainingFund[id] = round2((remainingFund[id] ?? 0) - fromFund)
+
+    const selfPaid = round2(fromCapacity + fromFund)
+    if (selfPaid > EPSILON) {
+      payments.push({ from: id, to: id, amount: selfPaid })
+      remainingOwed[id] = round2(owed - selfPaid)
     }
   }
 
-  const owers = Object.entries(adjustedNets)
+  const payers = Object.entries(remainingCapacity)
     .filter(([, n]) => n > EPSILON)
     .map(([memberId, amount]) => ({ memberId, amount: round2(amount) }))
-    .sort((a, b) => (availableFund[b.memberId] ?? 0) - (availableFund[a.memberId] ?? 0))
+    .sort((a, b) => (remainingFund[b.memberId] ?? 0) - (remainingFund[a.memberId] ?? 0))
 
-  const owed = Object.entries(adjustedNets)
-    .filter(([, n]) => n < -EPSILON)
-    .map(([memberId, amount]) => ({ memberId, amount: round2(-amount) }))
+  const recipients = Object.entries(remainingOwed)
+    .filter(([, n]) => n > EPSILON)
+    .map(([memberId, amount]) => ({ memberId, amount: round2(amount) }))
     .sort((a, b) => b.amount - a.amount)
 
-  const exact = tryExactPartition(owed, owers)
-  if (exact) return { payments: exact, consolidationAbsorptions: {}, selfSatisfactions, remainingNets: adjustedNets }
+  if (payers.length === 0 || recipients.length === 0) return payments
 
-  const hub = tryHubSettlement(owed, owers, availableFund)
-  if (hub) return { ...hub, selfSatisfactions, remainingNets: adjustedNets }
+  const exact = tryExactPartition(recipients, payers)
+  if (exact) return [...payments, ...exact]
 
-  return { payments: greedySettlement(owed, owers), consolidationAbsorptions: {}, selfSatisfactions, remainingNets: adjustedNets }
+  const hub = tryHubSettlement(recipients, payers, remainingFund)
+  if (hub) return [...payments, ...hub]
+
+  return [...payments, ...greedySettlement(recipients, payers)]
 }
 
 export interface ShowSettlementInput {
   involvedMemberIds: string[]
+  /** memberId -> their cut of this show */
   entitlements: Record<string, number>
+  /** the plain Band Fund % cut for this show — not inflated by any absorbed savings, those just fall out naturally as leftover capacity */
   bandFundAmount: number
   /** who keeps the Band Fund's cut for this show — typically whoever collected it */
   bandFundHolderId: string
   /** raw cash each involved member handled for this show (credits positive, expenses negative) */
   cashPositions: Record<string, number>
-  /**
-   * memberId -> amount of their fronted expense already covered by their own
-   * standing balance (from computeAbsorbedAmount) — money they don't need
-   * paid back in cash because their balance never actually went negative for
-   * it. Reduces what the real settlement below asks anyone to hand them.
-   * This is entirely separate from — and doesn't affect — the ledger
-   * bookkeeping in computeSettlementLedgerDelta, which reconciles each
-   * member's recorded balance to their entitlement on its own terms
-   * regardless of how the real cash is routed.
-   */
-  absorptions?: Record<string, number>
+  /** memberId -> real cash still owed back for a fronted expense, after their own standing balance covers what it can (from computeAbsorbedAmount) */
+  reimbursements?: Record<string, number>
+}
+
+export interface ShowSettlementResult {
+  /** memberId -> spare cash this show leaves them holding, beyond their own Band Fund obligation if they're the holder. Can be negative (e.g. they fronted an expense). */
+  capacity: Record<string, number>
+  /** memberId -> what they're owed from this show — their cut plus any real reimbursement for fronting. */
+  amountOwed: Record<string, number>
 }
 
 /**
- * Net settlement position for one show, per involved member — positive
- * means they need to pay out, negative means they're owed. Balances to zero
- * before absorption (sum of cash positions == netAmount by construction);
- * an absorption reduces what its member is owed without a matching increase
- * elsewhere, since that portion is real cash they already have on hand and
- * genuinely doesn't need to move — the payer(s) simply pay out that much
- * less. Feed the sums of these across every show in a batch into
- * minimizeSettlement to get pooled, minimized payment instructions.
+ * One show's contribution to the batch: how much spare cash each involved
+ * member is left holding (capacity), and how much each is owed (their cut,
+ * plus a real reimbursement if they fronted something that wasn't fully
+ * absorbed by their own standing balance). Pool these across every show in
+ * a batch (poolShowSettlements) before calling routeSettlement.
  */
-export function computeShowSettlementNets(input: ShowSettlementInput): Record<string, number> {
-  const nets: Record<string, number> = {}
+export function computeShowSettlement(input: ShowSettlementInput): ShowSettlementResult {
+  const capacity: Record<string, number> = {}
+  const amountOwed: Record<string, number> = {}
   for (const id of input.involvedMemberIds) {
-    let net = round2((input.cashPositions[id] ?? 0) - (input.entitlements[id] ?? 0))
-    if (id === input.bandFundHolderId) net = round2(net - input.bandFundAmount)
-    net = round2(net + (input.absorptions?.[id] ?? 0))
-    nets[id] = net
+    let cap = round2(input.cashPositions[id] ?? 0)
+    if (id === input.bandFundHolderId) cap = round2(cap - input.bandFundAmount)
+    capacity[id] = cap
+    amountOwed[id] = round2((input.entitlements[id] ?? 0) + (input.reimbursements?.[id] ?? 0))
   }
-  return nets
+  return { capacity, amountOwed }
 }
 
-/** Sums per-member nets from multiple shows into one pooled settlement input. */
-export function poolSettlementNets(perShowNets: Record<string, number>[]): Record<string, number> {
-  const pooled: Record<string, number> = {}
-  for (const showNets of perShowNets) {
-    for (const [id, net] of Object.entries(showNets)) {
-      pooled[id] = round2((pooled[id] ?? 0) + net)
-    }
+/** Sums per-show capacity and amountOwed from multiple shows into one pooled settlement input. */
+export function poolShowSettlements(results: ShowSettlementResult[]): ShowSettlementResult {
+  const capacity: Record<string, number> = {}
+  const amountOwed: Record<string, number> = {}
+  for (const r of results) {
+    for (const [id, v] of Object.entries(r.capacity)) capacity[id] = round2((capacity[id] ?? 0) + v)
+    for (const [id, v] of Object.entries(r.amountOwed)) amountOwed[id] = round2((amountOwed[id] ?? 0) + v)
   }
-  return pooled
+  return { capacity, amountOwed }
 }

@@ -2,8 +2,8 @@
 
 import { useState, useTransition, useMemo, useRef } from 'react'
 import { Check, ArrowRight, Download, X, Plus } from 'lucide-react'
-import { splitShows, type ShowSplitInput } from '@/actions/finance'
-import { computeEntitlements, computeAbsorbedAmount, computeShowSettlementNets, computeSettlementLedgerDelta, poolSettlementNets, minimizeSettlement } from '@/lib/finance/settlement'
+import { splitShows, type ShowSplitInput, type SplitPayment } from '@/actions/finance'
+import { computeEntitlements, computeAbsorbedAmount, computeShowSettlement, poolShowSettlements, routeSettlement, type Payment } from '@/lib/finance/settlement'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toaster'
 import { cn } from '@/lib/utils'
@@ -16,7 +16,7 @@ interface Props {
   members: Member[]
   txnsByShow: Record<string, FinanceTransaction[]>
   memberBalances: Record<string, number>
-  /** Each member's current tagged Band Fund balance (category 'fund' only) — this section only tracks Band Fund, and settlement routing runs on this, not overall balance. */
+  /** Each member's current tagged Band Fund balance (category 'fund' only) — used to decide who can safely absorb another payer's share without a real payment existing for it. */
   memberFundBalances: Record<string, number>
 }
 
@@ -38,6 +38,13 @@ function holderFor(txns: FinanceTransaction[], fallback: string): string {
   const positions = cashPositionsFor(txns)
   const sorted = Object.entries(positions).sort((a, b) => b[1] - a[1])
   return sorted[0]?.[0] ?? fallback
+}
+
+/** The transaction description for one payment — used both when confirming and previewing. */
+function descriptionFor(payment: Payment, nameOf: (id: string) => string, showTitles: string): string {
+  return payment.from === payment.to
+    ? `Covered own share from Band Fund — ${showTitles}`
+    : `Paid ${nameOf(payment.to)}'s share — ${showTitles}`
 }
 
 export function SplitWizard({ shows, members, txnsByShow, memberBalances, memberFundBalances }: Props) {
@@ -67,14 +74,15 @@ export function SplitWizard({ shows, members, txnsByShow, memberBalances, member
     return round2((memberBalances[memberId] ?? 0) - batchContribution)
   }
 
-  // Per-show computation: ideal equal split, cash positions, absorptions,
-  // and settlement nets. Memoized since it feeds both the preview and submit.
+  // Per-show computation: ideal equal split, cash positions, reimbursements,
+  // and this show's capacity/amountOwed contribution. Memoized since it
+  // feeds both the preview and submit.
   const perShow = useMemo(() => {
-    // Absorptions are computed sequentially across the batch (in show
-    // order), not independently per show — otherwise the same person
-    // fronting expenses in two selected shows would have their one
-    // standing-balance cushion checked against each front separately and
-    // counted twice, when it can really only cover so much combined.
+    // Absorption (how much of a front the fronter's own balance already
+    // covers) is computed sequentially across the batch's shows, not
+    // independently per show — otherwise the same person fronting expenses
+    // in two selected shows would have their one standing-balance cushion
+    // checked against each front separately and counted twice.
     const availableStanding: Record<string, number> = {}
     const standingFor = (id: string) => {
       if (!(id in availableStanding)) availableStanding[id] = standingBalanceBeforeBatch(id)
@@ -84,38 +92,36 @@ export function SplitWizard({ shows, members, txnsByShow, memberBalances, member
     return selectedShows.map(show => {
       const involved = [...(involvedByShow[show.id] ?? new Set())]
       const net = netForShow(show.id)
-      const { memberShares, bandFundAmount: baseBandFundAmount } = computeEntitlements(net, involved, bandPct)
+      const { memberShares, bandFundAmount } = computeEntitlements(net, involved, bandPct)
       const cashPositions = cashPositionsFor(txnsByShow[show.id] ?? [])
       const bandFundHolderId = holderFor(txnsByShow[show.id] ?? [], members[0]?.id ?? '')
 
-      const absorptions = involved
-        .filter(id => (cashPositions[id] ?? 0) < 0)
-        .map(id => {
-          const fronted = -(cashPositions[id] ?? 0)
-          const standing = standingFor(id)
-          const amount = computeAbsorbedAmount(standing, fronted)
-          availableStanding[id] = round2(standing - amount) // consume the cushion for later shows in this batch
-          return { memberId: id, amount }
-        })
-        .filter(a => a.amount > 0)
+      // Real cash still owed back for a fronted expense, after the
+      // fronter's own standing balance covers what it can — the
+      // reimbursement floor. 0 whenever their balance never would've gone
+      // below ₹0.
+      const reimbursements: Record<string, number> = {}
+      for (const id of involved) {
+        const cashPosition = cashPositions[id] ?? 0
+        if (cashPosition >= 0) continue
+        const fronted = -cashPosition
+        const standing = standingFor(id)
+        const absorbed = computeAbsorbedAmount(standing, fronted)
+        availableStanding[id] = round2(standing - absorbed) // consume the cushion for later shows in this batch
+        const reimbursed = round2(fronted - absorbed)
+        if (reimbursed > 0) reimbursements[id] = reimbursed
+      }
 
-      // Whatever a member's own balance covers doesn't need to be paid back
-      // in cash — that saved amount becomes extra Band Fund for this show,
-      // on top of the usual cut, so the holder's recorded balance matches
-      // what they actually end up keeping (nothing else accounts for it).
-      const totalAbsorbed = round2(absorptions.reduce((s, a) => s + a.amount, 0))
-      const bandFundAmount = round2(baseBandFundAmount + totalAbsorbed)
-
-      const nets = computeShowSettlementNets({
+      const settlement = computeShowSettlement({
         involvedMemberIds: involved,
         entitlements: memberShares,
         bandFundAmount,
         bandFundHolderId,
         cashPositions,
-        absorptions: Object.fromEntries(absorptions.map(a => [a.memberId, a.amount])),
+        reimbursements,
       })
 
-      return { show, net, involved, memberShares, bandFundAmount, baseBandFundAmount, totalAbsorbed, bandFundHolderId, cashPositions, absorptions, nets }
+      return { show, net, involved, memberShares, bandFundAmount, bandFundHolderId, cashPositions, reimbursements, settlement }
     })
     // netForShow/standingBalanceBeforeBatch derive purely from the args
     // already listed here, and `members` only supplies a fallback id —
@@ -123,115 +129,76 @@ export function SplitWizard({ shows, members, txnsByShow, memberBalances, member
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedShows, involvedByShow, bandPct, txnsByShow, memberBalances])
 
-  const pooledNets = useMemo(() => poolSettlementNets(perShow.map(p => p.nets)), [perShow])
-  // Each member's tagged Band Fund balance drives who self-satisfies their
-  // own share and who consolidates the rest (see minimizeSettlement).
-  const settlement = useMemo(() => minimizeSettlement(pooledNets, memberFundBalances), [pooledNets, memberFundBalances])
-  const payments = settlement.payments
-  const consolidationAbsorptions = settlement.consolidationAbsorptions
-  const selfSatisfactions = settlement.selfSatisfactions
+  const pooled = useMemo(
+    () => poolShowSettlements(perShow.map(p => p.settlement)),
+    [perShow]
+  )
+  // Auto mode's routed payments — a member's own spare capacity from this
+  // batch, then their pre-existing Band Fund, cover their own share first;
+  // whatever's left routes to whoever can pay it with the fewest, cleanest
+  // transactions. See lib/finance/settlement.ts's routeSettlement.
+  const payments = useMemo(
+    () => routeSettlement(pooled.amountOwed, pooled.capacity, memberFundBalances),
+    [pooled, memberFundBalances]
+  )
 
-  // Manual mode (default): just show each person's cut and everyone's Band
-  // Fund, and let a person assign who pays whom themselves. Auto mode
-  // (WIP): the algorithm's own routed payment instructions.
+  // Manual mode (default): show each person's amount owed and everyone's
+  // Band Fund, and let a person assign who pays whom themselves. Auto mode
+  // (WIP): the algorithm's own routed payments above.
   const [mode, setMode] = useState<'manual' | 'auto'>('manual')
 
   // Manual assignment scratchpad — recipientId -> one or more {payerId,
   // amount} rows, so a recipient's payment can be split across more than
-  // one payer if needed. Purely a planning aid, not written anywhere; the
-  // actual confirm action still runs through Auto mode.
+  // one payer if needed, including paying themselves.
   interface Assignment { payerId: string; amount: number }
   const [assignmentsByRecipient, setAssignmentsByRecipient] = useState<Record<string, Assignment[]>>({})
 
-  // Every calculation behind each person's final number, show by show — the
-  // full audit trail, not just the resulting payment.
+  // Every calculation behind each person's amount, show by show — the full
+  // audit trail behind the pooled amountOwed figure.
   interface BreakdownLine {
     showTitle: string
     entitlement: number
     cashPosition: number
-    isBandFundHolder: boolean
-    /** Combined Band Fund for this show — base cut plus any absorbed savings — used in showNet math. */
-    bandFundAmount: number
-    /** Just the plain {bandPct}% cut, before any absorbed-savings addition — for display. */
-    baseBandFundAmount: number
-    /** The extra Band Fund from someone's fronted expense not needing reimbursement — 0 most of the time. */
-    extraBandFund: number
-    absorbed: number
-    /** Real cash still owed back for what they fronted, after their own
-     * balance covers what it can — 0 whenever their balance never would've
-     * gone below zero. */
     reimbursed: number
-    /** What this show actually nets them, all in — entitlement, reconciled
-     * against cash they already handled, the reimbursement-floor correction,
-     * and the Band Fund cut if they're holding it. Positive = they come out
-     * ahead on this show; negative = they still owe it back. */
-    showNet: number
-    /** Their own money from this show — the cut, reconciled against cash
-     * they already handled. This is NOT Band Fund, even for the holder —
-     * it's personal, same as anyone else's cut. */
-    personalNet: number
-    /** Only the Band Fund portion of showNet — 0 unless they're the holder. */
-    fundNet: number
+    isBandFundHolder: boolean
+    bandFundAmount: number
+    /** What this show adds to their pooled amount owed — their cut, plus any real reimbursement for fronting. */
+    owedFromShow: number
   }
   const breakdownByPerson = useMemo(() => {
     const map: Record<string, BreakdownLine[]> = {}
     for (const p of perShow) {
       for (const id of p.involved) {
-        const absorption = p.absorptions.find(a => a.memberId === id)
-        const absorbed = absorption?.amount ?? 0
         const entitlement = p.memberShares[id] ?? 0
         const cashPosition = p.cashPositions[id] ?? 0
-        const fronted = cashPosition < 0 ? -cashPosition : 0
-        const reimbursed = round2(fronted - absorbed)
+        const reimbursed = p.reimbursements[id] ?? 0
         const isBandFundHolder = id === p.bandFundHolderId
-        const personalNet = round2(computeSettlementLedgerDelta(entitlement, cashPosition) - absorbed)
-        const fundNet = isBandFundHolder ? p.bandFundAmount : 0
-        const showNet = round2(personalNet + fundNet)
         ;(map[id] ??= []).push({
           showTitle: p.show.title,
           entitlement,
           cashPosition,
+          reimbursed,
           isBandFundHolder,
           bandFundAmount: p.bandFundAmount,
-          baseBandFundAmount: p.baseBandFundAmount,
-          extraBandFund: p.totalAbsorbed,
-          absorbed,
-          reimbursed,
-          showNet,
-          personalNet,
-          fundNet,
+          owedFromShow: round2(entitlement + reimbursed),
         })
       }
     }
     return map
   }, [perShow])
 
-  const peopleInSettlement = Object.keys(pooledNets).filter(id => Math.abs(pooledNets[id]) > 0.01)
-
   const totalNet = perShow.reduce((s, p) => s + p.net, 0)
   const totalBandFund = perShow.reduce((s, p) => s + p.bandFundAmount, 0)
 
-  // Chaining can route a payment through someone who isn't a direct
-  // recipient — their true net is out minus in, not just one direction's
-  // sum. Shared by the on-screen breakdown and the downloadable report;
-  // takes whichever payments list is active (auto-routed or manual).
-  const netFor = (id: string, paymentsList: { from: string; to: string; amount: number }[]) => {
-    const outgoing = paymentsList.filter(p => p.from === id)
-    const incoming = paymentsList.filter(p => p.to === id)
-    return round2(outgoing.reduce((s, p) => s + p.amount, 0) - incoming.reduce((s, p) => s + p.amount, 0))
-  }
-
-  // Everyone touched by any selected show, in a stable order — not just
-  // those left with a nonzero settlement, since the report should show
-  // entitlement and new balance for someone who's already exactly settled.
+  // Everyone touched by any selected show, in a stable order.
   const allInvolvedIds = members.map(m => m.id).filter(id => perShow.some(p => p.involved.includes(id)))
 
-  const cutFor = (id: string) => round2((breakdownByPerson[id] ?? []).reduce((s, l) => s + l.entitlement, 0))
+  const amountOwedFor = (id: string) => pooled.amountOwed[id] ?? 0
 
   const assignmentsFor = (recipientId: string): Assignment[] => {
     const existing = assignmentsByRecipient[recipientId]
     if (existing && existing.length > 0) return existing
-    return [{ payerId: '', amount: cutFor(recipientId) }]
+    return [{ payerId: '', amount: amountOwedFor(recipientId) }]
   }
 
   const updateAssignment = (recipientId: string, index: number, patch: Partial<Assignment>) => {
@@ -254,10 +221,8 @@ export function SplitWizard({ shows, members, txnsByShow, memberBalances, member
   }
 
   // Each payer's real available money — same figure as the main Finance
-  // page's Member Balances (their whole balance, not just the narrow
-  // tagged-fund slice), minus everything currently assigned to them across
-  // every recipient so far. Someone paying another member uses whatever
-  // they're actually holding, not just their "official" fund cut. Updates
+  // page's Member Balances — minus everything currently assigned to them
+  // (as payer, for any recipient, including themselves) so far. Updates
   // live as assignments change.
   const remainingFundFor = (memberId: string) => {
     const totalAssigned = allInvolvedIds
@@ -267,27 +232,19 @@ export function SplitWizard({ shows, members, txnsByShow, memberBalances, member
     return round2((memberBalances[memberId] ?? 0) - totalAssigned)
   }
 
-  // Manual mode's assignments, translated into the same shapes the
-  // algorithm produces, so the report and confirm logic can be shared. A
-  // recipient assigned to pay themselves is a self-satisfaction (their own
-  // Band Fund covers it, no cash moves) — everyone else is a real payment.
-  const manualPayments = allInvolvedIds.flatMap(id =>
+  // Manual mode's assignments, translated directly into payments — every
+  // row (including a self-assignment) becomes one payment, exactly the
+  // same shape routeSettlement produces for Auto mode.
+  const manualPayments: Payment[] = allInvolvedIds.flatMap(id =>
     assignmentsFor(id)
-      .filter(a => a.payerId && a.payerId !== id && a.amount > 0)
+      .filter(a => a.payerId && a.amount > 0)
       .map(a => ({ from: a.payerId, to: id, amount: round2(a.amount) }))
   )
-  const manualSelfSatisfactions: Record<string, number> = {}
-  for (const id of allInvolvedIds) {
-    const selfAmount = round2(
-      assignmentsFor(id).filter(a => a.payerId === id).reduce((s, a) => s + (a.amount || 0), 0)
-    )
-    if (selfAmount > 0.01) manualSelfSatisfactions[id] = selfAmount
-  }
-  // Every recipient needs a payer chosen for their full cut before this
-  // can be confirmed — an unassigned or over-assigned row blocks it.
+  // Every recipient needs their full amount assigned to a payer (or payers)
+  // before this can be confirmed.
   const manualFullyAssigned = allInvolvedIds.every(id => {
     const assigned = round2(assignmentsFor(id).reduce((s, a) => s + (a.payerId ? (a.amount || 0) : 0), 0))
-    return Math.abs(cutFor(id) - assigned) < 0.01
+    return Math.abs(amountOwedFor(id) - assigned) < 0.01
   })
 
   const toggleShow = (id: string) => {
@@ -307,34 +264,25 @@ export function SplitWizard({ shows, members, txnsByShow, memberBalances, member
 
   const showsReady = perShow.length > 0 && perShow.every(p => p.involved.length > 0)
   // Auto mode can always confirm once shows are ready — the algorithm
-  // routes everything. Manual mode also needs every recipient's full cut
-  // actually assigned to a payer first.
+  // routes everything. Manual mode also needs every recipient's full
+  // amount actually assigned to a payer first.
   const canConfirm = showsReady && (mode === 'auto' || manualFullyAssigned)
+
+  const nameOf = (id: string) => members.find(m => m.id === id)?.name ?? 'Unknown'
 
   const handleSplit = () => {
     if (!canConfirm) return
-    const payload: ShowSplitInput[] = perShow.map(p => ({
-      showId: p.show.id,
-      showTitle: p.show.title,
-      involvedMemberIds: p.involved,
-      entitlements: p.memberShares,
-      cashPositions: p.cashPositions,
-      bandFundAmount: p.bandFundAmount,
-      bandFundHolderId: p.bandFundHolderId,
-      absorptions: p.absorptions,
-    }))
-    // Manual mode has no consolidation concept — every non-self assignment
-    // is a real payment, never recorded as a transaction, same as auto's
-    // routed payments; only self-assignments need a fund deduction.
-    const consolidations = mode === 'auto' ? consolidationAbsorptions : {}
-    const selfSats = mode === 'auto' ? selfSatisfactions : manualSelfSatisfactions
+    const shows_: ShowSplitInput[] = selectedShows.map(s => ({ showId: s.id, showTitle: s.title }))
+    const showTitles = selectedShows.map(s => s.title).join(', ')
+    const activePayments = mode === 'auto' ? payments : manualPayments
+    const splitPayments: SplitPayment[] = activePayments
+      .filter(p => p.amount > 0)
+      .map(p => ({ from: p.from, to: p.to, amount: round2(p.amount), description: descriptionFor(p, nameOf, showTitles) }))
     startTransition(async () => {
-      const result = await splitShows(payload, consolidations, selfSats)
+      const result = await splitShows(shows_, splitPayments)
       if (result && 'error' in result && result.error) toast(result.error, 'error')
     })
   }
-
-  const nameOf = (id: string) => members.find(m => m.id === id)?.name ?? 'Unknown'
 
   const pdfRef = useRef<HTMLDivElement>(null)
   const [isDownloading, setIsDownloading] = useState(false)
@@ -346,46 +294,33 @@ export function SplitWizard({ shows, members, txnsByShow, memberBalances, member
       // Reflect whichever mode is active — the manual assignments if
       // that's what was actually decided, or the algorithm's routing.
       const activePayments = mode === 'auto' ? payments : manualPayments
-      const activeSelfSatisfactions = mode === 'auto' ? selfSatisfactions : manualSelfSatisfactions
-      const activeConsolidations = mode === 'auto' ? consolidationAbsorptions : {}
 
       const rows: SplitReportRow[] = allInvolvedIds.map(id => {
-        const lines: SplitReportLine[] = (breakdownByPerson[id] ?? []).map(l => ({
-          showTitle: l.showTitle,
-          cut: l.entitlement,
-          frontedFromBalance: l.cashPosition < 0 ? -l.cashPosition : 0,
-          reimbursed: l.reimbursed,
-          cashHandled: l.cashPosition > 0 ? l.cashPosition : 0,
-          isBandFundHolder: l.isBandFundHolder,
-          baseBandFundAmount: l.baseBandFundAmount,
-          extraBandFund: l.extraBandFund,
-          showNet: l.showNet,
-        }))
-        // Exactly the Manual mode Band Fund balances panel's own logic
-        // (remainingFundFor): real overall balance minus whatever they're
-        // committed to pay out — as a real payment, a self-satisfaction, or
-        // a consolidation absorption. Not a projected final balance — how
-        // much they still have spare, same question the panel answers.
+        const lines: SplitReportLine[] = breakdownByPerson[id] ?? []
+        const outgoing = activePayments.filter(p => p.from === id && p.to !== id)
+        const self = activePayments.find(p => p.from === id && p.to === id)
+        const incoming = activePayments.filter(p => p.to === id && p.from !== id)
+        // Same logic as the Manual mode Band Fund balances panel: real
+        // balance minus whatever they're paying out for anyone (including
+        // themselves) — how much they still have spare, not a projected
+        // final balance including what they're due to receive.
         const paidOut = round2(activePayments.filter(p => p.from === id).reduce((s, p) => s + p.amount, 0))
-        const newFundBalance = round2(
-          (memberBalances[id] ?? 0) - paidOut - (activeSelfSatisfactions[id] ?? 0) - (activeConsolidations[id] ?? 0)
-        )
+        const newFundBalance = round2((memberBalances[id] ?? 0) - paidOut)
         return {
           name: nameOf(id),
           lines,
-          selfSatisfied: activeSelfSatisfactions[id] ?? 0,
-          consolidationAbsorbed: activeConsolidations[id] ?? 0,
-          settlementAmount: netFor(id, activePayments), // pay-out-positive: >0 pays, <0 receives
-          outgoing: activePayments.filter(p => p.from === id).map(p => ({ to: nameOf(p.to), amount: p.amount })),
-          incoming: activePayments.filter(p => p.to === id).map(p => ({ from: nameOf(p.from), amount: p.amount })),
+          owed: amountOwedFor(id),
+          selfPaid: self?.amount ?? 0,
+          outgoing: outgoing.map(p => ({ to: nameOf(p.to), amount: p.amount })),
+          incoming: incoming.map(p => ({ from: nameOf(p.from), amount: p.amount })),
           newFundBalance,
         }
       })
 
       // One card per show — the exact same shape as the on-screen show
-      // preview (title, net, its own transactions, who's involved, and
-      // each person's plain cut + the plain Band Fund %), so the report
-      // reads as a full record of every show that went into this split.
+      // preview (title, net, its own transactions, each person's plain cut
+      // and the plain Band Fund %), so the report reads as a full record
+      // of every show that went into this split.
       const showDetails: SplitReportShow[] = perShow.map(p => ({
         showTitle: p.show.title,
         net: p.net,
@@ -396,8 +331,7 @@ export function SplitWizard({ shows, members, txnsByShow, memberBalances, member
         })),
         cuts: p.involved.map(id => ({ name: nameOf(id), cut: p.memberShares[id] ?? 0 })),
         bandFundHolderName: nameOf(p.bandFundHolderId),
-        baseBandFundAmount: p.baseBandFundAmount,
-        totalAbsorbed: p.totalAbsorbed,
+        bandFundAmount: p.bandFundAmount,
       }))
 
       const el = pdfRef.current
@@ -426,7 +360,7 @@ export function SplitWizard({ shows, members, txnsByShow, memberBalances, member
             const net = netForShow(s.id)
             const txns = txnsByShow[s.id] ?? []
             const involved = involvedByShow[s.id] ?? new Set()
-            const showEntitlement = perShow.find(p => p.show.id === s.id)
+            const showData = perShow.find(p => p.show.id === s.id)
 
             return (
               <div key={s.id} className={cn('rounded-lg border transition-colors', selected ? 'border-brand-400 bg-brand-50' : 'border-brand-200')}>
@@ -479,25 +413,19 @@ export function SplitWizard({ shows, members, txnsByShow, memberBalances, member
                       </div>
                     </div>
 
-                    {/* Ideal equal split preview — the plain {bandPct}/{100-bandPct} split, before any reimbursement-floor adjustment */}
-                    {showEntitlement && showEntitlement.involved.length > 0 && (
+                    {/* Ideal equal split preview — the plain {bandPct}/{100-bandPct} split */}
+                    {showData && showData.involved.length > 0 && (
                       <div className="space-y-1 border-t border-brand-100 pt-2 text-xs">
-                        {showEntitlement.involved.map(id => (
+                        {showData.involved.map(id => (
                           <div key={id} className="flex items-center justify-between text-gray-600">
                             <span>{nameOf(id)}</span>
-                            <span className="font-semibold tabular-nums">{fmt(showEntitlement.memberShares[id] ?? 0)}</span>
+                            <span className="font-semibold tabular-nums">{fmt(showData.memberShares[id] ?? 0)}</span>
                           </div>
                         ))}
                         <div className="flex items-center justify-between pt-1 text-brand-600">
-                          <span>Band Fund ({bandPct}%) <span className="text-gray-400">(kept by {nameOf(showEntitlement.bandFundHolderId)})</span></span>
-                          <span className="font-semibold tabular-nums">{fmt(showEntitlement.baseBandFundAmount)}</span>
+                          <span>Band Fund ({bandPct}%) <span className="text-gray-400">(kept by {nameOf(showData.bandFundHolderId)})</span></span>
+                          <span className="font-semibold tabular-nums">{fmt(showData.bandFundAmount)}</span>
                         </div>
-                        {showEntitlement.totalAbsorbed > 0 && (
-                          <div className="flex items-center justify-between text-brand-600">
-                            <span>+ Extra Band Fund <span className="text-gray-400">(no reimbursement needed for what was fronted)</span></span>
-                            <span className="font-semibold tabular-nums">{fmt(showEntitlement.totalAbsorbed)}</span>
-                          </div>
-                        )}
                       </div>
                     )}
                   </div>
@@ -547,16 +475,16 @@ export function SplitWizard({ shows, members, txnsByShow, memberBalances, member
           <h2 className="mb-4 text-sm font-semibold text-gray-600">Who&apos;s supposed to get what</h2>
           <div className="space-y-2.5">
             {allInvolvedIds.map(id => {
-              const cut = cutFor(id)
+              const owed = amountOwedFor(id)
               const rows = assignmentsFor(id)
               const assigned = round2(rows.reduce((s, a) => s + (a.payerId ? (a.amount || 0) : 0), 0))
-              const remaining = round2(cut - assigned)
+              const remaining = round2(owed - assigned)
 
               return (
                 <div key={id} className="rounded-lg bg-white p-3 shadow-sm">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-700">{nameOf(id)}</span>
-                    <span className="text-sm font-bold tabular-nums text-green-600">Gets {fmt(cut)}</span>
+                    <span className="text-sm font-bold tabular-nums text-green-600">Gets {fmt(owed)}</span>
                   </div>
                   <div className="mt-2 space-y-1.5">
                     {rows.map((row, i) => (
@@ -639,9 +567,15 @@ export function SplitWizard({ shows, members, txnsByShow, memberBalances, member
           <div className="space-y-1.5">
             {payments.map((p, i) => (
               <div key={i} className="flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 shadow-sm">
-                <span className="text-sm font-medium text-gray-700">{nameOf(p.from)}</span>
-                <ArrowRight className="h-3.5 w-3.5 shrink-0 text-gray-300" />
-                <span className="text-sm font-medium text-gray-700">{nameOf(p.to)}</span>
+                {p.from === p.to ? (
+                  <span className="text-sm font-medium text-gray-700">{nameOf(p.from)} keeps their own share (Band Fund)</span>
+                ) : (
+                  <>
+                    <span className="text-sm font-medium text-gray-700">{nameOf(p.from)}</span>
+                    <ArrowRight className="h-3.5 w-3.5 shrink-0 text-gray-300" />
+                    <span className="text-sm font-medium text-gray-700">{nameOf(p.to)}</span>
+                  </>
+                )}
                 <span className="ml-auto text-sm font-bold text-gray-900">{fmt(p.amount)}</span>
               </div>
             ))}
@@ -650,22 +584,17 @@ export function SplitWizard({ shows, members, txnsByShow, memberBalances, member
       )}
 
       {/* Complete breakdown — every number behind every payment above */}
-      {peopleInSettlement.length > 0 && (
+      {allInvolvedIds.length > 0 && (
         <section className="rounded-xl border border-gray-200 bg-gray-50 p-5">
           <h2 className="mb-4 text-sm font-semibold text-gray-600">Complete breakdown</h2>
           <div className="space-y-4">
-            {peopleInSettlement.map(id => {
+            {allInvolvedIds.map(id => {
               const lines = breakdownByPerson[id] ?? []
-              // Chaining can route a payment through someone (e.g. to avoid
-              // splitting a recipient's payment) — they end up with both
-              // outgoing and incoming lines here, so the true net is out
-              // minus in, not just the raw pooled net or one direction's sum.
-              const outgoing = payments.filter(p => p.from === id)
-              const incoming = payments.filter(p => p.to === id)
-              const net = round2(
-                outgoing.reduce((s, p) => s + p.amount, 0) - incoming.reduce((s, p) => s + p.amount, 0)
-              )
-              const isPayer = net > 0
+              const owed = amountOwedFor(id)
+              const outgoing = payments.filter(p => p.from === id && p.to !== id)
+              const self = payments.find(p => p.from === id && p.to === id)
+              const incoming = payments.filter(p => p.to === id && p.from !== id)
+              const paidOut = round2(payments.filter(p => p.from === id).reduce((s, p) => s + p.amount, 0))
 
               return (
                 <div key={id} className="rounded-lg bg-white p-4 shadow-sm">
@@ -700,50 +629,33 @@ export function SplitWizard({ shows, members, txnsByShow, memberBalances, member
                             </div>
                           )}
                           {line.isBandFundHolder && (
-                            <>
-                              <div className="flex items-center justify-between text-brand-600">
-                                <span>+ Band Fund cut (you keep it)</span>
-                                <span className="tabular-nums">+{fmt(line.baseBandFundAmount)}</span>
-                              </div>
-                              {line.extraBandFund > 0 && (
-                                <div className="flex items-center justify-between text-brand-600">
-                                  <span>+ Extra Band Fund (no reimbursement was needed)</span>
-                                  <span className="tabular-nums">+{fmt(line.extraBandFund)}</span>
-                                </div>
-                              )}
-                            </>
+                            <div className="flex items-center justify-between text-brand-600">
+                              <span>+ Band Fund cut (you keep it)</span>
+                              <span className="tabular-nums">+{fmt(line.bandFundAmount)}</span>
+                            </div>
                           )}
                           <div className="flex items-center justify-between border-t border-gray-100 pt-0.5 font-medium text-gray-700">
-                            <span>Show net</span>
-                            <span className={cn('tabular-nums', line.showNet >= 0 ? 'text-green-600' : 'text-red-500')}>
-                              {line.showNet >= 0 ? '+' : '−'}{fmt(line.showNet)}
-                            </span>
+                            <span>Owed from this show</span>
+                            <span className="tabular-nums text-green-600">+{fmt(line.owedFromShow)}</span>
                           </div>
                         </div>
                       </div>
                     ))}
-                    {(consolidationAbsorptions[id] ?? 0) > 0 && (
-                      <div className="text-xs">
-                        <div className="flex items-center justify-between pl-2 text-gray-500">
-                          <span>Covered another member&apos;s share from your Band Fund</span>
-                          <span className="tabular-nums">−{fmt(consolidationAbsorptions[id])}</span>
-                        </div>
-                      </div>
-                    )}
-                    {(selfSatisfactions[id] ?? 0) > 0 && (
-                      <div className="text-xs">
-                        <div className="flex items-center justify-between pl-2 text-gray-500">
-                          <span>Covered from your own Band Fund — nothing to send</span>
-                          <span className="tabular-nums">−{fmt(selfSatisfactions[id])}</span>
-                        </div>
-                      </div>
-                    )}
                   </div>
                   <div className="flex items-center justify-between pt-2.5 text-sm font-semibold text-gray-800">
-                    <span>{isPayer ? 'Total to pay out' : 'Total you’ll receive'}</span>
-                    <span className="tabular-nums">{fmt(net)}</span>
+                    <span>Total owed</span>
+                    <span className="tabular-nums text-green-600">{fmt(owed)}</span>
                   </div>
+                  {paidOut > 0 && (
+                    <div className="flex items-center justify-between pt-1 text-sm font-semibold text-gray-800">
+                      <span>Total to pay out</span>
+                      <span className="tabular-nums">{fmt(paidOut)}</span>
+                    </div>
+                  )}
                   <div className="mt-1.5 space-y-1">
+                    {self && (
+                      <p className="text-xs text-gray-500">Keeps {fmt(self.amount)} of their own share from Band Fund</p>
+                    )}
                     {outgoing.map((p, i) => (
                       <p key={`out-${i}`} className="text-xs text-gray-500">
                         → Pays {nameOf(p.to)} {fmt(p.amount)}
@@ -794,28 +706,22 @@ export function SplitWizard({ shows, members, txnsByShow, memberBalances, member
 
 interface SplitReportLine {
   showTitle: string
-  cut: number
-  frontedFromBalance: number
+  entitlement: number
+  cashPosition: number
   reimbursed: number
-  cashHandled: number
   isBandFundHolder: boolean
-  /** Just the plain {bandPct}% cut, before any absorbed-savings addition. */
-  baseBandFundAmount: number
-  /** Extra Band Fund from someone's fronted expense not needing reimbursement — 0 most of the time. */
-  extraBandFund: number
-  showNet: number
+  bandFundAmount: number
+  owedFromShow: number
 }
 
 interface SplitReportRow {
   name: string
   lines: SplitReportLine[]
-  selfSatisfied: number
-  consolidationAbsorbed: number
-  /** Pay-out-positive: >0 pays this much, <0 receives, ~0 already settled. */
-  settlementAmount: number
+  owed: number
+  selfPaid: number
   outgoing: { to: string; amount: number }[]
   incoming: { from: string; amount: number }[]
-  /** Their Band Fund specifically, once this split is done — only ever the 20% cut (+ savings), not their cuts. This tool only tracks Band Fund; a cut is personal money and out of scope once paid out. */
+  /** Their Band Fund specifically — real balance minus whatever they're paying out. */
   newFundBalance: number
 }
 
@@ -825,8 +731,7 @@ interface SplitReportShow {
   transactions: { description: string; memberName: string | null; amount: number }[]
   cuts: { name: string; cut: number }[]
   bandFundHolderName: string
-  baseBandFundAmount: number
-  totalAbsorbed: number
+  bandFundAmount: number
 }
 
 function buildSplitReportHtml(
@@ -839,11 +744,6 @@ function buildSplitReportHtml(
 ): string {
   const sign = (n: number) => n >= 0 ? '+' : '−'
   const fmt = (n: number) => `₹${Math.abs(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
-  const whatHappens = (n: number) => {
-    if (n > 0.01) return { label: `Pays ${fmt(n)}`, color: '#dc2626' }
-    if (n < -0.01) return { label: `Gets ${fmt(n)}`, color: '#16a34a' }
-    return { label: 'Nothing to send', color: '#999' }
-  }
 
   return `
     <div>
@@ -855,10 +755,9 @@ function buildSplitReportHtml(
       <p style="font-size:11px;color:#666;line-height:1.6;margin:0 0 20px;">
         Each show's money is split ${bandPct}% to the Band Fund and the rest equally among everyone who played it.
         Anyone who spent their own money on the show gets it back — but only the part that would've taken their own
-        balance below ₹0; if their existing Band Fund already covers it, that portion just gets relabelled as their
-        payout instead of new cash moving. Whoever's owed money first covers as much of it as they can from their
-        own Band Fund too. Whatever's left to actually pay out gets routed through whoever holds the most Band Fund,
-        so nobody's payment gets split between two different people unless it's truly unavoidable.
+        balance below ₹0; if their existing balance already covers it, no cash needs to move for that part. Every
+        payment (including someone covering their own share from their own Band Fund) is a straightforward payer to
+        recipient — nobody's payment ever gets split between two people unless it's truly unavoidable.
       </p>
 
       <h2 style="font-size:13px;font-weight:bold;margin:0 0 10px;color:#333;">Every show in this split</h2>
@@ -888,14 +787,8 @@ function buildSplitReportHtml(
               `).join('')}
               <tr>
                 <td style="padding:5px 10px;color:#7c3aed;">Band Fund (${bandPct}%) <span style="color:#999;">kept by ${s.bandFundHolderName}</span></td>
-                <td style="padding:5px 10px;text-align:right;font-weight:600;color:#7c3aed;">${fmt(s.baseBandFundAmount)}</td>
+                <td style="padding:5px 10px;text-align:right;font-weight:600;color:#7c3aed;">${fmt(s.bandFundAmount)}</td>
               </tr>
-              ${s.totalAbsorbed > 0 ? `
-              <tr>
-                <td style="padding:5px 10px;color:#7c3aed;">+ Extra Band Fund <span style="color:#999;">(no reimbursement was needed)</span></td>
-                <td style="padding:5px 10px;text-align:right;font-weight:600;color:#7c3aed;">${fmt(s.totalAbsorbed)}</td>
-              </tr>
-              ` : ''}
             </tbody>
           </table>
         </div>
@@ -906,24 +799,18 @@ function buildSplitReportHtml(
         <thead>
           <tr style="background:#f5f0ff;">
             <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #d4c8f4;">Member</th>
-            <th style="padding:8px 10px;text-align:right;border-bottom:2px solid #d4c8f4;">Cut (all shows)</th>
-            <th style="padding:8px 10px;text-align:right;border-bottom:2px solid #d4c8f4;">What happens</th>
+            <th style="padding:8px 10px;text-align:right;border-bottom:2px solid #d4c8f4;">Owed (all shows)</th>
             <th style="padding:8px 10px;text-align:right;border-bottom:2px solid #d4c8f4;">Band Fund left</th>
           </tr>
         </thead>
         <tbody>
-          ${rows.map((r, i) => {
-            const cell = whatHappens(r.settlementAmount)
-            const cut = round2(r.lines.reduce((s, l) => s + l.cut, 0))
-            return `
+          ${rows.map((r, i) => `
             <tr style="background:${i % 2 === 0 ? '#fff' : '#fafafa'}">
               <td style="padding:6px 10px;">${r.name}</td>
-              <td style="padding:6px 10px;text-align:right;font-weight:600;">${fmt(cut)}</td>
-              <td style="padding:6px 10px;text-align:right;color:${cell.color};font-weight:600;">${cell.label}</td>
+              <td style="padding:6px 10px;text-align:right;font-weight:600;">${fmt(r.owed)}</td>
               <td style="padding:6px 10px;text-align:right;font-weight:600;color:#7c3aed;">${fmt(r.newFundBalance)}</td>
             </tr>
-          `
-          }).join('')}
+          `).join('')}
         </tbody>
       </table>
 
@@ -935,22 +822,20 @@ function buildSplitReportHtml(
             <div style="font-size:11px;margin-bottom:6px;">
               <p style="margin:0 0 3px;color:#666;font-weight:600;">${l.showTitle}</p>
               <div style="padding-left:8px;color:#555;">
-                <div style="display:flex;justify-content:space-between;"><span>Your cut — ${bandPct}% goes to Band Fund, the rest split equally</span><span>+${fmt(l.cut)}</span></div>
-                ${l.frontedFromBalance > 0 ? `<div style="display:flex;justify-content:space-between;color:#999;"><span>You paid this out of your own pocket for the show</span><span>−${fmt(l.frontedFromBalance)}</span></div>` : ''}
+                <div style="display:flex;justify-content:space-between;"><span>Your cut — ${bandPct}% goes to Band Fund, the rest split equally</span><span>+${fmt(l.entitlement)}</span></div>
+                ${l.cashPosition < 0 ? `<div style="display:flex;justify-content:space-between;color:#999;"><span>You paid this out of your own pocket for the show</span><span>−${fmt(l.cashPosition)}</span></div>` : ''}
                 ${l.reimbursed > 0 ? `<div style="display:flex;justify-content:space-between;color:#16a34a;"><span>Paid back — the part that would've dropped your balance below ₹0</span><span>+${fmt(l.reimbursed)}</span></div>` : ''}
-                ${l.cashHandled > 0 ? `<div style="display:flex;justify-content:space-between;color:#dc2626;"><span>Cash you collected for the show, beyond your own cut — needs to go back</span><span>−${fmt(l.cashHandled)}</span></div>` : ''}
-                ${l.isBandFundHolder ? `<div style="display:flex;justify-content:space-between;color:#7c3aed;"><span>You're holding this show's Band Fund cut</span><span>+${fmt(l.baseBandFundAmount)}</span></div>` : ''}
-                ${l.isBandFundHolder && l.extraBandFund > 0 ? `<div style="display:flex;justify-content:space-between;color:#7c3aed;"><span>+ Extra Band Fund (no reimbursement was needed)</span><span>+${fmt(l.extraBandFund)}</span></div>` : ''}
-                <div style="display:flex;justify-content:space-between;font-weight:600;border-top:1px solid #eee;padding-top:2px;margin-top:2px;"><span>What this show gets you, all in</span><span>${sign(l.showNet)}${fmt(l.showNet)}</span></div>
+                ${l.cashPosition > 0 ? `<div style="display:flex;justify-content:space-between;color:#dc2626;"><span>Cash you collected for the show, beyond your own cut — needs to go back</span><span>−${fmt(l.cashPosition)}</span></div>` : ''}
+                ${l.isBandFundHolder ? `<div style="display:flex;justify-content:space-between;color:#7c3aed;"><span>You're holding this show's Band Fund cut</span><span>+${fmt(l.bandFundAmount)}</span></div>` : ''}
+                <div style="display:flex;justify-content:space-between;font-weight:600;border-top:1px solid #eee;padding-top:2px;margin-top:2px;"><span>Owed from this show</span><span>+${fmt(l.owedFromShow)}</span></div>
               </div>
             </div>
           `).join('')}
-          ${r.consolidationAbsorbed > 0 ? `<div style="font-size:11px;color:#666;padding-left:8px;margin-bottom:4px;">You covered another member's share out of your own Band Fund, so they didn't need to send it: −${fmt(r.consolidationAbsorbed)}</div>` : ''}
-          ${r.selfSatisfied > 0 ? `<div style="font-size:11px;color:#666;padding-left:8px;margin-bottom:4px;">You already held enough Band Fund to cover what you were owed, so nothing was sent to you: −${fmt(r.selfSatisfied)}</div>` : ''}
           <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:12px;border-top:1px solid #eee;padding-top:6px;margin-top:6px;">
-            <span>${r.settlementAmount > 0.01 ? 'Total to pay out' : 'Total you’ll receive'}</span>
-            <span>${fmt(Math.abs(r.settlementAmount))}</span>
+            <span>Total owed</span>
+            <span style="color:#16a34a;">${fmt(r.owed)}</span>
           </div>
+          ${r.selfPaid > 0 ? `<p style="font-size:11px;color:#666;margin:4px 0 0;">Keeps ${fmt(r.selfPaid)} of their own share from Band Fund</p>` : ''}
           ${r.outgoing.map(p => `<p style="font-size:11px;color:#666;margin:2px 0 0;">→ Pays ${p.to} ${fmt(p.amount)}</p>`).join('')}
           ${r.incoming.map(p => `<p style="font-size:11px;color:#666;margin:2px 0 0;">← Gets ${fmt(p.amount)} from ${p.from}</p>`).join('')}
           <div style="border-top:1px dashed #eee;padding-top:6px;margin-top:6px;font-size:11px;">

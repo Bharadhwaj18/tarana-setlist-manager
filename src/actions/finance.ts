@@ -3,7 +3,6 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { computeSettlementLedgerDelta } from '@/lib/finance/settlement'
 
 async function requireTreasurer(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<string | null> {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle()
@@ -146,32 +145,29 @@ export async function deleteShow(id: string): Promise<{ error?: string }> {
 export interface ShowSplitInput {
   showId: string
   showTitle: string
-  involvedMemberIds: string[]
-  /** memberId -> their entitlement for this show */
-  entitlements: Record<string, number>
-  /** memberId -> raw cash they already handled for this show (credits positive, expenses negative) — needed so the split doesn't double-count what's already recorded */
-  cashPositions: Record<string, number>
-  bandFundAmount: number
-  /** who keeps the Band Fund's cut for this show */
-  bandFundHolderId: string
-  /** members whose fronted expense was partly covered by their own standing balance */
-  absorptions: { memberId: string; amount: number }[]
+}
+
+export interface SplitPayment {
+  /** who's paying — gets debited */
+  from: string
+  /** who this covers — never credited; the moment it's paid it's personal money, out of scope for this app */
+  to: string
+  amount: number
+  description: string
 }
 
 /**
- * Confirms a batch split — one or more shows at once. Entitlement is always
- * computed per-show (already done by the caller before this runs); this
- * just persists it. The settlement ("who pays who") itself isn't stored as
- * transactions — same as before, it's a derived instruction, not a ledger
- * event — only the resulting entitlements and balance corrections are.
- * `consolidationAbsorptions` and `selfSatisfactions` — both from
- * minimizeSettlement — are batch-level corrections, not tied to any one show.
+ * Confirms a batch split — one or more shows at once. Every payment (who
+ * pays whom how much, already fully resolved by the caller — see
+ * lib/finance/settlement.ts's routeSettlement, or a treasurer's manual
+ * assignment) becomes exactly one debit transaction on the payer. Nobody is
+ * ever credited: this section only tracks Band Fund, and money paid out to
+ * someone becomes their personal money the instant it's paid, out of scope
+ * from then on. A self-payment (from === to, someone covering their own
+ * share from their own Band Fund) is written the exact same way as any
+ * other payment.
  */
-export async function splitShows(
-  shows: ShowSplitInput[],
-  consolidationAbsorptions: Record<string, number> = {},
-  selfSatisfactions: Record<string, number> = {}
-): Promise<{ error?: string }> {
+export async function splitShows(shows: ShowSplitInput[], payments: SplitPayment[]): Promise<{ error?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
@@ -181,103 +177,26 @@ export async function splitShows(
 
   const now = new Date().toISOString()
   const today = now.slice(0, 10)
+  // Only tie transactions to a specific show when there's exactly one in
+  // this batch — a pooled multi-show payment isn't any single show's alone.
+  const showId = shows.length === 1 ? shows[0].showId : null
 
-  const transactions: {
-    member_id: string | null
-    amount: number
-    description: string
-    category?: string | null
-    show_id: string | null
-    date: string
-    recorded_by: string
-  }[] = []
-
-  for (const show of shows) {
-    for (const memberId of show.involvedMemberIds) {
-      // Crediting the flat entitlement here would double-count whatever cash
-      // this member already has recorded for the show (their own income or
-      // expense transactions) — this delta reconciles it up to their true
-      // entitlement instead.
-      const delta = computeSettlementLedgerDelta(show.entitlements[memberId] ?? 0, show.cashPositions[memberId] ?? 0)
-      if (delta === 0) continue
-      transactions.push({
-        member_id: memberId,
-        amount: delta,
-        description: `Show split — ${show.showTitle}`,
-        category: 'split',
-        show_id: show.showId,
-        date: today,
-        recorded_by: user.id,
-      })
-    }
-    if (show.bandFundAmount !== 0) {
-      // Band Fund isn't a separate ledger entity — it's just money the
-      // holder keeps, tracked as theirs like anything else. "fund" as its
-      // own category (not "split") is what lets Split History still call
-      // this cut out distinctly, without needing a null-owner bucket.
-      transactions.push({
-        member_id: show.bandFundHolderId,
-        amount: show.bandFundAmount,
-        description: `Band Fund cut — ${show.showTitle}`,
-        category: 'fund',
-        show_id: show.showId,
-        date: today,
-        recorded_by: user.id,
-      })
-    }
-    for (const { memberId, amount } of show.absorptions) {
-      if (amount === 0) continue
-      transactions.push({
-        member_id: memberId,
-        amount: -amount,
-        description: `Balance applied toward fronted expense — ${show.showTitle}`,
-        category: 'split',
-        show_id: show.showId,
-        date: today,
-        recorded_by: user.id,
-      })
-    }
-  }
-
-  for (const [memberId, amount] of Object.entries(consolidationAbsorptions)) {
-    if (!amount) continue
-    // They covered another payer's share out of their own tagged Band Fund
-    // and won't be paid back for it — deduct it so their recorded balance
-    // matches what they actually have left. Tagged "fund" (not "split")
-    // since it's specifically their fund balance being spent down; not tied
-    // to one show since the consolidation happens across the whole batch.
-    transactions.push({
-      member_id: memberId,
-      amount: -amount,
-      description: `Covered another member's settlement share from your Band Fund`,
-      category: 'fund',
-      show_id: null,
+  const transactions = payments
+    .filter(p => p.amount > 0)
+    .map(p => ({
+      member_id: p.from,
+      amount: -p.amount,
+      description: p.description,
+      category: 'split',
+      show_id: showId,
       date: today,
       recorded_by: user.id,
-    })
-  }
+    }))
 
-  for (const [memberId, amount] of Object.entries(selfSatisfactions)) {
-    if (!amount) continue
-    // They were owed this much and already hold at least that much tagged
-    // Band Fund — no cash needs to move. Their normal per-show "Show split"
-    // credit above already brings them to their full entitlement regardless
-    // of how the real payment is routed, so this deduction is what keeps
-    // their total balance from inflating: it relabels fund they already
-    // hold as this payout instead of crediting fresh money on top of it.
-    transactions.push({
-      member_id: memberId,
-      amount: -amount,
-      description: `Band Fund used toward your own show payment`,
-      category: 'fund',
-      show_id: null,
-      date: today,
-      recorded_by: user.id,
-    })
+  if (transactions.length > 0) {
+    const { error: txErr } = await supabase.from('finance_transactions').insert(transactions)
+    if (txErr) return { error: txErr.message }
   }
-
-  const { error: txErr } = await supabase.from('finance_transactions').insert(transactions)
-  if (txErr) return { error: txErr.message }
 
   const { error: showErr } = await supabase
     .from('finance_shows')
