@@ -164,8 +164,14 @@ export interface ShowSplitInput {
  * just persists it. The settlement ("who pays who") itself isn't stored as
  * transactions — same as before, it's a derived instruction, not a ledger
  * event — only the resulting entitlements and balance corrections are.
+ * `consolidationAbsorptions` and `selfSatisfactions` — both from
+ * minimizeSettlement — are batch-level corrections, not tied to any one show.
  */
-export async function splitShows(shows: ShowSplitInput[]): Promise<{ error?: string }> {
+export async function splitShows(
+  shows: ShowSplitInput[],
+  consolidationAbsorptions: Record<string, number> = {},
+  selfSatisfactions: Record<string, number> = {}
+): Promise<{ error?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
@@ -231,6 +237,43 @@ export async function splitShows(shows: ShowSplitInput[]): Promise<{ error?: str
         recorded_by: user.id,
       })
     }
+  }
+
+  for (const [memberId, amount] of Object.entries(consolidationAbsorptions)) {
+    if (!amount) continue
+    // They covered another payer's share out of their own tagged Band Fund
+    // and won't be paid back for it — deduct it so their recorded balance
+    // matches what they actually have left. Tagged "fund" (not "split")
+    // since it's specifically their fund balance being spent down; not tied
+    // to one show since the consolidation happens across the whole batch.
+    transactions.push({
+      member_id: memberId,
+      amount: -amount,
+      description: `Covered another member's settlement share from your Band Fund`,
+      category: 'fund',
+      show_id: null,
+      date: today,
+      recorded_by: user.id,
+    })
+  }
+
+  for (const [memberId, amount] of Object.entries(selfSatisfactions)) {
+    if (!amount) continue
+    // They were owed this much and already hold at least that much tagged
+    // Band Fund — no cash needs to move. Their normal per-show "Show split"
+    // credit above already brings them to their full entitlement regardless
+    // of how the real payment is routed, so this deduction is what keeps
+    // their total balance from inflating: it relabels fund they already
+    // hold as this payout instead of crediting fresh money on top of it.
+    transactions.push({
+      member_id: memberId,
+      amount: -amount,
+      description: `Band Fund used toward your own show payment`,
+      category: 'fund',
+      show_id: null,
+      date: today,
+      recorded_by: user.id,
+    })
   }
 
   const { error: txErr } = await supabase.from('finance_transactions').insert(transactions)

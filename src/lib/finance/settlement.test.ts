@@ -69,12 +69,13 @@ describe('computeSettlementLedgerDelta', () => {
 
 describe('minimizeSettlement', () => {
   it('produces one payment for a single ower / single owed pair', () => {
-    expect(minimizeSettlement({ a: 100, b: -100 })).toEqual([{ from: 'a', to: 'b', amount: 100 }])
+    const { payments } = minimizeSettlement({ a: 100, b: -100 })
+    expect(payments).toEqual([{ from: 'a', to: 'b', amount: 100 }])
   })
 
   it('reproduces the exact BMC single-show settlement from the proposal', () => {
     const nets = { aditya: 116_720, kavya: -33_680, rohan: -35_680, meera: -23_680, vikram: -23_680 }
-    const payments = minimizeSettlement(nets)
+    const { payments } = minimizeSettlement(nets)
     expect(payments).toEqual([
       { from: 'aditya', to: 'rohan', amount: 35_680 },
       { from: 'aditya', to: 'kavya', amount: 33_680 },
@@ -83,19 +84,21 @@ describe('minimizeSettlement', () => {
     ])
   })
 
-  it('reproduces the exact pooled two-show settlement from the proposal — no wasted Aditya<->Kavya transfer', () => {
+  it('with two or more payers, every recipient is paid by exactly one person — the biggest payer consolidates, others just settle up with them', () => {
+    // Kavya's 9,520 doesn't match any single recipient, so a direct
+    // partition is impossible — but with Aditya (the bigger payer) as the
+    // consolidator, Sanya still gets paid in one shot instead of split.
     const nets = { aditya: 95_120, kavya: 9_520, rohan: -35_680, meera: -23_680, vikram: -23_680, sanya: -21_600 }
-    const payments = minimizeSettlement(nets)
-    expect(payments).toEqual([
-      { from: 'aditya', to: 'rohan', amount: 35_680 },
-      { from: 'aditya', to: 'meera', amount: 23_680 },
-      { from: 'aditya', to: 'vikram', amount: 23_680 },
-      { from: 'aditya', to: 'sanya', amount: 12_080 },
-      { from: 'kavya', to: 'sanya', amount: 9_520 },
-    ])
-    // The whole point of pooling: Aditya and Kavya owe each other in opposite
-    // directions per-show, and pooling cancels that out entirely.
-    expect(payments.some(p => (p.from === 'aditya' && p.to === 'kavya') || (p.from === 'kavya' && p.to === 'aditya'))).toBe(false)
+    const { payments, consolidationAbsorptions } = minimizeSettlement(nets)
+    for (const recipient of ['rohan', 'meera', 'vikram', 'sanya']) {
+      const paymentsToThem = payments.filter(p => p.to === recipient)
+      expect(paymentsToThem).toHaveLength(1)
+      expect(paymentsToThem[0].from).toBe('aditya')
+    }
+    // No standing balance was given, so Kavya pays her full share for real —
+    // nothing gets silently absorbed.
+    expect(payments.find(p => p.from === 'kavya' && p.to === 'aditya')?.amount).toBe(9_520)
+    expect(consolidationAbsorptions).toEqual({})
   })
 
   it('never splits one recipient across multiple payers when a clean assignment exists', () => {
@@ -104,7 +107,7 @@ describe('minimizeSettlement', () => {
     // with zero recipients split, even though a naive largest-vs-largest
     // greedy pass would need to verify this same outcome by coincidence.
     const nets = { a: 50, b: 30, x: -10, y: -20, z: -50 }
-    const payments = minimizeSettlement(nets)
+    const { payments } = minimizeSettlement(nets)
 
     // Every recipient appears as `to` in exactly one payment.
     for (const recipient of ['x', 'y', 'z']) {
@@ -123,77 +126,107 @@ describe('minimizeSettlement', () => {
     expect(net.z).toBeCloseTo(50)
   })
 
-  it('still splits a recipient across payers when no clean assignment is possible at all', () => {
-    // Kavya's 9,520 is smaller than the smallest single recipient (21,600),
-    // so no assignment can give any recipient a single payer covering their
-    // full amount from her alone — some recipient must be split by
-    // construction. This is the exact pooled two-show case above.
-    const nets = { aditya: 95_120, kavya: 9_520, rohan: -35_680, meera: -23_680, vikram: -23_680, sanya: -21_600 }
-    const payments = minimizeSettlement(nets)
-    const paymentsToSanya = payments.filter(p => p.to === 'sanya')
-    expect(paymentsToSanya.length).toBeGreaterThan(1)
-  })
-
   it('nets to nothing when everyone is already settled', () => {
-    expect(minimizeSettlement({ a: 0, b: 0 })).toEqual([])
+    const { payments } = minimizeSettlement({ a: 0, b: 0 })
+    expect(payments).toEqual([])
   })
 
   it('leaves a payer\'s excess capacity unpaid when an absorption shrinks total owed below total owing — they simply keep it', () => {
     // a owes 100 total, but b is only owed 92 (an absorption already covered
     // 8 of what would otherwise be owed). a should pay out only 92, not 100.
-    const payments = minimizeSettlement({ a: 100, b: -92 })
+    // Only one payer here, so there's no one to consolidate through.
+    const { payments } = minimizeSettlement({ a: 100, b: -92 })
     expect(payments).toEqual([{ from: 'a', to: 'b', amount: 92 }])
-    expect(payments.reduce((s, p) => s + p.amount, 0)).toBe(92)
   })
 
-  describe('chaining through a payer\'s standing balance to avoid a split', () => {
-    // a=70, b=30 owers; x=60, y=40 owed. a alone can't cover y (70-60=10
-    // left, y needs 40) — without chaining, y gets split between a and b.
+  describe('consolidating through the biggest payer\'s standing balance', () => {
+    // a=70, b=30 owers (a is bigger, so a consolidates); x=60, y=40 owed.
+    // a alone can't cover y (70-60=10 left, y needs 40) without help from b.
     const nets = { a: 70, b: 30, x: -60, y: -40 }
 
-    it('splits the recipient when no payer has a standing balance to safely front the gap', () => {
-      const payments = minimizeSettlement(nets)
-      const paymentsToY = payments.filter(p => p.to === 'y')
-      expect(paymentsToY.length).toBeGreaterThan(1)
-    })
-
-    it('splits the recipient when a payer\'s standing balance is too small to cover the gap safely', () => {
-      const payments = minimizeSettlement(nets, { a: 10 }) // needs 30, only has 10
-      const paymentsToY = payments.filter(p => p.to === 'y')
-      expect(paymentsToY.length).toBeGreaterThan(1)
-    })
-
-    it('routes the gap through an internal transfer instead of splitting, when the payer\'s balance can safely cover it', () => {
-      const payments = minimizeSettlement(nets, { a: 100 })
-      // x and y are each paid by exactly one source now.
+    it('still avoids splitting even with zero standing balance — b just pays a\'s shortfall in full, in real cash', () => {
+      const { payments, consolidationAbsorptions } = minimizeSettlement(nets)
       expect(payments.filter(p => p.to === 'x')).toHaveLength(1)
       expect(payments.filter(p => p.to === 'y')).toHaveLength(1)
       expect(payments.find(p => p.to === 'y')?.from).toBe('a')
-      // b fronts the internal transfer that tops a up to cover y in full.
-      expect(payments.find(p => p.to === 'a' && p.from === 'b')?.amount).toBe(30)
-      // Fully settles: nothing left over.
-      const net: Record<string, number> = { a: 0, b: 0, x: 0, y: 0 }
-      for (const p of payments) { net[p.from] -= p.amount; net[p.to] += p.amount }
-      expect(net.a).toBeCloseTo(-70)
-      expect(net.b).toBeCloseTo(-30)
-      expect(net.x).toBeCloseTo(60)
-      expect(net.y).toBeCloseTo(40)
+      expect(payments.find(p => p.from === 'b' && p.to === 'a')?.amount).toBe(30)
+      expect(consolidationAbsorptions).toEqual({})
+    })
+
+    it('reduces what b needs to pay by whatever a\'s balance can safely absorb — the reimbursement floor applied to consolidation', () => {
+      const { payments, consolidationAbsorptions } = minimizeSettlement(nets, { a: 10 })
+      expect(payments.filter(p => p.to === 'y')).toHaveLength(1) // still never split
+      // a absorbs 10 of b's 30 share; b only pays the remaining 20 for real.
+      expect(payments.find(p => p.from === 'b' && p.to === 'a')?.amount).toBe(20)
+      expect(consolidationAbsorptions).toEqual({ a: 10 })
+    })
+
+    it('needs no real payment from b at all when a\'s balance can absorb the whole gap', () => {
+      const { payments, consolidationAbsorptions } = minimizeSettlement(nets, { a: 100 })
+      expect(payments.find(p => p.from === 'b' && p.to === 'a')).toBeUndefined()
+      expect(consolidationAbsorptions).toEqual({ a: 30 })
+      // a still pays x and y in full, out of a's own resources.
+      expect(payments.find(p => p.to === 'x')).toEqual({ from: 'a', to: 'x', amount: 60 })
+      expect(payments.find(p => p.to === 'y')).toEqual({ from: 'a', to: 'y', amount: 40 })
     })
   })
 
-  it('reproduces the real pooled example — Harsh, who already has plenty of balance, pays everyone directly and Raga reimburses him in full', () => {
+  it('reproduces the real pooled example — Harsh, who already has plenty of balance, pays everyone directly and absorbs Raga\'s share entirely; she pays nothing', () => {
     const nets = { harsh: 49_308, raga: 13_003, you: -21_491, brao: -21_491, sujju: -9_665, adi: -9_664 }
-    const payments = minimizeSettlement(nets, { harsh: 300_000 })
-    // Every recipient paid by Harsh alone — no one gets a fraction from two
-    // different people, and Raga doesn't need to front anyone's payment
-    // before Harsh can pay them; she just settles her own share with Harsh.
+    const { payments, consolidationAbsorptions } = minimizeSettlement(nets, { harsh: 300_000 })
     for (const recipient of ['you', 'brao', 'sujju', 'adi']) {
       const paymentsToThem = payments.filter(p => p.to === recipient)
       expect(paymentsToThem).toHaveLength(1)
       expect(paymentsToThem[0].from).toBe('harsh')
     }
-    expect(payments.find(p => p.from === 'raga' && p.to === 'harsh')?.amount).toBe(13_003)
-    expect(payments).toHaveLength(5) // 4 direct payments + Raga's one reimbursement
+    // Harsh's balance comfortably covers Raga's whole share, so she doesn't
+    // pay him anything for real — it's absorbed and deducted from his own
+    // recorded balance instead (see splitShows / consolidationAbsorptions).
+    expect(payments.find(p => p.from === 'raga')).toBeUndefined()
+    expect(consolidationAbsorptions).toEqual({ harsh: 13_003 })
+    expect(payments).toHaveLength(4) // just the 4 direct payments — no reimbursement transaction needed
+  })
+})
+
+describe('minimizeSettlement — recipient self-satisfaction from their own tagged Band Fund', () => {
+  it('fully self-satisfies when their fund balance covers the whole amount owed to them — no real payment needed', () => {
+    const { payments, selfSatisfactions } = minimizeSettlement({ a: 100, z: -30 }, { z: 50 })
+    expect(selfSatisfactions).toEqual({ z: 30 })
+    expect(payments.find(p => p.to === 'z')).toBeUndefined()
+  })
+
+  it('partially self-satisfies, and the real payment only covers the shortfall', () => {
+    const { payments, selfSatisfactions } = minimizeSettlement({ a: 100, z: -30 }, { z: 10 })
+    expect(selfSatisfactions).toEqual({ z: 10 })
+    expect(payments.find(p => p.to === 'z')?.amount).toBe(20)
+  })
+
+  it('exposes the unrouted remaining position — what each person actually still owes or is owed, independent of who pays whom', () => {
+    const { remainingNets } = minimizeSettlement({ a: 100, z: -30 }, { z: 10 })
+    // z was owed 30, self-satisfied 10 of it, so only -20 is left to receive.
+    expect(remainingNets).toEqual({ a: 100, z: -20 })
+  })
+
+  it('needs the full real payment when the recipient holds no fund at all', () => {
+    const { payments, selfSatisfactions } = minimizeSettlement({ a: 100, z: -30 })
+    expect(selfSatisfactions).toEqual({})
+    expect(payments.find(p => p.to === 'z')?.amount).toBe(30)
+  })
+})
+
+describe('minimizeSettlement — the consolidation hub is picked by tagged Band Fund balance, not by who owes the most', () => {
+  it('prefers the smaller-obligation payer as hub when they hold more Band Fund', () => {
+    // Harsh owes less (30) than Raga (70), but holds far more Band Fund —
+    // he should still be the one who ends up paying x and y directly.
+    const nets = { harsh: 30, raga: 70, x: -60, y: -40 }
+    const { payments, consolidationAbsorptions } = minimizeSettlement(nets, { harsh: 1_000_000, raga: 0 })
+    expect(payments.filter(p => p.to === 'x')).toHaveLength(1)
+    expect(payments.filter(p => p.to === 'y')).toHaveLength(1)
+    expect(payments.find(p => p.to === 'x')?.from).toBe('harsh')
+    expect(payments.find(p => p.to === 'y')?.from).toBe('harsh')
+    // Harsh's fund comfortably absorbs Raga's whole 70 — she pays nothing for real.
+    expect(payments.find(p => p.from === 'raga')).toBeUndefined()
+    expect(consolidationAbsorptions).toEqual({ harsh: 70 })
   })
 })
 

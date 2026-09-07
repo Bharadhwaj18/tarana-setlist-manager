@@ -36,9 +36,17 @@ export default async function SplitPage() {
   // *this* unsplit batch get backed out client-side per show, since those
   // haven't been settled yet and shouldn't count as pre-existing balance.
   const balances: Record<string, number> = {}
+  // Each member's current tagged Band Fund balance specifically (category
+  // 'fund' transactions only) — this section only tracks Band Fund, and
+  // settlement routing (who self-satisfies, who consolidates) runs on this
+  // figure, not the member's whole balance.
+  const fundBalances: Record<string, number> = {}
   for (const t of allTxns ?? []) {
     if (!t.member_id) continue
     balances[t.member_id] = (balances[t.member_id] ?? 0) + t.amount
+    if (t.category === 'fund') {
+      fundBalances[t.member_id] = (fundBalances[t.member_id] ?? 0) + t.amount
+    }
   }
 
   return (
@@ -52,6 +60,7 @@ export default async function SplitPage() {
         members={members}
         txnsByShow={txnsByShow}
         memberBalances={balances}
+        memberFundBalances={fundBalances}
       />
     </div>
   )

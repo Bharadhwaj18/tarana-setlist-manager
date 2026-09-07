@@ -115,143 +115,154 @@ function tryExactPartition(owed: Balance[], owers: Balance[]): Payment[] | null 
 }
 
 /**
- * Tries designating a single payer with a large enough standing balance as
- * the sole "hub": they pay every recipient in full, up front, out of their
- * own pocket — and every other payer settles up by sending their own full
- * share to the hub in one transfer, whenever's convenient, rather than
- * anyone needing to juggle a fraction of who's owed what. This is simpler
- * than chainedSettlement's surgical, per-recipient topping-up whenever one
- * payer genuinely has money to spare — prefer it first. Only used when that
- * hub's balance can comfortably cover everyone else's share without going
- * negative; returns null when no single payer qualifies.
+ * Falls back from tryExactPartition when a clean assignment isn't possible —
+ * the classic largest-ower-against-largest-owed greedy pass, repeated. Still
+ * minimizes the total number of payments, but may split one recipient's
+ * payment across more than one payer where amounts don't divide cleanly.
  */
-function tryHubSettlement(owed: Balance[], owers: Balance[], standingBalances: Record<string, number>): Payment[] | null {
-  if (owers.length < 2) return null // nothing to consolidate
-
-  const totalOwed = round2(owed.reduce((s, o) => s + o.amount, 0))
-  const candidates = [...owers].sort((a, b) => (standingBalances[b.memberId] ?? 0) - (standingBalances[a.memberId] ?? 0))
-
-  for (const hub of candidates) {
-    // What everyone else needs to eventually contribute — the amount the
-    // hub is fronting until they're reimbursed.
-    const gap = round2(totalOwed - hub.amount)
-    if (gap <= EPSILON) continue // hub alone already covers everyone; tryExactPartition would've found this
-    const buffer = standingBalances[hub.memberId] ?? 0
-    if (buffer < gap - EPSILON) continue
-
-    const payments: Payment[] = owed
-      .filter(o => o.amount > EPSILON)
-      .map(o => ({ from: hub.memberId, to: o.memberId, amount: round2(o.amount) }))
-    for (const other of owers) {
-      if (other.memberId === hub.memberId || other.amount <= EPSILON) continue
-      payments.push({ from: other.memberId, to: hub.memberId, amount: round2(other.amount) })
-    }
-    return payments
-  }
-  return null
-}
-
-/**
- * Falls back from tryHubSettlement when no single payer's balance can cover
- * everyone — but before accepting a split recipient, tries to avoid it by
- * having the current payer borrow just the exact shortfall from the next
- * payer(s) in line first (an internal transfer), then pay the recipient in
- * full. That's only done when the payer's own already-recorded balance can
- * absorb the shortfall without going negative — a safety margin, since the
- * internal transfer and the outgoing payment may not land on the same day.
- * Only when no payer can safely front the gap does a recipient's payment
- * actually get split — the classic largest-ower-against-largest-owed greedy
- * pass, repeated.
- */
-function chainedSettlement(owed: Balance[], owers: Balance[], standingBalances: Record<string, number>): Payment[] {
+function greedySettlement(owed: Balance[], owers: Balance[]): Payment[] {
   const remainingOwed = owed.map(o => ({ ...o }))
   const remainingOwers = owers.map(o => ({ ...o }))
-  const availableBuffer: Record<string, number> = { ...standingBalances }
   const payments: Payment[] = []
   let i = 0
   let j = 0
 
   while (i < remainingOwers.length && j < remainingOwed.length) {
-    const ower = remainingOwers[i]
-    const recipient = remainingOwed[j]
-
-    if (ower.amount >= recipient.amount - EPSILON) {
-      const amount = round2(recipient.amount)
-      if (amount > EPSILON) payments.push({ from: ower.memberId, to: recipient.memberId, amount })
-      ower.amount = round2(ower.amount - amount)
-      j++
-      if (ower.amount <= EPSILON) i++
-      continue
-    }
-
-    const shortfall = round2(recipient.amount - ower.amount)
-    const buffer = availableBuffer[ower.memberId] ?? 0
-    const laterCapacity = remainingOwers.slice(i + 1).reduce((s, o) => s + o.amount, 0)
-
-    if (buffer >= shortfall - EPSILON && laterCapacity >= shortfall - EPSILON) {
-      // Safe to consolidate: pull exactly the shortfall from subsequent
-      // payers (in order) so this one payer covers the recipient outright,
-      // instead of splitting the recipient's payment across payers.
-      let stillNeeded = shortfall
-      for (let k = i + 1; k < remainingOwers.length && stillNeeded > EPSILON; k++) {
-        const lender = remainingOwers[k]
-        if (lender.amount <= EPSILON) continue
-        const pulled = round2(Math.min(lender.amount, stillNeeded))
-        payments.push({ from: lender.memberId, to: ower.memberId, amount: pulled })
-        lender.amount = round2(lender.amount - pulled)
-        stillNeeded = round2(stillNeeded - pulled)
-      }
-      payments.push({ from: ower.memberId, to: recipient.memberId, amount: round2(recipient.amount) })
-      availableBuffer[ower.memberId] = round2(buffer - shortfall)
-      ower.amount = 0
-      i++
-      j++
-      continue
-    }
-
-    // No payer can safely front the gap — split this recipient's payment
-    // the plain way and move on to the next payer for the remainder.
-    const amount = round2(ower.amount)
-    if (amount > EPSILON) payments.push({ from: ower.memberId, to: recipient.memberId, amount })
-    recipient.amount = round2(recipient.amount - amount)
-    ower.amount = 0
-    i++
+    const amount = round2(Math.min(remainingOwers[i].amount, remainingOwed[j].amount))
+    if (amount > EPSILON) payments.push({ from: remainingOwers[i].memberId, to: remainingOwed[j].memberId, amount })
+    remainingOwers[i].amount = round2(remainingOwers[i].amount - amount)
+    remainingOwed[j].amount = round2(remainingOwed[j].amount - amount)
+    if (remainingOwers[i].amount <= EPSILON) i++
+    if (remainingOwed[j].amount <= EPSILON) j++
   }
 
   return payments
 }
 
+export interface SettlementResult {
+  payments: Payment[]
+  /**
+   * memberId -> amount they fronted on another payer's behalf, out of their
+   * own tagged Band Fund balance, that genuinely doesn't need paying back —
+   * needs a ledger deduction (separate from any specific show) so their
+   * recorded balance matches what they actually still have, since nothing
+   * else accounts for that money having left their pocket.
+   */
+  consolidationAbsorptions: Record<string, number>
+  /**
+   * memberId -> amount they were owed that they covered out of their own
+   * tagged Band Fund balance instead of receiving real cash — the fund they
+   * already hold just gets relabeled as this payout. Needs a ledger
+   * deduction (see splitShows) so their total balance doesn't inflate.
+   */
+  selfSatisfactions: Record<string, number>
+  /**
+   * memberId -> net position after self-satisfaction but before any payment
+   * routing — positive means they still need to pay this much for real,
+   * negative means they still need to receive this much for real. This is
+   * "how much does each person actually owe/get" independent of who ends up
+   * paying whom — useful for a manual, unrouted view of the settlement.
+   */
+  remainingNets: Record<string, number>
+}
+
+/**
+ * Consolidates every recipient onto a single payer — whoever currently
+ * holds the most tagged Band Fund, since this whole section exists to track
+ * that fund and routing through its biggest holder is the most natural fit
+ * — instead of splitting a recipient's payment across payers. That hub pays
+ * every recipient in full, up front; every other payer then only owes the
+ * hub whatever the hub's own fund balance can't already absorb on their
+ * behalf, following the same reimbursement-floor rule as fronting a show
+ * expense or a recipient self-satisfying: don't ask anyone to pay back
+ * money that would've just sat in a fund balance anyway. Whatever the hub
+ * does absorb comes back as `consolidationAbsorptions`, for a ledger
+ * deduction. Returns null only when there's nobody to consolidate through
+ * (fewer than two payers).
+ */
+function tryHubSettlement(owed: Balance[], owers: Balance[], fundBalances: Record<string, number>): { payments: Payment[]; consolidationAbsorptions: Record<string, number> } | null {
+  if (owers.length < 2) return null
+
+  const totalOwed = round2(owed.reduce((s, o) => s + o.amount, 0))
+  const hub = owers[0] // owers is already sorted by fund balance descending — the biggest fund holder
+  const gap = round2(totalOwed - hub.amount)
+
+  const payments: Payment[] = []
+  const consolidationAbsorptions: Record<string, number> = {}
+
+  if (gap > EPSILON) {
+    let hubBuffer = fundBalances[hub.memberId] ?? 0
+    for (const other of owers.slice(1)) {
+      if (other.amount <= EPSILON) continue
+      const absorbed = round2(Math.min(hubBuffer, other.amount))
+      const realPayment = round2(other.amount - absorbed)
+      if (absorbed > EPSILON) {
+        consolidationAbsorptions[hub.memberId] = round2((consolidationAbsorptions[hub.memberId] ?? 0) + absorbed)
+        hubBuffer = round2(hubBuffer - absorbed)
+      }
+      if (realPayment > EPSILON) payments.push({ from: other.memberId, to: hub.memberId, amount: realPayment })
+    }
+  }
+
+  for (const recipient of owed) {
+    if (recipient.amount > EPSILON) payments.push({ from: hub.memberId, to: recipient.memberId, amount: round2(recipient.amount) })
+  }
+
+  return { payments, consolidationAbsorptions }
+}
+
 /**
  * Given each real member's net position (positive = holding more cash than
  * they're entitled to, so they need to pay out; negative = short, they need
- * to receive), produces the payments that settle everyone. Prefers a clean
- * assignment where every recipient is paid by exactly one payer; when that's
- * not directly possible, tries consolidating through one payer's standing
- * balance — first as a full hub (tryHubSettlement), then as a narrower,
- * surgical top-up for just the one shortfall (chainedSettlement) — before
- * ever splitting a recipient's payment across payers. `standingBalances` —
- * each payer's current overall balance, separate from this batch — gates
- * both; omit it (or pass {}) to skip straight to a direct split whenever a
- * clean assignment isn't possible. Netting positions from multiple shows
- * together before calling this is what makes multi-show batching actually
- * reduce the number of payments.
+ * to receive), produces the payments that settle everyone. First lets each
+ * recipient self-satisfy out of their own tagged Band Fund balance — no one
+ * needs fresh cash for a share they're already sitting on. For what's left,
+ * prefers a clean assignment where every recipient is paid by exactly one
+ * payer; when that's not directly possible, consolidates through whoever
+ * holds the most Band Fund (tryHubSettlement) before ever splitting a
+ * recipient's payment across payers. `fundBalances` — each member's current
+ * tagged Band Fund balance (`category: 'fund'` transactions only, not their
+ * whole balance) — drives both of those; omit it (or pass {}) to skip
+ * straight to a direct split whenever a clean assignment isn't possible.
+ * Netting positions from multiple shows together before calling this is
+ * what makes multi-show batching actually reduce the number of payments.
  */
-export function minimizeSettlement(nets: Record<string, number>, standingBalances: Record<string, number> = {}): Payment[] {
-  const owers = Object.entries(nets)
+export function minimizeSettlement(nets: Record<string, number>, fundBalances: Record<string, number> = {}): SettlementResult {
+  // Let each recipient cover as much of their own share as their tagged
+  // Band Fund allows before anyone else needs to pay them anything.
+  const selfSatisfactions: Record<string, number> = {}
+  const adjustedNets: Record<string, number> = { ...nets }
+  const availableFund: Record<string, number> = { ...fundBalances }
+
+  for (const [id, net] of Object.entries(nets)) {
+    if (net >= -EPSILON) continue // not owed anything
+    const owed = -net
+    const fund = availableFund[id] ?? 0
+    const satisfied = round2(Math.min(fund, owed))
+    if (satisfied > EPSILON) {
+      selfSatisfactions[id] = satisfied
+      adjustedNets[id] = round2(net + satisfied)
+      availableFund[id] = round2(fund - satisfied)
+    }
+  }
+
+  const owers = Object.entries(adjustedNets)
     .filter(([, n]) => n > EPSILON)
     .map(([memberId, amount]) => ({ memberId, amount: round2(amount) }))
-    .sort((a, b) => b.amount - a.amount)
+    .sort((a, b) => (availableFund[b.memberId] ?? 0) - (availableFund[a.memberId] ?? 0))
 
-  const owed = Object.entries(nets)
+  const owed = Object.entries(adjustedNets)
     .filter(([, n]) => n < -EPSILON)
     .map(([memberId, amount]) => ({ memberId, amount: round2(-amount) }))
     .sort((a, b) => b.amount - a.amount)
 
-  return (
-    tryExactPartition(owed, owers) ??
-    tryHubSettlement(owed, owers, standingBalances) ??
-    chainedSettlement(owed, owers, standingBalances)
-  )
+  const exact = tryExactPartition(owed, owers)
+  if (exact) return { payments: exact, consolidationAbsorptions: {}, selfSatisfactions, remainingNets: adjustedNets }
+
+  const hub = tryHubSettlement(owed, owers, availableFund)
+  if (hub) return { ...hub, selfSatisfactions, remainingNets: adjustedNets }
+
+  return { payments: greedySettlement(owed, owers), consolidationAbsorptions: {}, selfSatisfactions, remainingNets: adjustedNets }
 }
 
 export interface ShowSettlementInput {
