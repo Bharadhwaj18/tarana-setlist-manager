@@ -3,6 +3,7 @@ import { ChevronLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedAllProfiles, getCachedUser } from '@/lib/data'
 import { FinanceHistoryList } from '@/components/finance/FinanceHistoryList'
+import { FinanceFloatingNav } from '@/components/finance/FinanceFloatingNav'
 
 export default async function FinanceHistoryPage() {
   const supabase = await createClient()
@@ -43,6 +44,8 @@ export default async function FinanceHistoryPage() {
         shows={shows ?? []}
         showTitleById={showTitleById}
       />
+
+      <FinanceFloatingNav hasUnsplitShows={(shows ?? []).some(s => !s.split_at)} />
     </div>
   )
 }

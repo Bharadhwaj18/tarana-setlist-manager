@@ -3,15 +3,17 @@ import { ChevronLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedAllProfiles } from '@/lib/data'
 import { SplitHistoryList } from '@/components/finance/SplitHistoryList'
+import { FinanceFloatingNav } from '@/components/finance/FinanceFloatingNav'
 import type { FinanceTransaction } from '@/types/finance'
 
 export default async function SplitHistoryPage() {
   const supabase = await createClient()
 
-  const [profiles, { data: shows }, { data: allTxns }] = await Promise.all([
+  const [profiles, { data: shows }, { data: allTxns }, { data: unsplitShows }] = await Promise.all([
     getCachedAllProfiles(),
     supabase.from('shows').select('*').not('split_at', 'is', null).order('split_at', { ascending: false }),
     supabase.from('finance_transactions').select('*').eq('category', 'split'),
+    supabase.from('shows').select('id').is('split_at', null),
   ])
 
   const txnsByShow: Record<string, FinanceTransaction[]> = {}
@@ -36,6 +38,8 @@ export default async function SplitHistoryPage() {
       ) : (
         <SplitHistoryList shows={shows} txnsByShow={txnsByShow} profiles={profiles} />
       )}
+
+      <FinanceFloatingNav hasUnsplitShows={(unsplitShows ?? []).length > 0} />
     </div>
   )
 }

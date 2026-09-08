@@ -4,6 +4,7 @@ import { ChevronLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedAllProfiles, getCachedUser } from '@/lib/data'
 import { SplitWizard } from '@/components/finance/SplitWizard'
+import { FinanceFloatingNav } from '@/components/finance/FinanceFloatingNav'
 import type { FinanceTransaction } from '@/types/finance'
 
 export default async function SplitPage() {
@@ -40,6 +41,9 @@ export default async function SplitPage() {
   // reimbursement floor checks against. Transactions tagged to shows in
   // *this* unsplit batch get backed out client-side per show, since those
   // haven't been settled yet and shouldn't count as pre-existing balance.
+  // category:'reimbursement' is excluded — it's a personal cost they
+  // fronted (fuel, etc.), never Band Fund money, so it never touches this
+  // balance (see finance/page.tsx's Member Balances for the same rule).
   const balances: Record<string, number> = {}
   // Each member's current tagged Band Fund balance specifically (category
   // 'fund' transactions only) — this section only tracks Band Fund, and
@@ -48,7 +52,9 @@ export default async function SplitPage() {
   const fundBalances: Record<string, number> = {}
   for (const t of allTxns ?? []) {
     if (!t.member_id) continue
-    balances[t.member_id] = (balances[t.member_id] ?? 0) + t.amount
+    if (t.category !== 'reimbursement') {
+      balances[t.member_id] = (balances[t.member_id] ?? 0) + t.amount
+    }
     if (t.category === 'fund') {
       fundBalances[t.member_id] = (fundBalances[t.member_id] ?? 0) + t.amount
     }
@@ -68,6 +74,8 @@ export default async function SplitPage() {
         memberBalances={balances}
         memberFundBalances={fundBalances}
       />
+
+      <FinanceFloatingNav hasUnsplitShows={shows.length > 0} />
     </div>
   )
 }

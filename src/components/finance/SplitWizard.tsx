@@ -62,6 +62,11 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
 
   const selectedShows = shows.filter(s => selectedIds.has(s.id))
 
+  // Every transaction, reimbursements included — a category:'reimbursement'
+  // debit shrinks net and the equal split exactly like any other show
+  // expense (see perShow's computeEntitlements call). What's special about
+  // it is only that the fronter's guaranteed the full amount back on top
+  // of their base cut, never subject to the absorption floor.
   const netForShow = (showId: string) => {
     const txns = txnsByShow[showId] ?? []
     return round2(txns.reduce((s, t) => s + t.amount, 0))
@@ -69,10 +74,14 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
 
   // Standing balance "before this batch" — back out every selected show's
   // own contribution to a member's current overall balance, since none of
-  // that has actually been settled yet.
+  // that has actually been settled yet. Excludes category:'reimbursement'
+  // transactions from that backout, same as `memberBalances` itself
+  // already excludes them (they were never Band Fund money to begin with)
+  // — including them here would double-subtract an amount that was never
+  // added in the first place.
   const standingBalanceBeforeBatch = (memberId: string) => {
     const batchContribution = selectedShows.reduce((sum, s) => {
-      const positions = cashPositionsFor(txnsByShow[s.id] ?? [])
+      const positions = cashPositionsFor((txnsByShow[s.id] ?? []).filter(t => t.category !== 'reimbursement'))
       return sum + (positions[memberId] ?? 0)
     }, 0)
     return round2((memberBalances[memberId] ?? 0) - batchContribution)
@@ -95,25 +104,57 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
 
     return selectedShows.map(show => {
       const involved = [...(involvedByShow[show.id] ?? new Set())]
+      const showTxns = txnsByShow[show.id] ?? []
+
+      // A `category: 'reimbursement'` expense (fuel, parking, a personal
+      // cost for the show) is a debit like any other for the purposes of
+      // net and the equal split — it shrinks net, and everyone's (incl.
+      // Band Fund's) base cut is the standard % split of that already-
+      // shrunk net, same as a normal show expense. What's special about it
+      // is only that the fronter is guaranteed their money back in full,
+      // added on top of their base cut — see the reimbursement loop below
+      // — never subject to the absorption floor a normal fronted expense
+      // gets.
       const net = netForShow(show.id)
       const { memberShares, bandFundAmount } = computeEntitlements(net, involved, bandPct)
-      const cashPositions = cashPositionsFor(txnsByShow[show.id] ?? [])
-      const bandFundHolderId = holderFor(txnsByShow[show.id] ?? [], members[0]?.id ?? '')
+      const cashPositions = cashPositionsFor(showTxns)
+      const bandFundHolderId = holderFor(showTxns, members[0]?.id ?? '')
 
       // Real cash still owed back for a fronted expense, after the
       // fronter's own standing balance covers what it can — the
       // reimbursement floor. 0 whenever their balance never would've gone
-      // below ₹0.
+      // below ₹0. A guaranteed (category:'reimbursement') amount skips
+      // this floor entirely — it's always paid back in full, tracked
+      // separately in guaranteedReimbursements so the split screen and
+      // report can show it as its own line instead of silently folding it
+      // into "absorbed, no cash needs to move."
       const reimbursements: Record<string, number> = {}
+      const guaranteedReimbursements: Record<string, number> = {}
       for (const id of involved) {
         const cashPosition = cashPositions[id] ?? 0
-        if (cashPosition >= 0) continue
-        const fronted = -cashPosition
-        const standing = standingFor(id)
-        const absorbed = computeAbsorbedAmount(standing, fronted)
-        availableStanding[id] = round2(standing - absorbed) // consume the cushion for later shows in this batch
-        const reimbursed = round2(fronted - absorbed)
-        if (reimbursed > 0) reimbursements[id] = reimbursed
+        const guaranteed = round2(
+          showTxns.filter(t => t.member_id === id && t.category === 'reimbursement' && t.amount < 0)
+            .reduce((sum, t) => sum - t.amount, 0)
+        )
+        let totalReimbursed = 0
+        if (guaranteed > 0) {
+          guaranteedReimbursements[id] = guaranteed
+          totalReimbursed += guaranteed
+        }
+
+        // The absorption floor only ever applies to the *general* fronted
+        // portion — back the guaranteed amount out first so it's never
+        // checked against standing balance.
+        const generalCashPosition = round2(cashPosition + guaranteed)
+        if (generalCashPosition < 0) {
+          const fronted = -generalCashPosition
+          const standing = standingFor(id)
+          const absorbed = computeAbsorbedAmount(standing, fronted)
+          availableStanding[id] = round2(standing - absorbed) // consume the cushion for later shows in this batch
+          totalReimbursed += round2(fronted - absorbed)
+        }
+
+        if (totalReimbursed > 0) reimbursements[id] = round2(totalReimbursed)
       }
 
       const settlement = computeShowSettlement({
@@ -125,7 +166,7 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
         reimbursements,
       })
 
-      return { show, net, involved, memberShares, bandFundAmount, bandFundHolderId, cashPositions, reimbursements, settlement }
+      return { show, net, involved, memberShares, bandFundAmount, bandFundHolderId, cashPositions, reimbursements, guaranteedReimbursements, settlement }
     })
     // netForShow/standingBalanceBeforeBatch derive purely from the args
     // already listed here, and `members` only supplies a fallback id —
@@ -163,7 +204,10 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
     showTitle: string
     entitlement: number
     cashPosition: number
+    /** Total reimbursement for this show — guaranteed (fuel etc., see guaranteedReimbursed) plus any general-fronting shortfall. */
     reimbursed: number
+    /** The guaranteed portion of `reimbursed` — a category:'reimbursement' expense, always paid back in full, never subject to the absorption floor. Shown as its own line. */
+    guaranteedReimbursed: number
     isBandFundHolder: boolean
     bandFundAmount: number
     /** What this show adds to their pooled amount owed — their cut, plus any real reimbursement for fronting. */
@@ -176,12 +220,14 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
         const entitlement = p.memberShares[id] ?? 0
         const cashPosition = p.cashPositions[id] ?? 0
         const reimbursed = p.reimbursements[id] ?? 0
+        const guaranteedReimbursed = p.guaranteedReimbursements[id] ?? 0
         const isBandFundHolder = id === p.bandFundHolderId
         ;(map[id] ??= []).push({
           showTitle: p.show.title,
           entitlement,
           cashPosition,
           reimbursed,
+          guaranteedReimbursed,
           isBandFundHolder,
           bandFundAmount: p.bandFundAmount,
           owedFromShow: round2(entitlement + reimbursed),
@@ -337,7 +383,7 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
           memberName: t.member_id ? realNameOf(t.member_id) : null,
           amount: t.amount,
         })),
-        cuts: p.involved.map(id => ({ name: realNameOf(id), cut: p.memberShares[id] ?? 0 })),
+        cuts: p.involved.map(id => ({ name: realNameOf(id), cut: p.memberShares[id] ?? 0, reimbursement: p.guaranteedReimbursements[id] ?? 0 })),
         bandFundHolderName: realNameOf(p.bandFundHolderId),
         bandFundAmount: p.bandFundAmount,
       }))
@@ -430,15 +476,23 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
                       </div>
                     </div>
 
-                    {/* Ideal equal split preview — the plain {bandPct}/{100-bandPct} split */}
+                    {/* Ideal equal split preview — the plain {bandPct}/{100-bandPct} split, plus
+                        whatever anyone's owed back on top for a guaranteed (fuel etc.) reimbursement */}
                     {showData && showData.involved.length > 0 && (
                       <div className="space-y-1 border-t border-brand-100 pt-2 text-xs">
-                        {showData.involved.map(id => (
-                          <div key={id} className="flex items-center justify-between text-gray-600">
-                            <span>{nameOf(id)}</span>
-                            <span className="font-semibold tabular-nums">{fmt(showData.memberShares[id] ?? 0)}</span>
-                          </div>
-                        ))}
+                        {showData.involved.map(id => {
+                          const cut = showData.memberShares[id] ?? 0
+                          const reimbursement = showData.guaranteedReimbursements[id] ?? 0
+                          return (
+                            <div key={id} className="flex items-center justify-between text-gray-600">
+                              <span>
+                                {nameOf(id)}
+                                {reimbursement > 0 && <span className="ml-1.5 text-[10px] font-medium text-blue-500">+{fmt(reimbursement)} reimb.</span>}
+                              </span>
+                              <span className="font-semibold tabular-nums">{fmt(cut + reimbursement)}</span>
+                            </div>
+                          )
+                        })}
                         <div className="flex items-center justify-between pt-1 text-brand-600">
                           <span>Band Fund ({bandPct}%) <span className="text-gray-400">(kept by {nameOf(showData.bandFundHolderId)})</span></span>
                           <span className="font-semibold tabular-nums">{fmt(showData.bandFundAmount)}</span>
@@ -496,6 +550,10 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
               const rows = assignmentsFor(id)
               const assigned = round2(rows.reduce((s, a) => s + (a.payerId ? (a.amount || 0) : 0), 0))
               const remaining = round2(owed - assigned)
+              const lines = breakdownByPerson[id] ?? []
+              const cut = round2(lines.reduce((s, l) => s + l.entitlement, 0))
+              const reimbursement = round2(lines.reduce((s, l) => s + l.reimbursed, 0))
+              const guaranteedReimbursement = round2(lines.reduce((s, l) => s + l.guaranteedReimbursed, 0))
 
               return (
                 <div key={id} className="rounded-lg bg-white p-3 shadow-sm">
@@ -503,6 +561,12 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
                     <span className="text-sm font-medium text-gray-700">{nameOf(id)}</span>
                     <span className="text-sm font-bold tabular-nums text-green-600">Gets {fmt(owed)}</span>
                   </div>
+                  {reimbursement > 0.01 && (
+                    <p className="mt-0.5 text-xs text-gray-400">
+                      {fmt(cut)} cut + {fmt(reimbursement)} reimbursement
+                      {guaranteedReimbursement > 0.01 && ` (incl. ${fmt(guaranteedReimbursement)} fuel/expense reimbursement)`}
+                    </p>
+                  )}
                   <div className="mt-2 space-y-1.5">
                     {rows.map((row, i) => (
                       <div key={i} className="flex items-center gap-1.5">
@@ -625,16 +689,22 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
                             <span>Equal share</span>
                             <span className="tabular-nums">+{fmt(line.entitlement)}</span>
                           </div>
+                          {line.guaranteedReimbursed > 0 && (
+                            <div className="flex items-center justify-between text-blue-600">
+                              <span>Reimbursement (fuel etc. — paid back in full)</span>
+                              <span className="tabular-nums">+{fmt(line.guaranteedReimbursed)}</span>
+                            </div>
+                          )}
                           {line.cashPosition < 0 && (
                             <>
                               <div className="flex items-center justify-between text-gray-400">
                                 <span>Fronted from balance</span>
                                 <span className="tabular-nums">−{fmt(line.cashPosition)}</span>
                               </div>
-                              {line.reimbursed > 0 && (
+                              {round2(line.reimbursed - line.guaranteedReimbursed) > 0 && (
                                 <div className="flex items-center justify-between text-green-600">
                                   <span>Reimbursement (balance would&apos;ve gone below ₹0)</span>
-                                  <span className="tabular-nums">+{fmt(line.reimbursed)}</span>
+                                  <span className="tabular-nums">+{fmt(line.reimbursed - line.guaranteedReimbursed)}</span>
                                 </div>
                               )}
                             </>

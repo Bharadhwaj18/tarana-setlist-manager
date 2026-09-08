@@ -67,6 +67,8 @@ export interface SplitReportLine {
   entitlement: number
   cashPosition: number
   reimbursed: number
+  /** The guaranteed portion of `reimbursed` — a category:'reimbursement' expense (fuel, etc.), always paid back in full regardless of standing balance. Shown as its own line. */
+  guaranteedReimbursed: number
   isBandFundHolder: boolean
   bandFundAmount: number
   owedFromShow: number
@@ -86,7 +88,8 @@ export interface SplitReportShow {
   showTitle: string
   net: number
   transactions: { description: string; memberName: string | null; amount: number }[]
-  cuts: { name: string; cut: number }[]
+  /** `reimbursement` is the guaranteed (fuel etc.) portion paid on top of `cut`, funded from this show's Band Fund cut rather than the shared pool. */
+  cuts: { name: string; cut: number; reimbursement: number }[]
   bandFundHolderName: string
   bandFundAmount: number
 }
@@ -142,7 +145,10 @@ export function buildSplitReportPdf(
     }
 
     pdf.subHeading('Who\'s getting what')
-    const whoRows: string[][] = s.cuts.map(c => [c.name, fmt(c.cut)])
+    const whoRows: string[][] = s.cuts.map(c => [
+      c.reimbursement > 0.01 ? `${c.name} (incl. ${fmt(c.reimbursement)} reimbursement)` : c.name,
+      fmt(c.cut + c.reimbursement),
+    ])
     whoRows.push([`Band Fund (${bandPct}%) — kept by ${s.bandFundHolderName}`, fmt(s.bandFundAmount)])
     autoTable(pdf.doc, {
       ...TABLE_THEME,
@@ -198,10 +204,14 @@ export function buildSplitReportPdf(
     for (const { r, line } of showLines) {
       const lines: { label: string; value: string; valueColor?: string; indent?: boolean; muted?: boolean }[] = []
       lines.push({ label: `${r.name}'s cut`, value: `+ ${fmt(line.entitlement)}`, indent: true })
+      if (line.guaranteedReimbursed > 0.01) {
+        lines.push({ label: `${r.name}'s reimbursement (fuel etc. — paid back in full)`, value: `+ ${fmt(line.guaranteedReimbursed)}`, indent: true, valueColor: COLORS.accentDark })
+      }
       if (line.cashPosition < 0) {
         lines.push({ label: `${r.name} paid out of pocket for the show`, value: `- ${fmt(line.cashPosition)}`, indent: true, muted: true })
-        if (line.reimbursed > 0) {
-          lines.push({ label: `Paid back (would’ve dropped ${r.name}'s balance below Rs. 0)`, value: `+ ${fmt(line.reimbursed)}`, indent: true, valueColor: COLORS.positive })
+        const generalReimbursed = line.reimbursed - line.guaranteedReimbursed
+        if (generalReimbursed > 0.01) {
+          lines.push({ label: `Paid back (would’ve dropped ${r.name}'s balance below Rs. 0)`, value: `+ ${fmt(generalReimbursed)}`, indent: true, valueColor: COLORS.positive })
         }
       }
       if (line.cashPosition > 0) {
@@ -279,14 +289,14 @@ export function buildSplitReportPdf(
     ...TABLE_THEME,
     startY: pdf.y,
     head: [['Member', 'Band Fund']],
-    body: allBalances.map(b => [b.name, fmt(b.balance)]),
+    body: allBalances.map(b => [b.name, b.balance < 0 ? `- ${fmt(b.balance)}` : fmt(b.balance)]),
     columnStyles: {
       0: { cellWidth: 'auto' },
       1: { cellWidth: 'wrap', halign: 'right' },
     },
     didParseCell: data => {
       if (data.section === 'body' && data.column.index === 1) {
-        data.cell.styles.textColor = COLORS.accentDark
+        data.cell.styles.textColor = allBalances[data.row.index]?.balance < 0 ? COLORS.negative : COLORS.accentDark
         data.cell.styles.fontStyle = 'bold'
       }
     },

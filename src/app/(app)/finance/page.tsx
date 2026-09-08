@@ -28,10 +28,15 @@ export default async function FinancePage() {
 
   // Balance per member. There's no separate Band Fund bucket — whatever a
   // member is holding, including a retained Band Fund cut from a split, is
-  // just their balance, same as anything else.
+  // just their balance, same as anything else. category:'reimbursement' is
+  // the one exception — it's a personal cost they fronted (fuel, etc.),
+  // never Band Fund money in the first place, so it never touches this
+  // balance; the split pays it back to them directly (funded by whoever's
+  // assigned to cover it), same as their cut becoming personal money the
+  // moment it's paid.
   const balanceMap: Record<string, number> = {}
   for (const t of txns ?? []) {
-    if (!t.member_id) continue
+    if (!t.member_id || t.category === 'reimbursement') continue
     balanceMap[t.member_id] = (balanceMap[t.member_id] ?? 0) + t.amount
   }
 

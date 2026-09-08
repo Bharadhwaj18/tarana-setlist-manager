@@ -76,10 +76,17 @@ export function AddTransactionModal({ members, shows, transaction, lockedShow }:
     setOpen(true)
   }
 
+  // A category:'reimbursement' expense (fuel, parking, a personal cost for
+  // the show) is always a debit, and it's meaningless without knowing who
+  // it's for — the member field stops being an optional "who recorded
+  // this" and becomes the one thing this form exists to capture.
+  const isReimbursement = category === 'reimbursement'
+
   const canSubmit = tag !== null
     && !!category
     && (tag === 'misc' || showId !== NEW_SHOW || newShowTitle.trim() !== '')
     && !!amount
+    && (!isReimbursement || (memberId !== AUTO && memberId !== ''))
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -102,10 +109,11 @@ export function AddTransactionModal({ members, shows, transaction, lockedShow }:
         }
       }
 
+      const effectiveDir = isReimbursement ? 'debit' : dir
       const payload = {
         member_id: memberId === AUTO ? null : memberId,
-        amount: dir === 'credit' ? amt : -amt,
-        description: description.trim() || (dir === 'credit' ? 'Credit' : 'Debit'),
+        amount: effectiveDir === 'credit' ? amt : -amt,
+        description: description.trim() || (isReimbursement ? 'Reimbursement' : effectiveDir === 'credit' ? 'Credit' : 'Debit'),
         category,
         show_id: resolvedShowId,
         date,
@@ -194,17 +202,20 @@ export function AddTransactionModal({ members, shows, transaction, lockedShow }:
             </div>
           )}
 
-          {/* Credit / Debit */}
-          <div className="flex gap-2">
-            <button type="button" onClick={() => set('dir', 'credit')}
-              className={`flex-1 rounded-md py-2 text-sm font-semibold transition-colors ${dir === 'credit' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-              + Credit (add money)
-            </button>
-            <button type="button" onClick={() => set('dir', 'debit')}
-              className={`flex-1 rounded-md py-2 text-sm font-semibold transition-colors ${dir === 'debit' ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-              − Debit (subtract)
-            </button>
-          </div>
+          {/* Credit / Debit — skipped for Reimbursement, which is always a
+              debit: money the band owes someone back, never money in. */}
+          {!isReimbursement && (
+            <div className="flex gap-2">
+              <button type="button" onClick={() => set('dir', 'credit')}
+                className={`flex-1 rounded-md py-2 text-sm font-semibold transition-colors ${dir === 'credit' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                + Credit (add money)
+              </button>
+              <button type="button" onClick={() => set('dir', 'debit')}
+                className={`flex-1 rounded-md py-2 text-sm font-semibold transition-colors ${dir === 'debit' ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                − Debit (subtract)
+              </button>
+            </div>
+          )}
 
           {/* Amount */}
           <div>
@@ -213,11 +224,30 @@ export function AddTransactionModal({ members, shows, transaction, lockedShow }:
               placeholder="0" className={inputCls} required />
           </div>
 
+          {/* Reimbursement: who it's for, right up front and mandatory —
+              the whole point of this category. Everyone else: the usual
+              optional "who recorded this" field, further down. */}
+          {isReimbursement && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Reimburse *</label>
+              <select value={memberId === AUTO ? '' : memberId} onChange={e => set('memberId', e.target.value)} className={inputCls} required>
+                <option value="" disabled>Who gets this back?</option>
+                {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+              <p className="mt-1 text-xs text-gray-400">
+                Paid back to them in full on top of their cut — never absorbed into their Band Fund balance.
+              </p>
+            </div>
+          )}
+
           {/* Description */}
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Description *</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              {isReimbursement ? 'What for' : 'Description *'} {isReimbursement && <span className="font-normal text-gray-400">(optional)</span>}
+            </label>
             <input type="text" value={description} onChange={e => set('description', e.target.value)}
-              placeholder="e.g. Rehearsal space, Sound engineer" className={inputCls} required />
+              placeholder={isReimbursement ? 'e.g. Fuel for car' : 'e.g. Rehearsal space, Sound engineer'}
+              className={inputCls} required={!isReimbursement} />
           </div>
 
           {/* Date */}
@@ -227,15 +257,17 @@ export function AddTransactionModal({ members, shows, transaction, lockedShow }:
           </div>
 
           {/* Paid by / Received by — optional, bottom, real members only */}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              {dir === 'credit' ? 'Received by' : 'Paid by'} <span className="font-normal text-gray-400">(optional)</span>
-            </label>
-            <select value={memberId} onChange={e => set('memberId', e.target.value)} className={inputCls}>
-              <option value={AUTO}>Auto — whoever&apos;s adding this</option>
-              {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
-          </div>
+          {!isReimbursement && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                {dir === 'credit' ? 'Received by' : 'Paid by'} <span className="font-normal text-gray-400">(optional)</span>
+              </label>
+              <select value={memberId} onChange={e => set('memberId', e.target.value)} className={inputCls}>
+                <option value={AUTO}>Auto — whoever&apos;s adding this</option>
+                {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-1">
             <Button type="button" variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
