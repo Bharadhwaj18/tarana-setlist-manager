@@ -243,7 +243,14 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
   // Everyone touched by any selected show, in a stable order.
   const allInvolvedIds = members.map(m => m.id).filter(id => perShow.some(p => p.involved.includes(id)))
 
-  const amountOwedFor = (id: string) => pooled.amountOwed[id] ?? 0
+  // Rounded to the whole rupee — real settlements are always whole-rupee
+  // amounts, and `fmt()` only ever displays whole rupees too. Keeping this
+  // fractional (e.g. 13714.29) while the UI shows "₹13,714" meant typing
+  // exactly what you see could never satisfy the assigned-vs-owed check —
+  // a sub-rupee residual stayed forever, invisibly blocking Confirm. The
+  // real routing math (routeSettlement) still runs on the exact pooled
+  // figures — only this manual-assignment/display helper rounds.
+  const amountOwedFor = (id: string) => Math.round(pooled.amountOwed[id] ?? 0)
 
   const assignmentsFor = (recipientId: string): Assignment[] => {
     const existing = assignmentsByRecipient[recipientId]
