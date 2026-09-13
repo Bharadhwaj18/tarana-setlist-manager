@@ -156,12 +156,20 @@ export interface SplitPayment {
  * Confirms a batch split — one or more shows at once. Every payment (who
  * pays whom how much, already fully resolved by the caller — see
  * lib/finance/settlement.ts's routeSettlement, or a treasurer's manual
- * assignment) becomes exactly one debit transaction on the payer. Nobody is
- * ever credited: this section only tracks Band Fund, and money paid out to
- * someone becomes their personal money the instant it's paid, out of scope
- * from then on. A self-payment (from === to, someone covering their own
- * share from their own Band Fund) is written the exact same way as any
- * other payment.
+ * assignment) resolves to exactly one debit on the payer, eventually.
+ * Nobody is ever credited: this section only tracks Band Fund, and money
+ * paid out to someone becomes their personal money the instant it's paid,
+ * out of scope from then on.
+ *
+ * A self-payment (from === to, someone covering their own share from their
+ * own Band Fund) is a same-person internal transfer — nothing physically
+ * needs to change hands, so it's written immediately as a real debit, same
+ * as before. A payer-to-recipient payment is real money someone still has
+ * to actually hand over, so it's held as a `pending_payments` row instead —
+ * it only becomes a real finance_transactions debit once the payer marks
+ * it paid (see markPendingPaymentPaid in actions/pending-payments.ts). The
+ * show is still marked split immediately either way; Band Fund balances
+ * just reflect only what's actually been paid so far.
  */
 export async function splitShows(shows: ShowSplitInput[], payments: SplitPayment[]): Promise<{ error?: string }> {
   const supabase = await createClient()
@@ -177,9 +185,12 @@ export async function splitShows(shows: ShowSplitInput[], payments: SplitPayment
   // this batch — a pooled multi-show payment isn't any single show's alone.
   const showId = shows.length === 1 ? shows[0].showId : null
 
-  const transactions = payments
-    .filter(p => p.amount > 0)
-    .map(p => ({
+  const real = payments.filter(p => p.amount > 0)
+  const selfPayments = real.filter(p => p.from === p.to)
+  const crossPayments = real.filter(p => p.from !== p.to)
+
+  if (selfPayments.length > 0) {
+    const transactions = selfPayments.map(p => ({
       member_id: p.from,
       amount: -p.amount,
       description: p.description,
@@ -188,10 +199,21 @@ export async function splitShows(shows: ShowSplitInput[], payments: SplitPayment
       date: today,
       recorded_by: user.id,
     }))
-
-  if (transactions.length > 0) {
     const { error: txErr } = await supabase.from('finance_transactions').insert(transactions)
     if (txErr) return { error: txErr.message }
+  }
+
+  if (crossPayments.length > 0) {
+    const pending = crossPayments.map(p => ({
+      from_member: p.from,
+      to_member: p.to,
+      amount: p.amount,
+      description: p.description,
+      category: 'split',
+      show_id: showId,
+    }))
+    const { error: pendingErr } = await supabase.from('pending_payments').insert(pending)
+    if (pendingErr) return { error: pendingErr.message }
   }
 
   const { error: showErr } = await supabase

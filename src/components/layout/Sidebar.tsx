@@ -32,6 +32,8 @@ function LogoImage() {
 
 interface SidebarProps {
   user: User
+  /** How many split payments this person still owes a bandmate — badged on the Finance link until each one's marked paid. */
+  pendingPaymentCount?: number
 }
 
 const navItems = [
@@ -42,7 +44,7 @@ const navItems = [
   { href: '/notes', label: 'Notes', icon: StickyNote },
 ]
 
-export function Sidebar({ user }: SidebarProps) {
+export function Sidebar({ user, pendingPaymentCount = 0 }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -82,7 +84,12 @@ export function Sidebar({ user }: SidebarProps) {
           )}
         >
           <Icon className="h-5 w-5 shrink-0" />
-          {label}
+          <span className="flex-1">{label}</span>
+          {href === '/finance' && pendingPaymentCount > 0 && (
+            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white">
+              {pendingPaymentCount}
+            </span>
+          )}
         </Link>
       ))}
     </nav>

@@ -95,3 +95,16 @@ export const getCachedNotes = cache(async () => {
   const { data } = await supabase.from('notes').select('*').order('updated_at', { ascending: false })
   return data ?? []
 })
+
+// Every unpaid split payment still waiting on someone to actually hand the
+// money over — the reminder banner (Finance page) and the Sidebar's badge
+// both read this, plus Split History shows them alongside paid ones.
+export const getCachedPendingPayments = cache(async () => {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('pending_payments')
+    .select('*')
+    .is('paid_at', null)
+    .order('created_at', { ascending: false })
+  return data ?? []
+})

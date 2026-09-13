@@ -290,6 +290,45 @@ export type Database = {
         }
         Relationships: []
       }
+      pending_payments: {
+        Row: {
+          id: string
+          from_member: string
+          to_member: string
+          amount: number
+          description: string
+          category: string
+          show_id: string | null
+          created_at: string
+          paid_at: string | null
+          paid_transaction_id: string | null
+        }
+        Insert: {
+          id?: string
+          from_member: string
+          to_member: string
+          amount: number
+          description: string
+          category?: string
+          show_id?: string | null
+          created_at?: string
+          paid_at?: string | null
+          paid_transaction_id?: string | null
+        }
+        Update: {
+          id?: string
+          from_member?: string
+          to_member?: string
+          amount?: number
+          description?: string
+          category?: string
+          show_id?: string | null
+          created_at?: string
+          paid_at?: string | null
+          paid_transaction_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: { [_ in never]: never }
     Functions: { [_ in never]: never }

@@ -1,19 +1,21 @@
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
-import { getCachedAllProfiles } from '@/lib/data'
+import { getCachedAllProfiles, getCachedPendingPayments } from '@/lib/data'
 import { SplitHistoryList } from '@/components/finance/SplitHistoryList'
 import { FinanceFloatingNav } from '@/components/finance/FinanceFloatingNav'
 import type { FinanceTransaction } from '@/types/finance'
+import type { PendingPayment } from '@/types'
 
 export default async function SplitHistoryPage() {
   const supabase = await createClient()
 
-  const [profiles, { data: shows }, { data: allTxns }, { data: unsplitShows }] = await Promise.all([
+  const [profiles, { data: shows }, { data: allTxns }, { data: unsplitShows }, pendingPayments] = await Promise.all([
     getCachedAllProfiles(),
     supabase.from('shows').select('*').not('split_at', 'is', null).order('split_at', { ascending: false }),
     supabase.from('finance_transactions').select('*').eq('category', 'split'),
     supabase.from('shows').select('id').is('split_at', null),
+    getCachedPendingPayments(),
   ])
 
   const txnsByShow: Record<string, FinanceTransaction[]> = {}
@@ -21,6 +23,13 @@ export default async function SplitHistoryPage() {
     if (!t.show_id) continue
     if (!txnsByShow[t.show_id]) txnsByShow[t.show_id] = []
     txnsByShow[t.show_id].push(t)
+  }
+
+  const pendingByShow: Record<string, PendingPayment[]> = {}
+  for (const p of pendingPayments) {
+    if (!p.show_id) continue
+    if (!pendingByShow[p.show_id]) pendingByShow[p.show_id] = []
+    pendingByShow[p.show_id].push(p)
   }
 
   return (
@@ -36,7 +45,7 @@ export default async function SplitHistoryPage() {
           No shows have been split yet.
         </div>
       ) : (
-        <SplitHistoryList shows={shows} txnsByShow={txnsByShow} profiles={profiles} />
+        <SplitHistoryList shows={shows} txnsByShow={txnsByShow} pendingByShow={pendingByShow} profiles={profiles} />
       )}
 
       <FinanceFloatingNav hasUnsplitShows={(unsplitShows ?? []).length > 0} />

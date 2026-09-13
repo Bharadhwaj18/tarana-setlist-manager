@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { getCachedUser } from '@/lib/data'
+import { getCachedUser, getCachedPendingPayments } from '@/lib/data'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { OfflineUserSync } from '@/components/OfflineUserSync'
 import type { ReactNode } from 'react'
@@ -31,10 +31,16 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   if (!profileError && !profile?.display_name?.trim()) redirect('/setup')
 
+  // How many split payments this person still owes a bandmate — the
+  // Sidebar's Finance badge, visible from anywhere in the app until each
+  // one's marked paid.
+  const pendingPayments = await getCachedPendingPayments()
+  const pendingCount = pendingPayments.filter(p => p.from_member === effectiveUser.id).length
+
   return (
     <div className="flex h-screen">
       <OfflineUserSync email={effectiveUser.email ?? ''} displayName={profile?.display_name ?? ''} />
-      <Sidebar user={effectiveUser} />
+      <Sidebar user={effectiveUser} pendingPaymentCount={pendingCount} />
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-5xl px-4 pb-8 pt-20 sm:px-6 lg:px-8 lg:pt-8">
           {children}

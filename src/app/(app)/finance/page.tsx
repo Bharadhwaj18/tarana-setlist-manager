@@ -1,11 +1,12 @@
 import Link from 'next/link'
 import { TrendingUp, TrendingDown } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
-import { getCachedAllProfiles, getCachedUser } from '@/lib/data'
+import { getCachedAllProfiles, getCachedUser, getCachedPendingPayments } from '@/lib/data'
 import { AddTransactionModal } from '@/components/finance/AddTransactionModal'
 import { DeleteTransactionButton } from '@/components/finance/DeleteTransactionButton'
 import { ExportModal } from '@/components/finance/ExportModal'
 import { FinanceFloatingNav } from '@/components/finance/FinanceFloatingNav'
+import { PendingPaymentsBanner } from '@/components/finance/PendingPaymentsBanner'
 import { cn } from '@/lib/utils'
 
 function fmt(n: number) {
@@ -19,11 +20,12 @@ function sign(n: number) {
 export default async function FinancePage() {
   const supabase = await createClient()
 
-  const [{ data: { user } }, profiles, { data: txns }, { data: shows }] = await Promise.all([
+  const [{ data: { user } }, profiles, { data: txns }, { data: shows }, pendingPayments] = await Promise.all([
     getCachedUser(),
     getCachedAllProfiles(),
     supabase.from('finance_transactions').select('*').order('created_at', { ascending: false }),
     supabase.from('shows').select('*').order('show_date', { ascending: false }),
+    getCachedPendingPayments(),
   ])
 
   // Balance per member. There's no separate Band Fund bucket — whatever a
@@ -58,6 +60,7 @@ export default async function FinancePage() {
     id === null ? 'Unattributed' : id === user?.id ? 'You' : (profiles.find(p => p.id === id)?.display_name ?? 'Member')
 
   const memberOptions = profiles.map(p => ({ id: p.id, name: p.id === user?.id ? 'You' : (p.display_name ?? 'Member') }))
+  const myPendingPayments = user ? pendingPayments.filter(p => p.from_member === user.id) : []
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -74,6 +77,9 @@ export default async function FinancePage() {
           <ExportModal members={profiles.map(p => ({ id: p.id, name: p.display_name ?? 'Member' }))} />
         </div>
       </div>
+
+      {/* Pending payments — a standing reminder until marked paid */}
+      <PendingPaymentsBanner payments={myPendingPayments} nameOf={nameOf} />
 
       {/* Balances */}
       <section className="rounded-xl border border-brand-200 bg-white p-5 shadow-sm">

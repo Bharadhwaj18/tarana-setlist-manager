@@ -4,10 +4,12 @@ import { useState } from 'react'
 import { Search } from 'lucide-react'
 import type { FinanceTransaction } from '@/types/finance'
 import type { Show } from '@/types/shows'
+import type { PendingPayment } from '@/types'
 
 interface Props {
   shows: Show[]
   txnsByShow: Record<string, FinanceTransaction[]>
+  pendingByShow: Record<string, PendingPayment[]>
   profiles: { id: string; display_name: string | null }[]
 }
 
@@ -15,7 +17,7 @@ function fmt(n: number) {
   return `₹${Math.abs(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
 }
 
-export function SplitHistoryList({ shows, txnsByShow, profiles }: Props) {
+export function SplitHistoryList({ shows, txnsByShow, pendingByShow, profiles }: Props) {
   const [query, setQuery] = useState('')
 
   // A plain function prop isn't serializable across the server/client
@@ -29,9 +31,14 @@ export function SplitHistoryList({ shows, txnsByShow, profiles }: Props) {
         if (show.title.toLowerCase().includes(q)) return true
         if (show.venue?.toLowerCase().includes(q)) return true
         if (show.notes?.toLowerCase().includes(q)) return true
-        return (txnsByShow[show.id] ?? []).some(t =>
+        if ((txnsByShow[show.id] ?? []).some(t =>
           nameOf(t.member_id).toLowerCase().includes(q) ||
           t.description.toLowerCase().includes(q)
+        )) return true
+        return (pendingByShow[show.id] ?? []).some(p =>
+          nameOf(p.from_member).toLowerCase().includes(q) ||
+          nameOf(p.to_member).toLowerCase().includes(q) ||
+          p.description.toLowerCase().includes(q)
         )
       })
     : shows
@@ -64,6 +71,7 @@ export function SplitHistoryList({ shows, txnsByShow, profiles }: Props) {
               .filter(t => t.category === 'split')
               .sort((a, b) => a.amount - b.amount)
             const totalPaidOut = payments.reduce((s, t) => s + t.amount, 0)
+            const pending = pendingByShow[show.id] ?? []
 
             return (
               <section key={show.id} className="rounded-xl border border-brand-200 bg-white p-5 shadow-sm">
@@ -95,8 +103,24 @@ export function SplitHistoryList({ shows, txnsByShow, profiles }: Props) {
                       <span className="font-medium tabular-nums">−{fmt(totalPaidOut)}</span>
                     </div>
                   </div>
-                ) : (
+                ) : pending.length === 0 ? (
                   <p className="text-sm text-gray-400">No settlement transactions recorded for this show.</p>
+                ) : null}
+
+                {pending.length > 0 && (
+                  <div className="mt-3 space-y-1.5 border-t border-amber-100 pt-3">
+                    {pending.map(p => (
+                      <div key={p.id} className="flex items-center justify-between text-sm">
+                        <span className="text-gray-700">
+                          {nameOf(p.from_member)} → {nameOf(p.to_member)} <span className="text-xs text-gray-400">— {p.description}</span>
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">Pending</span>
+                          <span className="font-semibold tabular-nums text-amber-700">{fmt(p.amount)}</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </section>
             )
