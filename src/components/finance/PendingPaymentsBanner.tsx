@@ -13,7 +13,7 @@ function fmt(n: number) {
 interface Props {
   /** Already filtered to the current user's own pending payments (from_member === them). */
   payments: PendingPayment[]
-  nameOf: (id: string) => string
+  profiles: { id: string; display_name: string | null }[]
 }
 
 /**
@@ -24,9 +24,14 @@ interface Props {
  * reminder, and it's there every time they open the app until it's dealt
  * with.
  */
-export function PendingPaymentsBanner({ payments, nameOf }: Props) {
+export function PendingPaymentsBanner({ payments, profiles }: Props) {
   const [isPending, startTransition] = useTransition()
   const toast = useToast()
+
+  // A plain function prop isn't serializable across the server/client
+  // boundary — pass the raw profiles instead and resolve names in here
+  // (same fix as SplitHistoryList's identical issue).
+  const nameOf = (id: string) => profiles.find(p => p.id === id)?.display_name ?? 'Member'
 
   if (payments.length === 0) return null
 

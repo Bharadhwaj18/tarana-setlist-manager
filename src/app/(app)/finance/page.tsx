@@ -79,7 +79,7 @@ export default async function FinancePage() {
       </div>
 
       {/* Pending payments — a standing reminder until marked paid */}
-      <PendingPaymentsBanner payments={myPendingPayments} nameOf={nameOf} />
+      <PendingPaymentsBanner payments={myPendingPayments} profiles={profiles} />
 
       {/* Balances */}
       <section className="rounded-xl border border-brand-200 bg-white p-5 shadow-sm">
