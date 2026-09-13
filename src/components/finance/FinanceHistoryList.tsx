@@ -1,10 +1,9 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { TrendingUp, TrendingDown, Search } from 'lucide-react'
+import { Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { AddTransactionModal } from './AddTransactionModal'
-import { DeleteTransactionButton } from './DeleteTransactionButton'
+import { TransactionRow } from './TransactionRow'
 import type { FinanceTransaction } from '@/types/finance'
 import type { Show } from '@/types/shows'
 
@@ -88,31 +87,21 @@ export function FinanceHistoryList({ transactions, members, shows, showTitleById
       ) : (
         <div className="space-y-1">
           {filtered.map(t => {
-            const isCredit = t.amount >= 0
             const showTitle = t.show_id ? showTitleById[t.show_id] : null
+            const badge = showTitle
+              ? { label: showTitle, kind: 'show' as const }
+              : t.category
+                ? { label: t.category, kind: 'category' as const }
+                : undefined
             return (
-              <div key={t.id} className="group flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-gray-50">
-                <div className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-full', isCredit ? 'bg-green-100' : 'bg-red-100')}>
-                  {isCredit
-                    ? <TrendingUp className="h-3.5 w-3.5 text-green-600" />
-                    : <TrendingDown className="h-3.5 w-3.5 text-red-500" />}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-gray-800">{t.description}</p>
-                  <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-gray-400">
-                    <span>{nameOf(t.member_id)}</span>
-                    <span>·</span>
-                    <span>{new Date(t.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}</span>
-                    {showTitle && <span className="rounded bg-brand-100 px-1.5 py-0.5 font-medium text-brand-700">{showTitle}</span>}
-                    {!showTitle && t.category && <span className="rounded bg-gray-100 px-1.5 py-0.5 font-medium text-gray-500">{t.category}</span>}
-                  </p>
-                </div>
-                <span className={cn('shrink-0 text-sm font-bold tabular-nums', isCredit ? 'text-green-600' : 'text-red-500')}>
-                  {isCredit ? '+' : '−'}{fmt(t.amount)}
-                </span>
-                <AddTransactionModal members={members} shows={shows} transaction={t} />
-                <DeleteTransactionButton id={t.id} />
-              </div>
+              <TransactionRow
+                key={t.id}
+                transaction={t}
+                members={members}
+                shows={shows}
+                payerName={nameOf(t.member_id)}
+                badge={badge}
+              />
             )
           })}
         </div>

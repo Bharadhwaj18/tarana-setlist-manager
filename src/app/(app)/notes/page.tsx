@@ -1,7 +1,7 @@
 import { StickyNote } from 'lucide-react'
 import { getCachedNotes, getCachedAllProfiles, getCachedUser } from '@/lib/data'
 import { NoteModal } from '@/components/notes/NoteModal'
-import { DeleteNoteButton } from '@/components/notes/DeleteNoteButton'
+import { NoteCard } from '@/components/notes/NoteCard'
 
 export default async function NotesPage() {
   const [notes, profiles, { data: { user } }] = await Promise.all([
@@ -35,21 +35,14 @@ export default async function NotesPage() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {notes.map(note => (
-            <div key={note.id} className="group flex flex-col rounded-xl border border-brand-200 bg-white p-4 shadow-sm">
-              <div className="mb-1 flex items-start justify-between gap-2">
-                <p className="font-semibold text-gray-900">{note.title}</p>
-                <div className="flex shrink-0 items-center gap-2">
-                  <NoteModal note={note} />
-                  <DeleteNoteButton id={note.id} />
-                </div>
-              </div>
-              {note.content && <p className="mb-3 flex-1 whitespace-pre-wrap text-sm text-gray-600">{note.content}</p>}
-              <p className="mt-auto text-xs text-gray-400">
-                {note.updated_by ? `Last edited by ${nameOf(note.updated_by)}` : `Added by ${nameOf(note.created_by)}`}
-                {' · '}
-                {new Date(note.updated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}
-              </p>
-            </div>
+            <NoteCard
+              key={note.id}
+              note={note}
+              authorLine={
+                `${note.updated_by ? `Last edited by ${nameOf(note.updated_by)}` : `Added by ${nameOf(note.created_by)}`}` +
+                ` · ${new Date(note.updated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}`
+              }
+            />
           ))}
         </div>
       )}

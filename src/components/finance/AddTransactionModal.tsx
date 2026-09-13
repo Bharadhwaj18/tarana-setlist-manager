@@ -19,6 +19,9 @@ interface Props {
   transaction?: FinanceTransaction
   /** Present = pin this transaction to one specific show — used for "add a missed expense" from inside that show's own review (e.g. the Split screen). Hides the Tag/Which-show pickers since both are already implied. */
   lockedShow?: { id: string; title: string }
+  /** Controlled visibility — pass both to drive this from outside (e.g. a whole tappable row opening it) instead of the built-in pencil trigger, which is skipped entirely when these are provided. */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 const inputCls = 'w-full rounded-md border border-brand-200 bg-white px-3 py-2.5 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400'
@@ -50,8 +53,9 @@ function fieldsFrom(transaction: FinanceTransaction | undefined, unsplitShows: S
   }
 }
 
-export function AddTransactionModal({ members, shows, transaction, lockedShow }: Props) {
+export function AddTransactionModal({ members, shows, transaction, lockedShow, open: controlledOpen, onOpenChange }: Props) {
   const isEdit = !!transaction
+  const isControlled = controlledOpen !== undefined && onOpenChange !== undefined
   const unsplitShows = shows.filter(s => !s.split_at)
   // Editing a transaction tagged to an already-split show still needs that
   // show in the list (just to display correctly), even though it can't be
@@ -60,7 +64,9 @@ export function AddTransactionModal({ members, shows, transaction, lockedShow }:
     ? [...unsplitShows, ...shows.filter(s => s.id === transaction.show_id)]
     : unsplitShows
 
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+  const open = isControlled ? controlledOpen : internalOpen
+  const setOpen = isControlled ? onOpenChange : setInternalOpen
   const [fields, setFields] = useState(() => fieldsFrom(transaction, unsplitShows, lockedShow))
   const [newShowTitle, setNewShowTitle] = useState('')
   const [isPending, startTransition] = useTransition()
@@ -70,10 +76,20 @@ export function AddTransactionModal({ members, shows, transaction, lockedShow }:
   const set = <K extends keyof typeof fields>(key: K, value: typeof fields[K]) =>
     setFields(prev => ({ ...prev, [key]: value }))
 
-  const openModal = () => {
-    setFields(fieldsFrom(transaction, unsplitShows, lockedShow))
-    setNewShowTitle('')
-    setOpen(true)
+  // Reset the form fresh every time the modal opens — whether that's the
+  // built-in trigger below or a parent driving `open` directly (a tappable
+  // row), the reset needs to happen either way. Adjusting state during
+  // render (React's documented pattern for "reset state when a prop
+  // changes") rather than in an effect — it takes one extra render instead
+  // of a post-commit effect pass, and never risks running before the
+  // fields actually get used.
+  const [prevOpen, setPrevOpen] = useState(open)
+  if (open !== prevOpen) {
+    setPrevOpen(open)
+    if (open) {
+      setFields(fieldsFrom(transaction, unsplitShows, lockedShow))
+      setNewShowTitle('')
+    }
   }
 
   // A category:'reimbursement' expense (fuel, parking, a personal cost for
@@ -131,20 +147,20 @@ export function AddTransactionModal({ members, shows, transaction, lockedShow }:
 
   return (
     <>
-      {isEdit ? (
+      {isControlled ? null : isEdit ? (
         <button
-          onClick={openModal}
-          className="shrink-0 text-gray-300 opacity-0 transition-opacity hover:text-brand-500 group-hover:opacity-100"
+          onClick={() => setOpen(true)}
+          className="shrink-0 rounded-md p-1 text-gray-400 hover:bg-brand-50 hover:text-brand-500"
           aria-label="Edit transaction"
         >
-          <Pencil className="h-3.5 w-3.5" />
+          <Pencil className="h-4 w-4" />
         </button>
       ) : lockedShow ? (
-        <Button variant="secondary" size="sm" onClick={openModal}>
+        <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>
           <Plus className="h-4 w-4" /> Add expense
         </Button>
       ) : (
-        <Button variant="secondary" onClick={openModal}>
+        <Button variant="secondary" onClick={() => setOpen(true)}>
           <Plus className="h-4 w-4" /> Transaction
         </Button>
       )}

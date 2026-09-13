@@ -14,20 +14,33 @@ import type { Note } from '@/types'
 interface Props {
   /** Present = edit this note instead of creating a new one. */
   note?: Note
+  /** Controlled visibility — pass both to drive this from outside (e.g. a whole tappable card opening it) instead of the built-in pencil trigger, which is skipped entirely when these are provided. */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
-export function NoteModal({ note }: Props) {
+export function NoteModal({ note, open: controlledOpen, onOpenChange }: Props) {
   const isEdit = !!note
-  const [open, setOpen] = useState(false)
+  const isControlled = controlledOpen !== undefined && onOpenChange !== undefined
+  const [internalOpen, setInternalOpen] = useState(false)
+  const open = isControlled ? controlledOpen : internalOpen
+  const setOpen = isControlled ? onOpenChange : setInternalOpen
   const [title, setTitle] = useState(note?.title ?? '')
   const [content, setContent] = useState(note?.content ?? '')
   const [isPending, startTransition] = useTransition()
   const toast = useToast()
 
-  const openModal = () => {
-    setTitle(note?.title ?? '')
-    setContent(note?.content ?? '')
-    setOpen(true)
+  // Reset the form fresh every time the modal opens, whether that's the
+  // built-in trigger below or a parent driving `open` directly. Adjusting
+  // state during render (React's documented pattern for "reset state when
+  // a prop changes") rather than in an effect.
+  const [prevOpen, setPrevOpen] = useState(open)
+  if (open !== prevOpen) {
+    setPrevOpen(open)
+    if (open) {
+      setTitle(note?.title ?? '')
+      setContent(note?.content ?? '')
+    }
   }
 
   const canSubmit = title.trim() !== ''
@@ -50,16 +63,16 @@ export function NoteModal({ note }: Props) {
 
   return (
     <>
-      {isEdit ? (
+      {isControlled ? null : isEdit ? (
         <button
-          onClick={openModal}
-          className="shrink-0 text-gray-300 opacity-0 transition-opacity hover:text-brand-500 group-hover:opacity-100"
+          onClick={() => setOpen(true)}
+          className="shrink-0 rounded-md p-1 text-gray-400 hover:bg-brand-50 hover:text-brand-500"
           aria-label="Edit note"
         >
-          <Pencil className="h-3.5 w-3.5" />
+          <Pencil className="h-4 w-4" />
         </button>
       ) : (
-        <Button onClick={openModal}>
+        <Button onClick={() => setOpen(true)}>
           <Plus className="h-4 w-4" /> New Note
         </Button>
       )}

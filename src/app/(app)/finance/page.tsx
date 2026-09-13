@@ -1,9 +1,8 @@
 import Link from 'next/link'
-import { TrendingUp, TrendingDown } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedAllProfiles, getCachedUser, getCachedPendingPayments } from '@/lib/data'
 import { AddTransactionModal } from '@/components/finance/AddTransactionModal'
-import { DeleteTransactionButton } from '@/components/finance/DeleteTransactionButton'
+import { TransactionRow } from '@/components/finance/TransactionRow'
 import { ExportModal } from '@/components/finance/ExportModal'
 import { FinanceFloatingNav } from '@/components/finance/FinanceFloatingNav'
 import { PendingPaymentsBanner } from '@/components/finance/PendingPaymentsBanner'
@@ -11,10 +10,6 @@ import { cn } from '@/lib/utils'
 
 function fmt(n: number) {
   return `₹${Math.abs(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
-}
-
-function sign(n: number) {
-  return n >= 0 ? '+' : '−'
 }
 
 export default async function FinancePage() {
@@ -138,30 +133,15 @@ export default async function FinancePage() {
           </div>
         ) : (
           <div className="space-y-1">
-            {recentTxns.map(t => {
-              const isCredit = t.amount >= 0
-              return (
-                <div key={t.id} className="group flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-gray-50">
-                  <div className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-full', isCredit ? 'bg-green-100' : 'bg-red-100')}>
-                    {isCredit
-                      ? <TrendingUp className="h-3.5 w-3.5 text-green-600" />
-                      : <TrendingDown className="h-3.5 w-3.5 text-red-500" />
-                    }
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-gray-800">{t.description}</p>
-                    <p className="text-xs text-gray-400">
-                      {nameOf(t.member_id)} · {new Date(t.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}
-                    </p>
-                  </div>
-                  <span className={cn('shrink-0 text-sm font-bold tabular-nums', isCredit ? 'text-green-600' : 'text-red-500')}>
-                    {sign(t.amount)}{fmt(t.amount)}
-                  </span>
-                  <AddTransactionModal members={memberOptions} shows={shows ?? []} transaction={t} />
-                  <DeleteTransactionButton id={t.id} />
-                </div>
-              )
-            })}
+            {recentTxns.map(t => (
+              <TransactionRow
+                key={t.id}
+                transaction={t}
+                members={memberOptions}
+                shows={shows ?? []}
+                payerName={nameOf(t.member_id)}
+              />
+            ))}
           </div>
         )}
       </section>
