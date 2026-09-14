@@ -1,8 +1,8 @@
 name: Backup Supabase Database
 
 # This repo is public, so backups never touch it — they're dumped and
-# pushed straight to a separate PRIVATE repo (tarana-db-backups). Only the
-# public schema is dumped, never auth/storage/other Supabase-internal
+# pushed straight to a separate PRIVATE repo (Bharadhwaj18/db-dump). Only
+# the public schema is dumped, never auth/storage/other Supabase-internal
 # schemas, to keep the backup's blast radius to just this app's own data.
 
 on:
@@ -41,7 +41,7 @@ jobs:
         env:
           TOKEN: ${{ secrets.BACKUP_REPO_TOKEN }}
         run: |
-          git clone https://x-access-token:${TOKEN}@github.com/Bharadhwaj18/tarana-db-backups.git backups-repo
+          git clone https://x-access-token:${TOKEN}@github.com/Bharadhwaj18/db-dump.git backups-repo
           cp backup.sql backups-repo/latest.sql
           cd backups-repo
           git config user.name "tarana-backup-bot"
