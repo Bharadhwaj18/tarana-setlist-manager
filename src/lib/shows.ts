@@ -17,3 +17,30 @@ export function todayISO() {
 export function isUpcoming(showDate: string | null, today: string) {
   return !!showDate && showDate > today
 }
+
+/**
+ * Known spelling variants for the same city in shows.venue, as entered
+ * across different rows of the source booking sheet — folded to one
+ * canonical display name for anything that groups shows by city (e.g. the
+ * Shows dashboard's "Top cities" panel). Keyed lowercase; extend as new
+ * variants turn up.
+ */
+const CITY_ALIASES: Record<string, string> = {
+  bangalore: 'Bangalore',
+  bengaluru: 'Bangalore',
+  bngaluru: 'Bangalore', // typo seen in the source sheet
+}
+
+function titleCase(s: string) {
+  return s.replace(/\S+/g, word => word[0].toUpperCase() + word.slice(1).toLowerCase())
+}
+
+/**
+ * Canonical display name for a venue/city string — folds known spelling
+ * variants (via CITY_ALIASES) and normalizes casing otherwise (so "udupi"
+ * and "Udupi" land on the same key), so this alone is safe to group by.
+ */
+export function canonicalCity(venue: string) {
+  const trimmed = venue.trim()
+  return CITY_ALIASES[trimmed.toLowerCase()] ?? titleCase(trimmed)
+}

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Plus, CalendarDays } from 'lucide-react'
 import { getCachedShows, getCachedShowTransactions, getCachedSetlistsByShow } from '@/lib/data'
-import { todayISO, isUpcoming } from '@/lib/shows'
+import { todayISO, isUpcoming, canonicalCity } from '@/lib/shows'
 import { Button } from '@/components/ui/Button'
 import { ShowSearchList } from '@/components/shows/ShowSearchList'
 import { ShowsDashboard } from '@/components/shows/ShowsDashboard'
@@ -56,19 +56,17 @@ export default async function ShowsPage() {
     .sort((a, b) => a.label.localeCompare(b.label))
 
   // venue holds a city for most bulk-imported shows, a specific venue name
-  // for a few others — grouped case-insensitively (typos/spelling variants
-  // like "Bangalore" vs "Bengaluru" are kept as separate entries, not merged).
+  // for a few others — grouped by canonical city, folding known spelling
+  // variants (Bangalore/Bengaluru/the odd typo all count as one city).
   const cityCounts: Record<string, number> = {}
-  const cityDisplay: Record<string, string> = {}
   for (const s of played) {
     const venue = s.venue?.trim()
     if (!venue) continue
-    const key = venue.toLowerCase()
-    cityCounts[key] = (cityCounts[key] ?? 0) + 1
-    cityDisplay[key] ??= venue
+    const city = canonicalCity(venue)
+    cityCounts[city] = (cityCounts[city] ?? 0) + 1
   }
   const topCities = Object.entries(cityCounts)
-    .map(([key, count]) => ({ label: cityDisplay[key], count }))
+    .map(([label, count]) => ({ label, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 8)
 
