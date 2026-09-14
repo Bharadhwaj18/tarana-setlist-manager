@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Music2, ListMusic, Wallet, LogOut, Menu, X, CalendarDays, StickyNote } from 'lucide-react'
+import { Music2, ListMusic, Wallet, LogOut, Menu, X, CalendarDays, StickyNote, Building2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { ACTIVE_SETLIST_COOKIE } from '@/lib/setlist-context'
@@ -41,6 +41,7 @@ const navItems = [
   { href: '/songs', label: 'Songs', icon: Music2 },
   { href: '/setlists', label: 'Setlists', icon: ListMusic },
   { href: '/finance', label: 'Finance', icon: Wallet },
+  { href: '/event-management', label: 'Event Management', icon: Building2 },
   { href: '/notes', label: 'Notes', icon: StickyNote },
 ]
 

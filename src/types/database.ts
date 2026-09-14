@@ -178,6 +178,11 @@ export type Database = {
           tds_amount: number | null
           tds_filed: boolean
           tds_certificate_received: boolean
+          booking_status: string | null
+          poc_name: string | null
+          poc_phone: string | null
+          poc_email: string | null
+          event_management_id: string | null
           notes: string | null
           created_by: string
           updated_by: string | null
@@ -197,6 +202,11 @@ export type Database = {
           tds_amount?: number | null
           tds_filed?: boolean
           tds_certificate_received?: boolean
+          booking_status?: string | null
+          poc_name?: string | null
+          poc_phone?: string | null
+          poc_email?: string | null
+          event_management_id?: string | null
           notes?: string | null
           created_by: string
           updated_by?: string | null
@@ -216,6 +226,58 @@ export type Database = {
           tds_amount?: number | null
           tds_filed?: boolean
           tds_certificate_received?: boolean
+          booking_status?: string | null
+          poc_name?: string | null
+          poc_phone?: string | null
+          poc_email?: string | null
+          event_management_id?: string | null
+          notes?: string | null
+          created_by?: string
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'shows_event_management_id_fkey'
+            columns: ['event_management_id']
+            isOneToOne: false
+            referencedRelation: 'event_management'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      event_management: {
+        Row: {
+          id: string
+          name: string
+          contact_name: string | null
+          contact_phone: string | null
+          contact_email: string | null
+          notes: string | null
+          created_by: string
+          updated_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          contact_name?: string | null
+          contact_phone?: string | null
+          contact_email?: string | null
+          notes?: string | null
+          created_by: string
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          contact_name?: string | null
+          contact_phone?: string | null
+          contact_email?: string | null
           notes?: string | null
           created_by?: string
           updated_by?: string | null

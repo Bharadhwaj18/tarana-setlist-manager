@@ -7,12 +7,16 @@ import { Label } from '@/components/ui/Label'
 import { Textarea } from '@/components/ui/Textarea'
 import { cn } from '@/lib/utils'
 import type { ShowFormData } from '@/lib/validators'
-import type { Show } from '@/types'
+import type { Show, EventManagement } from '@/types'
+import { BOOKING_STATUSES } from '@/types/shows'
 
 interface ShowFormProps {
   show?: Show
+  eventManagementCompanies?: EventManagement[]
   onSubmit: (data: ShowFormData) => Promise<{ error?: string; id?: string } | void>
 }
+
+const DIRECT_BOOKING = 'direct'
 
 function fieldsFrom(show: Show | undefined) {
   return {
@@ -26,6 +30,11 @@ function fieldsFrom(show: Show | undefined) {
     tds_amount: show?.tds_amount != null ? String(show.tds_amount) : '',
     tds_filed: show?.tds_filed ?? false,
     tds_certificate_received: show?.tds_certificate_received ?? false,
+    booking_status: show?.booking_status ?? '',
+    event_management_id: show?.event_management_id ?? DIRECT_BOOKING,
+    poc_name: show?.poc_name ?? '',
+    poc_phone: show?.poc_phone ?? '',
+    poc_email: show?.poc_email ?? '',
     notes: show?.notes ?? '',
   }
 }
@@ -45,7 +54,7 @@ function Toggle({ label, active, onClick }: { label: string; active: boolean; on
   )
 }
 
-export function ShowForm({ show, onSubmit }: ShowFormProps) {
+export function ShowForm({ show, eventManagementCompanies = [], onSubmit }: ShowFormProps) {
   const [fields, setFields] = useState(() => fieldsFrom(show))
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -72,6 +81,11 @@ export function ShowForm({ show, onSubmit }: ShowFormProps) {
         tds_amount: fields.tds_amount ? parseFloat(fields.tds_amount) : null,
         tds_filed: fields.tds_filed,
         tds_certificate_received: fields.tds_certificate_received,
+        booking_status: fields.booking_status || null,
+        event_management_id: fields.event_management_id === DIRECT_BOOKING ? null : fields.event_management_id,
+        poc_name: fields.poc_name.trim() || null,
+        poc_phone: fields.poc_phone.trim() || null,
+        poc_email: fields.poc_email.trim() || null,
         notes: fields.notes.trim() || null,
       }
       const result = await onSubmit(data)
@@ -98,6 +112,54 @@ export function ShowForm({ show, onSubmit }: ShowFormProps) {
             <Label htmlFor="venue">Venue</Label>
             <Input id="venue" placeholder="Blue Frog" className="mt-1" value={fields.venue}
               onChange={e => set('venue', e.target.value)} />
+          </div>
+        </div>
+      </div>
+
+      {/* Booking */}
+      <div className="space-y-4 rounded-lg border border-brand-200 bg-brand-50 p-4">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500">Booking</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="booking_status">Status</Label>
+            <select
+              id="booking_status"
+              className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm transition-colors focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
+              value={fields.booking_status}
+              onChange={e => set('booking_status', e.target.value)}
+            >
+              <option value="">—</option>
+              {BOOKING_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <Label htmlFor="event_management_id">Booked through</Label>
+            <select
+              id="event_management_id"
+              className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm transition-colors focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
+              value={fields.event_management_id}
+              onChange={e => set('event_management_id', e.target.value)}
+            >
+              <option value={DIRECT_BOOKING}>Direct booking</option>
+              {eventManagementCompanies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <Label htmlFor="poc_name">POC name</Label>
+            <Input id="poc_name" placeholder="Optional" className="mt-1" value={fields.poc_name}
+              onChange={e => set('poc_name', e.target.value)} />
+          </div>
+          <div>
+            <Label htmlFor="poc_phone">POC phone</Label>
+            <Input id="poc_phone" type="tel" placeholder="Optional" className="mt-1" value={fields.poc_phone}
+              onChange={e => set('poc_phone', e.target.value)} />
+          </div>
+          <div>
+            <Label htmlFor="poc_email">POC email</Label>
+            <Input id="poc_email" type="email" placeholder="Optional" className="mt-1" value={fields.poc_email}
+              onChange={e => set('poc_email', e.target.value)} />
           </div>
         </div>
       </div>

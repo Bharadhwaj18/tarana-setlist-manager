@@ -1,8 +1,8 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronLeft, Pencil, CalendarDays, MapPin, ListMusic, Wallet, CheckCircle2, Circle, Plus } from 'lucide-react'
+import { ChevronLeft, Pencil, CalendarDays, MapPin, ListMusic, Wallet, CheckCircle2, Circle, Plus, Building2, User, Phone, Mail } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
-import { getCachedShow, getCachedAllProfiles, getCachedUser } from '@/lib/data'
+import { getCachedShow, getCachedAllProfiles, getCachedUser, getCachedEventManagementCompany } from '@/lib/data'
 import { Button } from '@/components/ui/Button'
 import { DeleteShowButton } from '@/components/shows/DeleteShowButton'
 import { AddTransactionModal } from '@/components/finance/AddTransactionModal'
@@ -29,6 +29,10 @@ export default async function ShowDetailPage({ params }: Props) {
   ])
 
   if (!show) notFound()
+
+  const eventManagementCompany = show.event_management_id
+    ? await getCachedEventManagementCompany(show.event_management_id)
+    : null
 
   const members = profiles.map(p => ({ id: p.id, name: p.id === user?.id ? 'You' : (p.display_name ?? 'Member') }))
   const nameOf = (id: string | null) =>
@@ -125,6 +129,40 @@ export default async function ShowDetailPage({ params }: Props) {
           )}
         </div>
       </section>
+
+      {/* Booking */}
+      {(show.booking_status || eventManagementCompany || show.poc_name || show.poc_phone || show.poc_email) && (
+        <section className="mb-5 rounded-xl border border-brand-200 bg-white p-5 shadow-sm">
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">Booking</h2>
+          <dl className="space-y-2 text-sm">
+            {show.booking_status && (
+              <div className="flex justify-between">
+                <dt className="text-gray-500">Status</dt>
+                <dd className="rounded-full bg-brand-100 px-2.5 py-0.5 text-xs font-medium text-brand-700">{show.booking_status}</dd>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <dt className="text-gray-500">Booked through</dt>
+              <dd className="font-medium text-gray-800">
+                {eventManagementCompany ? (
+                  <Link href={`/event-management/${eventManagementCompany.id}`} className="flex items-center gap-1.5 text-brand-600 hover:underline">
+                    <Building2 className="h-3.5 w-3.5" />{eventManagementCompany.name}
+                  </Link>
+                ) : 'Direct booking'}
+              </dd>
+            </div>
+            {show.poc_name && (
+              <div className="flex justify-between"><dt className="flex items-center gap-1.5 text-gray-500"><User className="h-3.5 w-3.5" />POC</dt><dd className="font-medium text-gray-800">{show.poc_name}</dd></div>
+            )}
+            {show.poc_phone && (
+              <div className="flex justify-between"><dt className="flex items-center gap-1.5 text-gray-500"><Phone className="h-3.5 w-3.5" />Phone</dt><dd className="font-medium text-gray-800">{show.poc_phone}</dd></div>
+            )}
+            {show.poc_email && (
+              <div className="flex justify-between"><dt className="flex items-center gap-1.5 text-gray-500"><Mail className="h-3.5 w-3.5" />Email</dt><dd className="font-medium text-gray-800">{show.poc_email}</dd></div>
+            )}
+          </dl>
+        </section>
+      )}
 
       {/* Fee & payment / TDS */}
       <section className="mb-5 grid gap-4 sm:grid-cols-2">

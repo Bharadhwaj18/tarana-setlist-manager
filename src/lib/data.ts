@@ -90,6 +90,18 @@ export const getCachedSetlistsByShow = cache(async () => {
   return data ?? []
 })
 
+export const getCachedEventManagementCompanies = cache(async () => {
+  const supabase = await createClient()
+  const { data } = await supabase.from('event_management').select('*').order('name')
+  return data ?? []
+})
+
+export const getCachedEventManagementCompany = cache(async (id: string) => {
+  const supabase = await createClient()
+  const { data } = await supabase.from('event_management').select('*').eq('id', id).single()
+  return data
+})
+
 export const getCachedNotes = cache(async () => {
   const supabase = await createClient()
   const { data } = await supabase.from('notes').select('*').order('updated_at', { ascending: false })

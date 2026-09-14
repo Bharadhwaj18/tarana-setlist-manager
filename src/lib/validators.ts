@@ -38,6 +38,19 @@ export const showSchema = z.object({
   tds_amount: z.number().min(0).nullable().optional(),
   tds_filed: z.boolean().optional(),
   tds_certificate_received: z.boolean().optional(),
+  booking_status: z.string().nullable().optional(),
+  poc_name: z.string().nullable().optional(),
+  poc_phone: z.string().nullable().optional(),
+  poc_email: z.string().nullable().optional(),
+  event_management_id: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+})
+
+export const eventManagementSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  contact_name: z.string().nullable().optional(),
+  contact_phone: z.string().nullable().optional(),
+  contact_email: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
 })
 
@@ -46,3 +59,4 @@ export type MagicLinkFormData = z.infer<typeof magicLinkSchema>
 export type SongFormData = z.infer<typeof songSchema>
 export type SetlistFormData = z.infer<typeof setlistSchema>
 export type ShowFormData = z.infer<typeof showSchema>
+export type EventManagementFormData = z.infer<typeof eventManagementSchema>
