@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Search, CalendarDays, MapPin, CheckCircle2, Circle, Sparkles } from 'lucide-react'
+import { Search, CalendarDays, MapPin, CheckCircle2, Circle, Sparkles, Building2 } from 'lucide-react'
 import { isUpcoming } from '@/lib/shows'
 import type { Show } from '@/types'
 
@@ -13,6 +13,7 @@ interface ShowSearchListProps {
   /** Today's date (YYYY-MM-DD), passed from the server so upcoming/past is
    *  decided consistently rather than by the viewer's own clock. */
   today: string
+  eventManagementById: Record<string, { id: string; name: string }>
 }
 
 function fmt(n: number) {
@@ -31,12 +32,13 @@ function countdownLabel(showDate: string, today: string) {
   return `In ${days} days`
 }
 
-function ShowCard({ s, net, setlist, today, badge }: {
+function ShowCard({ s, net, setlist, today, badge, agency }: {
   s: Show
   net: number
   setlist: { id: string; title: string } | undefined
   today: string
   badge?: 'upcoming'
+  agency?: string
 }) {
   const isSplit = !!s.split_at
   const date = s.show_date
@@ -66,6 +68,7 @@ function ShowCard({ s, net, setlist, today, badge }: {
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
           {date && <span className="flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" />{date}</span>}
           {s.venue && <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{s.venue}</span>}
+          {agency && <span className="flex items-center gap-1 text-violet-600"><Building2 className="h-3.5 w-3.5" />via {agency}</span>}
           <span className={setlist ? 'text-green-600' : 'text-gray-400'}>
             {setlist ? `Setlist: ${setlist.title}` : 'No setlist yet'}
           </span>
@@ -82,8 +85,9 @@ function ShowCard({ s, net, setlist, today, badge }: {
   )
 }
 
-export function ShowSearchList({ shows, netByShow, setlistByShow, today }: ShowSearchListProps) {
+export function ShowSearchList({ shows, netByShow, setlistByShow, today, eventManagementById }: ShowSearchListProps) {
   const [query, setQuery] = useState('')
+  const agencyOf = (s: Show) => (s.event_management_id ? eventManagementById[s.event_management_id]?.name : undefined)
 
   const q = query.trim().toLowerCase()
   const filtered = q
@@ -92,6 +96,7 @@ export function ShowSearchList({ shows, netByShow, setlistByShow, today }: ShowS
         s.venue?.toLowerCase().includes(q) ||
         s.notes?.toLowerCase().includes(q) ||
         s.format?.toLowerCase().includes(q) ||
+        agencyOf(s)?.toLowerCase().includes(q) ||
         setlistByShow[s.id]?.title.toLowerCase().includes(q)
       )
     : shows
@@ -125,7 +130,7 @@ export function ShowSearchList({ shows, netByShow, setlistByShow, today }: ShowS
       ) : q ? (
         <div className="space-y-2">
           {filtered.map(s => (
-            <ShowCard key={s.id} s={s} net={netByShow[s.id] ?? 0} setlist={setlistByShow[s.id]} today={today} />
+            <ShowCard key={s.id} s={s} net={netByShow[s.id] ?? 0} setlist={setlistByShow[s.id]} today={today} agency={agencyOf(s)} />
           ))}
         </div>
       ) : (
@@ -137,7 +142,7 @@ export function ShowSearchList({ shows, netByShow, setlistByShow, today }: ShowS
               </h2>
               <div className="space-y-2">
                 {upcoming.map(s => (
-                  <ShowCard key={s.id} s={s} net={netByShow[s.id] ?? 0} setlist={setlistByShow[s.id]} today={today} badge="upcoming" />
+                  <ShowCard key={s.id} s={s} net={netByShow[s.id] ?? 0} setlist={setlistByShow[s.id]} today={today} badge="upcoming" agency={agencyOf(s)} />
                 ))}
               </div>
             </div>
@@ -150,7 +155,7 @@ export function ShowSearchList({ shows, netByShow, setlistByShow, today }: ShowS
               )}
               <div className="space-y-2">
                 {rest.map(s => (
-                  <ShowCard key={s.id} s={s} net={netByShow[s.id] ?? 0} setlist={setlistByShow[s.id]} today={today} />
+                  <ShowCard key={s.id} s={s} net={netByShow[s.id] ?? 0} setlist={setlistByShow[s.id]} today={today} agency={agencyOf(s)} />
                 ))}
               </div>
             </div>

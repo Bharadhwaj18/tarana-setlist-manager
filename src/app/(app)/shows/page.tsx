@@ -1,16 +1,17 @@
 import Link from 'next/link'
 import { Plus, CalendarDays } from 'lucide-react'
-import { getCachedShows, getCachedShowTransactions, getCachedSetlistsByShow } from '@/lib/data'
+import { getCachedShows, getCachedShowTransactions, getCachedSetlistsByShow, getCachedEventManagementCompanies } from '@/lib/data'
 import { todayISO, isUpcoming, canonicalCity } from '@/lib/shows'
 import { Button } from '@/components/ui/Button'
 import { ShowSearchList } from '@/components/shows/ShowSearchList'
 import { ShowsDashboard } from '@/components/shows/ShowsDashboard'
 
 export default async function ShowsPage() {
-  const [shows, txns, setlists] = await Promise.all([
+  const [shows, txns, setlists, eventManagementCompanies] = await Promise.all([
     getCachedShows(),
     getCachedShowTransactions(),
     getCachedSetlistsByShow(),
+    getCachedEventManagementCompanies(),
   ])
   const today = todayISO()
 
@@ -22,6 +23,10 @@ export default async function ShowsPage() {
   const setlistByShow: Record<string, { id: string; title: string } | undefined> = {}
   for (const s of setlists) {
     if (s.show_id) setlistByShow[s.show_id] = { id: s.id, title: s.title }
+  }
+  const eventManagementById: Record<string, { id: string; name: string }> = {}
+  for (const c of eventManagementCompanies) {
+    eventManagementById[c.id] = { id: c.id, name: c.name }
   }
 
   // Dashboard stats — "played" means already happened (or undated legacy
@@ -103,7 +108,7 @@ export default async function ShowsPage() {
           </Button>
         </div>
       ) : (
-        <ShowSearchList shows={shows} netByShow={netByShow} setlistByShow={setlistByShow} today={today} />
+        <ShowSearchList shows={shows} netByShow={netByShow} setlistByShow={setlistByShow} today={today} eventManagementById={eventManagementById} />
       )}
     </div>
   )
