@@ -1,0 +1,36 @@
+name: Backup Supabase Database
+
+# This repo is public, so backups never touch it — they're dumped and
+# pushed straight to a separate PRIVATE repo (tarana-db-backups). Only the
+# public schema is dumped, never auth/storage/other Supabase-internal
+# schemas, to keep the backup's blast radius to just this app's own data.
+
+on:
+  schedule:
+    - cron: '0 20 * * *' # 20:00 UTC daily (~1:30 AM IST)
+  workflow_dispatch: {} # lets you trigger a backup manually from the Actions tab
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Dump the public schema
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: pg_dump --schema=public --no-owner --no-privileges -F p -f backup.sql "$SUPABASE_DB_URL"
+
+      - name: Push to the private backups repo
+        env:
+          TOKEN: ${{ secrets.BACKUP_REPO_TOKEN }}
+        run: |
+          git clone https://x-access-token:${TOKEN}@github.com/Bharadhwaj18/tarana-db-backups.git backups-repo
+          cp backup.sql backups-repo/latest.sql
+          cd backups-repo
+          git config user.name "tarana-backup-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add latest.sql
+          git commit -m "Backup $(date -u +%Y-%m-%dT%H:%M:%SZ)" || echo "No changes since last backup"
+          git push
