@@ -179,7 +179,10 @@ export default async function ShowDetailPage({ params }: Props) {
         <div className="rounded-xl border border-brand-200 bg-white p-5 shadow-sm">
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">Fee &amp; Payment</h2>
           <dl className="space-y-2 text-sm">
-            <div className="flex justify-between"><dt className="text-gray-500">Agreed fee</dt><dd className="font-medium text-gray-800">{show.fee != null ? fmt(show.fee) : '—'}</dd></div>
+            <div className="flex justify-between">
+              <dt className="text-gray-500">{show.tds_applicable ? 'Amount received' : 'Agreed fee'}</dt>
+              <dd className="font-medium text-gray-800">{show.fee != null ? fmt(show.fee) : '—'}</dd>
+            </div>
             <div className="flex justify-between">
               <dt className="text-gray-500">Received</dt>
               <dd className={cn('font-medium', show.fee_received ? 'text-green-600' : 'text-amber-600')}>{show.fee_received ? 'Yes' : 'Not yet'}</dd>
@@ -193,7 +196,13 @@ export default async function ShowDetailPage({ params }: Props) {
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">TDS</h2>
           {show.tds_applicable ? (
             <dl className="space-y-2 text-sm">
-              <div className="flex justify-between"><dt className="text-gray-500">Amount</dt><dd className="font-medium text-gray-800">{show.tds_amount != null ? fmt(show.tds_amount) : '—'}</dd></div>
+              {show.tds_percentage != null && (
+                <div className="flex justify-between"><dt className="text-gray-500">Rate</dt><dd className="font-medium text-gray-800">{show.tds_percentage}%</dd></div>
+              )}
+              {show.fee != null && show.tds_amount != null && (
+                <div className="flex justify-between"><dt className="text-gray-500">Gross fee</dt><dd className="font-medium text-gray-800">{fmt(show.fee + show.tds_amount)}</dd></div>
+              )}
+              <div className="flex justify-between"><dt className="text-gray-500">TDS to claim</dt><dd className="font-medium text-gray-800">{show.tds_amount != null ? fmt(show.tds_amount) : '—'}</dd></div>
               <div className="flex justify-between">
                 <dt className="text-gray-500">Filed</dt>
                 <dd className={cn('font-medium', show.tds_filed ? 'text-green-600' : 'text-amber-600')}>{show.tds_filed ? 'Yes' : 'Not yet'}</dd>

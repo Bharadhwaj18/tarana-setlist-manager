@@ -175,6 +175,7 @@ export type Database = {
           fee_received: boolean
           payment_reference: string | null
           tds_applicable: boolean
+          tds_percentage: number | null
           tds_amount: number | null
           tds_filed: boolean
           tds_certificate_received: boolean
@@ -201,6 +202,7 @@ export type Database = {
           fee_received?: boolean
           payment_reference?: string | null
           tds_applicable?: boolean
+          tds_percentage?: number | null
           tds_amount?: number | null
           tds_filed?: boolean
           tds_certificate_received?: boolean
@@ -227,6 +229,7 @@ export type Database = {
           fee_received?: boolean
           payment_reference?: string | null
           tds_applicable?: boolean
+          tds_percentage?: number | null
           tds_amount?: number | null
           tds_filed?: boolean
           tds_certificate_received?: boolean

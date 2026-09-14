@@ -35,6 +35,7 @@ export const showSchema = z.object({
   fee_received: z.boolean().optional(),
   payment_reference: z.string().nullable().optional(),
   tds_applicable: z.boolean().optional(),
+  tds_percentage: z.number().min(0).max(100).nullable().optional(),
   tds_amount: z.number().min(0).nullable().optional(),
   tds_filed: z.boolean().optional(),
   tds_certificate_received: z.boolean().optional(),

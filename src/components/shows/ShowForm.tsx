@@ -18,6 +18,23 @@ interface ShowFormProps {
 
 const DIRECT_BOOKING = 'direct'
 
+function fmt(n: number) {
+  return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+}
+
+/**
+ * `fee` is what actually hit the bank account (after TDS was withheld at
+ * source), not the pre-tax contract value — so TDS is the OTHER
+ * percentage, not a cut out of fee itself. e.g. fee ₹90,000 at a 10% TDS
+ * rate means ₹90,000 is the 90% received, and the 10% still to claim via
+ * the certificate is ₹10,000 (fee/(1-rate) - fee), not ₹9,000.
+ */
+function computeTds(fee: number, tdsPercentage: number) {
+  if (!fee || !tdsPercentage || tdsPercentage <= 0 || tdsPercentage >= 100) return { tdsAmount: 0, grossFee: fee }
+  const grossFee = fee / (1 - tdsPercentage / 100)
+  return { tdsAmount: grossFee - fee, grossFee }
+}
+
 function fieldsFrom(show: Show | undefined) {
   return {
     title: show?.title ?? '',
@@ -27,7 +44,7 @@ function fieldsFrom(show: Show | undefined) {
     fee_received: show?.fee_received ?? false,
     payment_reference: show?.payment_reference ?? '',
     tds_applicable: show?.tds_applicable ?? false,
-    tds_amount: show?.tds_amount != null ? String(show.tds_amount) : '',
+    tds_percentage: show?.tds_percentage != null ? String(show.tds_percentage) : '',
     tds_filed: show?.tds_filed ?? false,
     tds_certificate_received: show?.tds_certificate_received ?? false,
     booking_status: show?.booking_status ?? '',
@@ -66,6 +83,10 @@ export function ShowForm({ show, eventManagementCompanies = [], onSubmit }: Show
 
   const canSubmit = fields.title.trim() !== ''
 
+  const feeNum = parseFloat(fields.fee) || 0
+  const tdsPercentageNum = parseFloat(fields.tds_percentage) || 0
+  const { tdsAmount, grossFee } = computeTds(feeNum, tdsPercentageNum)
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!canSubmit) return
@@ -80,7 +101,8 @@ export function ShowForm({ show, eventManagementCompanies = [], onSubmit }: Show
         fee_received: fields.fee_received,
         payment_reference: fields.payment_reference.trim() || null,
         tds_applicable: fields.tds_applicable,
-        tds_amount: fields.tds_amount ? parseFloat(fields.tds_amount) : null,
+        tds_percentage: fields.tds_applicable && fields.tds_percentage ? tdsPercentageNum : null,
+        tds_amount: fields.tds_applicable && tdsAmount > 0 ? Math.round(tdsAmount * 100) / 100 : null,
         tds_filed: fields.tds_filed,
         tds_certificate_received: fields.tds_certificate_received,
         booking_status: fields.booking_status || null,
@@ -185,9 +207,12 @@ export function ShowForm({ show, eventManagementCompanies = [], onSubmit }: Show
         <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500">Fee &amp; Payment</h3>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="fee">Agreed fee (₹)</Label>
+            <Label htmlFor="fee">{fields.tds_applicable ? 'Amount received (₹)' : 'Agreed fee (₹)'}</Label>
             <Input id="fee" type="number" min="0" step="any" placeholder="0" className="mt-1" value={fields.fee}
               onChange={e => set('fee', e.target.value)} />
+            {fields.tds_applicable && (
+              <p className="mt-1 text-xs text-gray-500">What actually hit the account, after TDS was withheld.</p>
+            )}
           </div>
           <div>
             <Label htmlFor="payment_reference">Payment / invoice ref</Label>
@@ -217,10 +242,17 @@ export function ShowForm({ show, eventManagementCompanies = [], onSubmit }: Show
         {fields.tds_applicable && (
           <>
             <div>
-              <Label htmlFor="tds_amount">TDS amount (₹)</Label>
-              <Input id="tds_amount" type="number" min="0" step="any" placeholder="0" className="mt-1" value={fields.tds_amount}
-                onChange={e => set('tds_amount', e.target.value)} />
+              <Label htmlFor="tds_percentage">TDS rate (%)</Label>
+              <Input id="tds_percentage" type="number" min="0" max="100" step="any" placeholder="10" className="mt-1" value={fields.tds_percentage}
+                onChange={e => set('tds_percentage', e.target.value)} />
             </div>
+            {tdsAmount > 0 && (
+              <div className="rounded-md bg-white px-3 py-2 text-xs text-gray-600">
+                {fmt(feeNum)} received is the other {(100 - tdsPercentageNum).toFixed(tdsPercentageNum % 1 ? 1 : 0)}% —
+                that puts the gross fee at <span className="font-semibold text-gray-800">{fmt(grossFee)}</span>, with{' '}
+                <span className="font-semibold text-gray-800">{fmt(tdsAmount)}</span> in TDS still to claim via the certificate.
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Filed / deposited?</Label>
