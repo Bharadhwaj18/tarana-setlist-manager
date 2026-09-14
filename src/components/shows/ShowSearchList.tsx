@@ -54,6 +54,9 @@ function ShowCard({ s, net, setlist, today, badge }: {
           {s.tds_applicable && (
             <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">TDS</span>
           )}
+          {s.format && (
+            <span className="shrink-0 rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700">{s.format}</span>
+          )}
           {badge === 'upcoming' && s.show_date && (
             <span className="shrink-0 rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700">
               {countdownLabel(s.show_date, today)}
@@ -88,6 +91,7 @@ export function ShowSearchList({ shows, netByShow, setlistByShow, today }: ShowS
         s.title.toLowerCase().includes(q) ||
         s.venue?.toLowerCase().includes(q) ||
         s.notes?.toLowerCase().includes(q) ||
+        s.format?.toLowerCase().includes(q) ||
         setlistByShow[s.id]?.title.toLowerCase().includes(q)
       )
     : shows
@@ -107,7 +111,7 @@ export function ShowSearchList({ shows, netByShow, setlistByShow, today }: ShowS
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-300" />
         <input
           type="text"
-          placeholder="Search by title, venue, or notes…"
+          placeholder="Search by title, venue, format, or notes…"
           value={query}
           onChange={e => setQuery(e.target.value)}
           className="w-full rounded-lg border border-brand-200 bg-white py-2.5 pl-9 pr-3 text-sm placeholder-gray-400 focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"

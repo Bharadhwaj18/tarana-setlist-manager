@@ -183,6 +183,8 @@ export type Database = {
           poc_phone: string | null
           poc_email: string | null
           event_management_id: string | null
+          format: string | null
+          media_url: string | null
           notes: string | null
           created_by: string
           updated_by: string | null
@@ -207,6 +209,8 @@ export type Database = {
           poc_phone?: string | null
           poc_email?: string | null
           event_management_id?: string | null
+          format?: string | null
+          media_url?: string | null
           notes?: string | null
           created_by: string
           updated_by?: string | null
@@ -231,6 +235,8 @@ export type Database = {
           poc_phone?: string | null
           poc_email?: string | null
           event_management_id?: string | null
+          format?: string | null
+          media_url?: string | null
           notes?: string | null
           created_by?: string
           updated_by?: string | null

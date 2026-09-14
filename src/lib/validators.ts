@@ -43,6 +43,8 @@ export const showSchema = z.object({
   poc_phone: z.string().nullable().optional(),
   poc_email: z.string().nullable().optional(),
   event_management_id: z.string().nullable().optional(),
+  format: z.string().nullable().optional(),
+  media_url: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
 })
 

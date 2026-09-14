@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/Textarea'
 import { cn } from '@/lib/utils'
 import type { ShowFormData } from '@/lib/validators'
 import type { Show, EventManagement } from '@/types'
-import { BOOKING_STATUSES } from '@/types/shows'
+import { BOOKING_STATUSES, SHOW_FORMATS } from '@/types/shows'
 
 interface ShowFormProps {
   show?: Show
@@ -35,6 +35,8 @@ function fieldsFrom(show: Show | undefined) {
     poc_name: show?.poc_name ?? '',
     poc_phone: show?.poc_phone ?? '',
     poc_email: show?.poc_email ?? '',
+    format: show?.format ?? '',
+    media_url: show?.media_url ?? '',
     notes: show?.notes ?? '',
   }
 }
@@ -86,6 +88,8 @@ export function ShowForm({ show, eventManagementCompanies = [], onSubmit }: Show
         poc_name: fields.poc_name.trim() || null,
         poc_phone: fields.poc_phone.trim() || null,
         poc_email: fields.poc_email.trim() || null,
+        format: fields.format || null,
+        media_url: fields.media_url.trim() || null,
         notes: fields.notes.trim() || null,
       }
       const result = await onSubmit(data)
@@ -113,6 +117,18 @@ export function ShowForm({ show, eventManagementCompanies = [], onSubmit }: Show
             <Input id="venue" placeholder="Blue Frog" className="mt-1" value={fields.venue}
               onChange={e => set('venue', e.target.value)} />
           </div>
+        </div>
+        <div>
+          <Label htmlFor="format">Format</Label>
+          <select
+            id="format"
+            className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm transition-colors focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
+            value={fields.format}
+            onChange={e => set('format', e.target.value)}
+          >
+            <option value="">—</option>
+            {SHOW_FORMATS.map(f => <option key={f} value={f}>{f}</option>)}
+          </select>
         </div>
       </div>
 
@@ -223,6 +239,13 @@ export function ShowForm({ show, eventManagementCompanies = [], onSubmit }: Show
             </div>
           </>
         )}
+      </div>
+
+      {/* Media */}
+      <div>
+        <Label htmlFor="media_url">Media link</Label>
+        <Input id="media_url" type="url" placeholder="https://mega.nz/folder/..." className="mt-1" value={fields.media_url}
+          onChange={e => set('media_url', e.target.value)} />
       </div>
 
       {/* Notes */}

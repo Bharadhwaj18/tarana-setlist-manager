@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronLeft, Pencil, CalendarDays, MapPin, ListMusic, Wallet, CheckCircle2, Circle, Plus, Building2, User, Phone, Mail } from 'lucide-react'
+import { ChevronLeft, Pencil, CalendarDays, MapPin, ListMusic, Wallet, CheckCircle2, Circle, Plus, Building2, User, Phone, Mail, Tag, Film } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedShow, getCachedAllProfiles, getCachedUser, getCachedEventManagementCompany } from '@/lib/data'
 import { Button } from '@/components/ui/Button'
@@ -62,10 +62,20 @@ export default async function ShowDetailPage({ params }: Props) {
               {isSplit ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
               {isSplit ? 'Split' : 'Unsplit'}
             </span>
+            {show.format && (
+              <span className="flex items-center gap-1 rounded-full bg-brand-100 px-2.5 py-0.5 text-xs font-medium text-brand-700">
+                <Tag className="h-3.5 w-3.5" />{show.format}
+              </span>
+            )}
           </div>
           <div className="mt-2 flex flex-wrap gap-3 text-sm text-gray-500">
             {date && <span className="flex items-center gap-1.5"><CalendarDays className="h-4 w-4" />{date}</span>}
             {show.venue && <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" />{show.venue}</span>}
+            {show.media_url && (
+              <a href={show.media_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-brand-600 hover:underline">
+                <Film className="h-4 w-4" />Media
+              </a>
+            )}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
