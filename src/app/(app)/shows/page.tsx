@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Plus, CalendarDays } from 'lucide-react'
 import { getCachedShows, getCachedShowTransactions, getCachedSetlistsByShow } from '@/lib/data'
+import { todayISO } from '@/lib/shows'
 import { Button } from '@/components/ui/Button'
 import { ShowSearchList } from '@/components/shows/ShowSearchList'
 
@@ -10,6 +11,7 @@ export default async function ShowsPage() {
     getCachedShowTransactions(),
     getCachedSetlistsByShow(),
   ])
+  const today = todayISO()
 
   const netByShow: Record<string, number> = {}
   for (const t of txns) {
@@ -45,7 +47,7 @@ export default async function ShowsPage() {
           </Button>
         </div>
       ) : (
-        <ShowSearchList shows={shows} netByShow={netByShow} setlistByShow={setlistByShow} />
+        <ShowSearchList shows={shows} netByShow={netByShow} setlistByShow={setlistByShow} today={today} />
       )}
     </div>
   )

@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedAllProfiles, getCachedUser } from '@/lib/data'
+import { todayISO, isUpcoming } from '@/lib/shows'
 import { SplitWizard } from '@/components/finance/SplitWizard'
 import { FinanceFloatingNav } from '@/components/finance/FinanceFloatingNav'
 import type { FinanceTransaction } from '@/types/finance'
@@ -10,14 +11,19 @@ import type { FinanceTransaction } from '@/types/finance'
 export default async function SplitPage() {
   const supabase = await createClient()
 
-  const [{ data: { user } }, profiles, { data: shows }, { data: allTxns }] = await Promise.all([
+  const [{ data: { user } }, profiles, { data: unsplitShows }, { data: allTxns }] = await Promise.all([
     getCachedUser(),
     getCachedAllProfiles(),
     supabase.from('shows').select('*').is('split_at', null).order('show_date', { ascending: false }),
     supabase.from('finance_transactions').select('*'),
   ])
 
-  if (!shows?.length) notFound()
+  // A show that hasn't happened yet has nothing to split — same rule as the
+  // Finance page's "unsplit shows" reminder (src/lib/shows.ts).
+  const today = todayISO()
+  const shows = (unsplitShows ?? []).filter(s => !isUpcoming(s.show_date, today))
+
+  if (!shows.length) notFound()
 
   const members = profiles.map(p => ({
     id: p.id,

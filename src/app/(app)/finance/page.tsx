@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedAllProfiles, getCachedUser, getCachedPendingPayments } from '@/lib/data'
+import { todayISO, isUpcoming } from '@/lib/shows'
 import { AddTransactionModal } from '@/components/finance/AddTransactionModal'
 import { TransactionRow } from '@/components/finance/TransactionRow'
 import { ExportModal } from '@/components/finance/ExportModal'
@@ -49,7 +50,11 @@ export default async function FinancePage() {
   const netForShow = (showId: string) =>
     (txns ?? []).filter(t => t.show_id === showId).reduce((s, t) => s + t.amount, 0)
 
-  const unsplitShows = (shows ?? []).filter(s => !s.split_at)
+  // A show that hasn't happened yet has nothing to split — keep it out of
+  // this "needs splitting" reminder (and the Split screen's picker below)
+  // until its date arrives.
+  const today = todayISO()
+  const unsplitShows = (shows ?? []).filter(s => !s.split_at && !isUpcoming(s.show_date, today))
   const recentTxns = (txns ?? []).slice(0, 15)
   const nameOf = (id: string | null) =>
     id === null ? 'Unattributed' : id === user?.id ? 'You' : (profiles.find(p => p.id === id)?.display_name ?? 'Member')
