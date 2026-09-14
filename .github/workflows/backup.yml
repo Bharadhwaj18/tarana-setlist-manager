@@ -18,16 +18,24 @@ jobs:
         # ubuntu-latest's default postgresql-client is older than Supabase's
         # Postgres version, and pg_dump refuses to dump from a server newer
         # than itself — pull the client straight from the official PGDG repo
-        # instead, which always has the current release available.
+        # instead, which always has the current release available. Installs
+        # the latest major version PGDG offers rather than pinning one, so
+        # this keeps working across future Supabase Postgres upgrades.
         run: |
           sudo apt-get install -y postgresql-common
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
-          sudo apt-get install -y postgresql-client-17
+          latest=$(apt-cache search '^postgresql-client-[0-9]+$' | grep -oE '[0-9]+' | sort -n | tail -1)
+          sudo apt-get install -y "postgresql-client-$latest"
 
       - name: Dump the public schema
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-        run: pg_dump --schema=public --no-owner --no-privileges -F p -f backup.sql "$SUPABASE_DB_URL"
+        # Call the newest installed pg_dump explicitly — plain `pg_dump` on
+        # PATH still resolves to the runner's older preinstalled client,
+        # which refuses to dump a server newer than itself.
+        run: |
+          pg_dump_bin=$(ls -d /usr/lib/postgresql/*/bin/pg_dump | sort -V | tail -1)
+          "$pg_dump_bin" --schema=public --no-owner --no-privileges -F p -f backup.sql "$SUPABASE_DB_URL"
 
       - name: Push to the private backups repo
         env:
