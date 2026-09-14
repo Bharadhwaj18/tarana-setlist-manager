@@ -34,7 +34,7 @@ function BarList({ rows, formatValue, barClassName }: {
               style={{ width: `${Math.round((r.value / max) * 100)}%` }}
             />
           </div>
-          <span className="w-16 shrink-0 text-right text-xs font-bold tabular-nums text-gray-800">{formatValue(r.value)}</span>
+          <span className="w-20 shrink-0 truncate text-right text-xs font-bold tabular-nums text-gray-800" title={formatValue(r.value)}>{formatValue(r.value)}</span>
         </div>
       ))}
     </div>
@@ -43,9 +43,27 @@ function BarList({ rows, formatValue, barClassName }: {
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-brand-200 bg-white p-4 shadow-sm">
+    <div className="min-w-0 rounded-xl border border-brand-200 bg-white p-4 shadow-sm">
       <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">{title}</h3>
       {children}
+    </div>
+  )
+}
+
+// A headline stat tile — sized down and clamped to one line so a long
+// figure (₹5,58,032 and up) can't push past its own tile edge in a fixed
+// multi-column grid, which doesn't get the usual chance to wrap or stack
+// narrower on mobile the way sm:grid-cols-N layouts do. This pattern
+// (min-w-0 on the grid item + a responsive, truncating value) is the one to
+// reuse for any other tight-grid stat display, not just this dashboard.
+function StatTile({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | number }) {
+  return (
+    <div className="min-w-0 rounded-xl border border-brand-200 bg-white p-3 shadow-sm sm:p-4">
+      <div className="flex items-center gap-1.5 text-gray-400 sm:gap-2">
+        {icon}
+        <span className="truncate text-[10px] font-semibold uppercase tracking-wider sm:text-xs">{label}</span>
+      </div>
+      <p className="mt-1.5 truncate text-base font-bold text-gray-900 sm:text-2xl" title={String(value)}>{value}</p>
     </div>
   )
 }
@@ -56,19 +74,10 @@ export function ShowsDashboard({ totalPlayed, totalRevenue, formatBreakdown, rev
   return (
     <div className="mb-6 space-y-4">
       {/* Headline tiles */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-xl border border-brand-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-2 text-gray-400"><Music2 className="h-4 w-4" /><span className="text-xs font-semibold uppercase tracking-wider">Played</span></div>
-          <p className="mt-1.5 text-2xl font-bold text-gray-900">{totalPlayed}</p>
-        </div>
-        <div className="rounded-xl border border-brand-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-2 text-gray-400"><Tags className="h-4 w-4" /><span className="text-xs font-semibold uppercase tracking-wider">Formats</span></div>
-          <p className="mt-1.5 text-2xl font-bold text-gray-900">{formatBreakdown.length}</p>
-        </div>
-        <div className="rounded-xl border border-brand-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-2 text-gray-400"><Wallet className="h-4 w-4" /><span className="text-xs font-semibold uppercase tracking-wider">Revenue</span></div>
-          <p className="mt-1.5 text-2xl font-bold text-gray-900">{fmt(totalRevenue)}</p>
-        </div>
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <StatTile icon={<Music2 className="h-4 w-4 shrink-0" />} label="Played" value={totalPlayed} />
+        <StatTile icon={<Tags className="h-4 w-4 shrink-0" />} label="Formats" value={formatBreakdown.length} />
+        <StatTile icon={<Wallet className="h-4 w-4 shrink-0" />} label="Revenue" value={fmt(totalRevenue)} />
       </div>
 
       {/* Breakdowns */}
