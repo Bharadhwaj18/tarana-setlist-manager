@@ -19,6 +19,7 @@ function fieldsFrom(company: EventManagement | undefined) {
     contact_name: company?.contact_name ?? '',
     contact_phone: company?.contact_phone ?? '',
     contact_email: company?.contact_email ?? '',
+    base_location: company?.base_location ?? '',
     notes: company?.notes ?? '',
   }
 }
@@ -44,6 +45,7 @@ export function EventManagementForm({ company, onSubmit }: EventManagementFormPr
         contact_name: fields.contact_name.trim() || null,
         contact_phone: fields.contact_phone.trim() || null,
         contact_email: fields.contact_email.trim() || null,
+        base_location: fields.base_location.trim() || null,
         notes: fields.notes.trim() || null,
       }
       const result = await onSubmit(data)
@@ -57,6 +59,11 @@ export function EventManagementForm({ company, onSubmit }: EventManagementFormPr
         <Label htmlFor="name">Agency / Company Name *</Label>
         <Input id="name" className="mt-1" placeholder="Eventurox" value={fields.name}
           onChange={e => set('name', e.target.value)} />
+      </div>
+      <div>
+        <Label htmlFor="base_location">Base location</Label>
+        <Input id="base_location" placeholder="Bangalore" className="mt-1" value={fields.base_location}
+          onChange={e => set('base_location', e.target.value)} />
       </div>
 
       <div className="space-y-4 rounded-lg border border-brand-200 bg-brand-50 p-4">

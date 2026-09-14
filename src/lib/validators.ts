@@ -53,6 +53,7 @@ export const eventManagementSchema = z.object({
   contact_name: z.string().nullable().optional(),
   contact_phone: z.string().nullable().optional(),
   contact_email: z.string().nullable().optional(),
+  base_location: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
 })
 

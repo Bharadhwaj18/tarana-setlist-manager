@@ -27,7 +27,12 @@ export default async function EventManagementDetailPage({ params }: Props) {
       </Link>
 
       <div className="mb-6 flex flex-col gap-3">
-        <h1 className="text-2xl font-bold text-gray-900">{company.name}</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">{company.name}</h1>
+          {company.base_location && (
+            <p className="mt-1 flex items-center gap-1.5 text-sm text-gray-500"><MapPin className="h-4 w-4" />{company.base_location}</p>
+          )}
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="secondary" size="sm" asChild>
             <Link href={`/event-management/${id}/edit`}><Pencil className="h-4 w-4" /> Edit</Link>

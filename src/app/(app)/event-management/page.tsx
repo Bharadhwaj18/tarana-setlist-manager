@@ -1,7 +1,8 @@
 import Link from 'next/link'
-import { Plus, Building2, Phone, Mail } from 'lucide-react'
+import { Plus, Building2 } from 'lucide-react'
 import { getCachedEventManagementCompanies, getCachedShows } from '@/lib/data'
 import { Button } from '@/components/ui/Button'
+import { EventManagementSearchList } from '@/components/event-management/EventManagementSearchList'
 
 export default async function EventManagementPage() {
   const [companies, shows] = await Promise.all([
@@ -39,28 +40,7 @@ export default async function EventManagementPage() {
           </Button>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {companies.map(c => {
-            const showCount = showCountByCompany[c.id] ?? 0
-            return (
-              <Link
-                key={c.id}
-                href={`/event-management/${c.id}`}
-                className="flex flex-col gap-2 rounded-xl border border-brand-200 bg-white p-4 shadow-sm transition-colors hover:border-brand-400"
-              >
-                <p className="font-semibold text-gray-900">{c.name}</p>
-                <div className="flex flex-col gap-1 text-xs text-gray-500">
-                  {c.contact_name && <span>{c.contact_name}</span>}
-                  {c.contact_phone && <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />{c.contact_phone}</span>}
-                  {c.contact_email && <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />{c.contact_email}</span>}
-                </div>
-                <span className="mt-auto text-xs font-medium text-brand-600">
-                  {showCount} show{showCount !== 1 ? 's' : ''} booked
-                </span>
-              </Link>
-            )
-          })}
-        </div>
+        <EventManagementSearchList companies={companies} showCountByCompany={showCountByCompany} />
       )}
     </div>
   )
