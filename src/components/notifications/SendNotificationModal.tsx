@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
 import { Textarea } from '@/components/ui/Textarea'
 import { Modal } from '@/components/ui/Modal'
-import { sendNotification } from '@/actions/notifications'
+import { sendNotification, sendNotificationToAll } from '@/actions/notifications'
 import { useToast } from '@/components/ui/Toaster'
 
 interface Member { id: string; name: string }
@@ -16,9 +16,13 @@ interface Props {
   members: Member[]
 }
 
+const ALL = '__all__'
+
 export function SendNotificationModal({ members }: Props) {
   const [open, setOpen] = useState(false)
-  const [recipientId, setRecipientId] = useState(members[0]?.id ?? '')
+  // Defaults to a specific person, not everyone — broadcasting should be a
+  // deliberate choice, not what fires if someone submits without looking.
+  const [recipientId, setRecipientId] = useState(members[0]?.id ?? ALL)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -33,7 +37,9 @@ export function SendNotificationModal({ members }: Props) {
     setError(null)
 
     startTransition(async () => {
-      const result = await sendNotification({ recipientId, title: title.trim(), body: body.trim() || null })
+      const result = recipientId === ALL
+        ? await sendNotificationToAll({ title: title.trim(), body: body.trim() || null })
+        : await sendNotification({ recipientId, title: title.trim(), body: body.trim() || null })
       if (result.error) {
         setError(result.error)
         return
@@ -61,6 +67,7 @@ export function SendNotificationModal({ members }: Props) {
               onChange={e => setRecipientId(e.target.value)}
             >
               {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+              <option value={ALL}>Everyone</option>
             </select>
           </div>
           <div>

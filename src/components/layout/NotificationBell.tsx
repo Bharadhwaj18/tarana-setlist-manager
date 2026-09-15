@@ -3,7 +3,6 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Bell } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { markNotificationRead } from '@/actions/notifications'
 import type { NotificationItem } from '@/types/notifications'
@@ -41,9 +40,10 @@ export function NotificationBell({ notifications }: Props) {
       <button
         onClick={() => setOpen(v => !v)}
         aria-label="Notifications"
-        className="relative rounded-md p-1.5 text-gray-600 hover:bg-brand-100"
+        className="relative rounded-md p-1.5 hover:bg-brand-100"
       >
-        <Bell className="h-5 w-5" />
+        {/* eslint-disable-next-line @next/next/no-img-element -- small static asset, same convention as Sidebar's own LogoImage */}
+        <img src="/icon-192.png" alt="" className="h-5 w-5 rounded object-cover" />
         {unreadCount > 0 && (
           <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
             {unreadCount}

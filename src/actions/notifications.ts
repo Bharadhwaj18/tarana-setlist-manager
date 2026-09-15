@@ -74,6 +74,47 @@ export async function sendNotification({ recipientId, title, body, link, type }:
   return {}
 }
 
+interface SendNotificationToAllInput {
+  title: string
+  body?: string | null
+  link?: string | null
+  type?: string
+}
+
+/**
+ * One notifications row (and one push) per other band member — not a
+ * single row with no recipient, since every recipient needs their own
+ * read_at state and their own row to mark read independently.
+ */
+export async function sendNotificationToAll({ title, body, link, type }: SendNotificationToAllInput): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { data: profiles, error: profilesError } = await supabase.from('profiles').select('id').neq('id', user.id)
+  if (profilesError) return { error: profilesError.message }
+  if (!profiles?.length) return {}
+
+  const { error } = await supabase.from('notifications').insert(
+    profiles.map(p => ({
+      recipient_id: p.id,
+      sender_id: user.id,
+      title,
+      body: body ?? null,
+      link: link ?? null,
+      type: type ?? 'custom',
+    }))
+  )
+  if (error) return { error: error.message }
+
+  await Promise.allSettled(
+    profiles.map(p => sendPushToProfile(supabase, p.id, { title, body, link }))
+  )
+
+  revalidatePath('/', 'layout')
+  return {}
+}
+
 export async function markNotificationRead(id: string): Promise<{ error?: string }> {
   const supabase = await createClient()
   const { error } = await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', id)
