@@ -1,12 +1,17 @@
+// The whole band is in India, so "today" always means the calendar date in
+// IST — never the deploy server's own timezone. Vercel functions run in
+// UTC, so between 00:00 and 05:29 IST the naive `new Date().getDate()`
+// approach reads yesterday's date; explicitly formatting in this zone
+// sidesteps that regardless of where the code executes.
+export const IST_TIME_ZONE = 'Asia/Kolkata'
+
 /**
- * Today's date as YYYY-MM-DD (server local time) — the same plain-date
- * format shows.show_date is stored in, so a straight string comparison is
- * enough to tell future from past without parsing.
+ * Today's date as YYYY-MM-DD in IST — the same plain-date format
+ * shows.show_date is stored in, so a straight string comparison is enough
+ * to tell future from past without parsing.
  */
 export function todayISO() {
-  const d = new Date()
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  return new Intl.DateTimeFormat('en-CA', { timeZone: IST_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
 }
 
 /**

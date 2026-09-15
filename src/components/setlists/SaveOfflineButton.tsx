@@ -123,7 +123,7 @@ function buildOfflineHtml(
       ${dateStr ? `<span>📅 ${dateStr}</span>` : ''}
       ${venue ? `${dateStr ? ' &nbsp;·&nbsp; ' : ''}<span>📍 ${escapeHtml(venue)}</span>` : ''}
     </div>
-    <div class="saved-note">Saved offline — ${new Date().toLocaleString()}</div>
+    <div class="saved-note">Saved offline — ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</div>
   </div>
   <div class="toc"><h2>Setlist (${items.length} songs)</h2>${tocHtml}</div>
   ${songsHtml}

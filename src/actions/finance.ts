@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { todayISO } from '@/lib/shows'
 
 async function requireTreasurer(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<string | null> {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle()
@@ -72,7 +73,7 @@ export async function addTransaction(data: TransactionInput): Promise<{ error?: 
 
   const { error } = await supabase.from('finance_transactions').insert({
     ...data,
-    date: data.date ?? new Date().toISOString().slice(0, 10),
+    date: data.date ?? todayISO(),
     recorded_by: user.id,
   })
   if (error) return { error: error.message }
@@ -94,7 +95,7 @@ export async function updateTransaction(id: string, data: TransactionInput): Pro
 
   const { error } = await supabase.from('finance_transactions').update({
     ...data,
-    date: data.date ?? new Date().toISOString().slice(0, 10),
+    date: data.date ?? todayISO(),
   }).eq('id', id)
   if (error) return { error: error.message }
   revalidatePath('/finance')
@@ -180,7 +181,7 @@ export async function splitShows(shows: ShowSplitInput[], payments: SplitPayment
   if (permissionError) return { error: permissionError }
 
   const now = new Date().toISOString()
-  const today = now.slice(0, 10)
+  const today = todayISO()
   // Only tie transactions to a specific show when there's exactly one in
   // this batch — a pooled multi-show payment isn't any single show's alone.
   const showId = shows.length === 1 ? shows[0].showId : null

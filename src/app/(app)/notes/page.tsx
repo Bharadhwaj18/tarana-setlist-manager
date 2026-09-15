@@ -30,7 +30,7 @@ export default async function NotesPage() {
   for (const note of notes) {
     authorLines[note.id] =
       `${note.updated_by ? `Last edited by ${nameOf(note.updated_by)}` : `Added by ${nameOf(note.created_by)}`}` +
-      ` · ${new Date(note.updated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}`
+      ` · ${new Date(note.updated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit', timeZone: 'Asia/Kolkata' })}`
     assigneeNames[note.id] = note.assigned_to ? nameOf(note.assigned_to) : null
   }
 

@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/Button'
 import { exportTransactions } from '@/actions/finance'
 import { useToast } from '@/components/ui/Toaster'
 import { buildTransactionStatementPdf } from '@/lib/pdf/financeReports'
+import { todayISO } from '@/lib/shows'
+import { addDaysISO } from '@/lib/dates'
 
 interface Member { id: string; name: string }
 
@@ -19,9 +21,6 @@ const PRESETS = [
 ] as const
 
 type Preset = typeof PRESETS[number]['label']
-
-function toDateStr(d: Date) { return d.toISOString().slice(0, 10) }
-function addDays(d: Date, n: number) { const r = new Date(d); r.setDate(r.getDate() - n); return r }
 
 const inputCls = 'w-full rounded-md border border-brand-200 bg-white px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400'
 
@@ -36,13 +35,13 @@ export function ExportModal({ members }: { members: Member[] }) {
   const toast = useToast()
 
   const getFilters = () => {
-    const today = new Date()
+    const today = todayISO()
     const p = PRESETS.find(x => x.label === preset)!
     if (preset === 'Custom') {
       return { dateFrom: dateFrom || undefined, dateTo: dateTo || undefined, memberId }
     }
     if (p.days === 0) return { memberId }  // all time
-    return { dateFrom: toDateStr(addDays(today, p.days)), dateTo: toDateStr(today), memberId }
+    return { dateFrom: addDaysISO(today, -p.days), dateTo: today, memberId }
   }
 
   const memberLabel = (id: string) =>
@@ -73,7 +72,7 @@ export function ExportModal({ members }: { members: Member[] }) {
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = `tarana-finance-${toDateStr(new Date())}.csv`
+        a.download = `tarana-finance-${todayISO()}.csv`
         a.click()
         URL.revokeObjectURL(url)
         toast('CSV downloaded', 'success')

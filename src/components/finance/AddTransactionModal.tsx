@@ -8,6 +8,7 @@ import { addTransaction, updateTransaction, addShow } from '@/actions/finance'
 import { useToast } from '@/components/ui/Toaster'
 import { TRANSACTION_CATEGORIES } from '@/types/finance'
 import { cn } from '@/lib/utils'
+import { todayISO } from '@/lib/shows'
 import type { FinanceTransaction } from '@/types/finance'
 import type { Show } from '@/types/shows'
 
@@ -38,7 +39,7 @@ function fieldsFrom(transaction: FinanceTransaction | undefined, unsplitShows: S
       amount: '',
       dir: 'credit' as 'credit' | 'debit',
       description: '',
-      date: new Date().toISOString().slice(0, 10),
+      date: todayISO(),
     }
   }
   return {

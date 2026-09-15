@@ -84,7 +84,7 @@ export function SplitHistoryList({ shows, txnsByShow, pendingByShow, profiles }:
                     </p>
                   </div>
                   <p className="shrink-0 text-xs text-gray-400">
-                    Split {show.split_at && new Date(show.split_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}
+                    Split {show.split_at && new Date(show.split_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit', timeZone: 'Asia/Kolkata' })}
                   </p>
                 </div>
 

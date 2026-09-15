@@ -1,5 +1,6 @@
 import autoTable from 'jspdf-autotable'
 import { PdfDoc, TABLE_THEME, COLORS, MARGIN, CONTENT_W } from './pdfDoc'
+import { todayISO, IST_TIME_ZONE } from '@/lib/shows'
 
 // jsPDF's built-in Helvetica only covers the Windows-1252 repertoire — the
 // Rupee sign (₹), the true minus sign (−), and arrows (→/←) all fall
@@ -12,7 +13,7 @@ function signed(n: number) {
   return `${n >= 0 ? '+' : '-'} ${fmt(n)}`
 }
 function today() {
-  return new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+  return new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', timeZone: IST_TIME_ZONE })
 }
 
 export interface StatementRow { date: string; member: string; description: string; amount: number }
@@ -57,7 +58,7 @@ export function buildTransactionStatementPdf(rows: StatementRow[], rangeLabel: s
     valueColor: total >= 0 ? COLORS.positive : COLORS.negative,
   })
 
-  pdf.save(`tarana-finance-${new Date().toISOString().slice(0, 10)}.pdf`)
+  pdf.save(`tarana-finance-${todayISO()}.pdf`)
 }
 
 // ---- Split report -----------------------------------------------------
@@ -310,5 +311,5 @@ export function buildSplitReportPdf(
   pdf.keyValueRow('Band Fund', fmt(totalBandFund), { valueColor: COLORS.accentDark })
   pdf.keyValueRow('To artists', fmt(totalNet - totalBandFund))
 
-  pdf.save(`tarana-split-${new Date().toISOString().slice(0, 10)}.pdf`)
+  pdf.save(`tarana-split-${todayISO()}.pdf`)
 }

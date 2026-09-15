@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { todayISO } from '@/lib/shows'
 
 /**
  * The payer marks a pending split payment as paid, once they've actually
@@ -37,7 +38,7 @@ export async function markPendingPaymentPaid(id: string): Promise<{ error?: stri
       description: pending.description,
       category: pending.category,
       show_id: pending.show_id,
-      date: new Date().toISOString().slice(0, 10),
+      date: todayISO(),
       recorded_by: user.id,
     })
     .select('id')
