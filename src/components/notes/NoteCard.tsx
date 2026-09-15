@@ -19,6 +19,8 @@ interface Props {
   /** Already resolved to a display string — never pass a function here, it can't cross the server/client boundary. */
   authorLine: string
   assigneeName: string | null
+  /** profile id -> display name, for resolving each checklist item's own assignee (a plain lookup object, not a function). */
+  memberNameById: Record<string, string>
   /** Today's date (YYYY-MM-DD), server-computed for consistent overdue/countdown rendering. */
   today: string
 }
@@ -32,7 +34,7 @@ interface Props {
  * safety net. Checklist items are independently tappable too, without
  * opening the edit modal at all.
  */
-export function NoteCard({ note, checklistItems, members, authorLine, assigneeName, today }: Props) {
+export function NoteCard({ note, checklistItems, members, authorLine, assigneeName, memberNameById, today }: Props) {
   const [editOpen, setEditOpen] = useState(false)
   const [isDeleting, startDeleteTransition] = useTransition()
   const [, startTransition] = useTransition()
@@ -137,6 +139,11 @@ export function NoteCard({ note, checklistItems, members, authorLine, assigneeNa
                 {item.done && <Check className="h-2.5 w-2.5" />}
               </span>
               <span className={cn('min-w-0 flex-1 truncate text-sm text-gray-700', item.done && 'text-gray-400 line-through')}>{item.text}</span>
+              {item.assigned_to && memberNameById[item.assigned_to] && (
+                <span className="shrink-0 rounded-full bg-violet-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-violet-600">
+                  {memberNameById[item.assigned_to]}
+                </span>
+              )}
             </div>
           ))}
           <p className="pl-6 text-xs text-gray-400">{doneCount}/{checklistItems.length} done</p>

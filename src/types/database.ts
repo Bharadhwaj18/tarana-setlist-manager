@@ -363,6 +363,7 @@ export type Database = {
           done: boolean
           position: number
           created_at: string
+          assigned_to: string | null
         }
         Insert: {
           id?: string
@@ -371,6 +372,7 @@ export type Database = {
           done?: boolean
           position?: number
           created_at?: string
+          assigned_to?: string | null
         }
         Update: {
           id?: string
@@ -379,6 +381,7 @@ export type Database = {
           done?: boolean
           position?: number
           created_at?: string
+          assigned_to?: string | null
         }
         Relationships: []
       }

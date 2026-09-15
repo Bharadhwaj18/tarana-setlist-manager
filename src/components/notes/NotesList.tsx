@@ -33,6 +33,10 @@ export function NotesList({ notes, checklistByNote, members, currentUserId, auth
   const [filter, setFilter] = useState<Filter>('all')
   const [label, setLabel] = useState<string | null>(null)
 
+  // Derived from `members` (plain data, already passed down) rather than a
+  // new prop — a per-checklist-item assignee lookup, not a resolver function.
+  const memberNameById = Object.fromEntries(members.map(m => [m.id, m.name]))
+
   const allLabels = [...new Set(notes.flatMap(n => n.labels ?? []))].sort()
 
   const base = filter === 'archived' ? notes.filter(n => n.archived_at) : notes.filter(n => !n.archived_at)
@@ -93,6 +97,7 @@ export function NotesList({ notes, checklistByNote, members, currentUserId, auth
               members={members}
               authorLine={authorLines[note.id] ?? ''}
               assigneeName={assigneeNames[note.id] ?? null}
+              memberNameById={memberNameById}
               today={today}
             />
           ))}

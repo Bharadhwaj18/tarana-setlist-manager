@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
 import { Textarea } from '@/components/ui/Textarea'
-import { createNote, updateNote, type NoteFormData } from '@/actions/notes'
+import { createNote, updateNote, type NoteFormData, type ChecklistItemInput } from '@/actions/notes'
 import { useToast } from '@/components/ui/Toaster'
 import { cn } from '@/lib/utils'
 import { NOTE_COLORS, NOTE_COLOR_CLASSES, RECURRENCE_OPTIONS, RECURRENCE_LABELS, REMINDER_PRESETS } from '@/types/notes'
@@ -44,7 +44,7 @@ function fieldsFrom(note: Note | undefined, checklistItems: ChecklistItem[], def
     color: note?.color ?? '',
     recurrence: note?.recurrence ?? '',
     labels: (note?.labels ?? []).join(', '),
-    checklist: checklistItems.map(i => i.text),
+    checklist: checklistItems.map((i): ChecklistItemInput => ({ id: i.id, text: i.text, assignedTo: i.assigned_to })),
   }
 }
 
@@ -79,10 +79,14 @@ export function NoteModal({ note, checklistItems = [], members, open: controlled
 
   const addChecklistItem = () => {
     if (!newItemText.trim()) return
-    set('checklist', [...fields.checklist, newItemText.trim()])
+    set('checklist', [...fields.checklist, { text: newItemText.trim(), assignedTo: null }])
     setNewItemText('')
   }
   const removeChecklistItem = (index: number) => set('checklist', fields.checklist.filter((_, i) => i !== index))
+  const setChecklistAssignee = (index: number, assignedTo: string) =>
+    set('checklist', fields.checklist.map((item, i) => i === index ? { ...item, assignedTo: assignedTo || null } : item))
+
+  const remindeeName = (fields.assignedTo && members.find(m => m.id === fields.assignedTo)?.name) || 'you'
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -146,13 +150,24 @@ export function NoteModal({ note, checklistItems = [], members, open: controlled
             <Textarea id="note-content" rows={4} className="mt-1" placeholder="Write anything..." value={fields.content} onChange={e => set('content', e.target.value)} />
           </div>
 
-          {/* Checklist */}
+          {/* Checklist — each item is its own tiny assignable checkpoint,
+              like a Jira subtask, not just plain text. */}
           <div>
             <Label>Checklist</Label>
-            <div className="mt-1 space-y-1.5">
+            <p className="mt-0.5 text-xs text-gray-400">Each item can go to a different person</p>
+            <div className="mt-1.5 space-y-1.5">
               {fields.checklist.map((item, i) => (
-                <div key={i} className="flex items-center gap-2 rounded-md bg-gray-50 px-2.5 py-1.5">
-                  <span className="min-w-0 flex-1 truncate text-sm text-gray-700">{item}</span>
+                <div key={item.id ?? `new-${i}`} className="flex items-center gap-2 rounded-md bg-gray-50 px-2.5 py-1.5">
+                  <span className="min-w-0 flex-1 truncate text-sm text-gray-700">{item.text}</span>
+                  <select
+                    className="shrink-0 rounded border-0 bg-transparent py-0.5 pl-1 pr-5 text-xs text-gray-500 focus:outline-none focus:ring-1 focus:ring-brand-400"
+                    value={item.assignedTo ?? UNASSIGNED}
+                    onChange={e => setChecklistAssignee(i, e.target.value)}
+                    aria-label={`Assign "${item.text}"`}
+                  >
+                    <option value={UNASSIGNED}>Unassigned</option>
+                    {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select>
                   <button type="button" onClick={() => removeChecklistItem(i)} className="shrink-0 text-gray-400 hover:text-red-500" aria-label="Remove item">
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -192,37 +207,46 @@ export function NoteModal({ note, checklistItems = [], members, open: controlled
               </div>
             </div>
             {fields.dueDate && (
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="note-remind">Remind me</Label>
-                  <select
-                    id="note-remind"
-                    className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
-                    value={fields.remindPreset}
-                    onChange={e => set('remindPreset', e.target.value)}
-                  >
-                    <option value="">No reminder</option>
-                    {REMINDER_PRESETS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-                    <option value={CUSTOM_REMINDER}>Custom...</option>
-                  </select>
-                  {fields.remindPreset === CUSTOM_REMINDER && (
-                    <Input type="number" min="0" step="1" placeholder="Days before" className="mt-1.5" value={fields.remindCustom}
-                      onChange={e => set('remindCustom', e.target.value)} />
-                  )}
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="note-remind">Remind {remindeeName}</Label>
+                    <select
+                      id="note-remind"
+                      className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
+                      value={fields.remindPreset}
+                      onChange={e => set('remindPreset', e.target.value)}
+                    >
+                      <option value="">No reminder</option>
+                      {REMINDER_PRESETS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                      <option value={CUSTOM_REMINDER}>Custom...</option>
+                    </select>
+                    {fields.remindPreset === CUSTOM_REMINDER && (
+                      <Input type="number" min="0" step="1" placeholder="Days before" className="mt-1.5" value={fields.remindCustom}
+                        onChange={e => set('remindCustom', e.target.value)} />
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="note-recurrence">Repeat</Label>
+                    <select
+                      id="note-recurrence"
+                      className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
+                      value={fields.recurrence}
+                      onChange={e => set('recurrence', e.target.value)}
+                    >
+                      <option value="">Doesn&apos;t repeat</option>
+                      {RECURRENCE_OPTIONS.map(r => <option key={r} value={r}>{RECURRENCE_LABELS[r]}</option>)}
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <Label htmlFor="note-recurrence">Repeat</Label>
-                  <select
-                    id="note-recurrence"
-                    className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
-                    value={fields.recurrence}
-                    onChange={e => set('recurrence', e.target.value)}
-                  >
-                    <option value="">Doesn&apos;t repeat</option>
-                    {RECURRENCE_OPTIONS.map(r => <option key={r} value={r}>{RECURRENCE_LABELS[r]}</option>)}
-                  </select>
-                </div>
-              </div>
+                {/* The relationship between a single due date and a repeat
+                    rule isn't obvious from the fields alone — spell it out. */}
+                {fields.recurrence && (
+                  <p className="text-xs text-gray-500">
+                    This due date is just for the next time. Once it&apos;s marked done, a new {RECURRENCE_LABELS[fields.recurrence as keyof typeof RECURRENCE_LABELS].toLowerCase()} copy is created automatically, due {fields.recurrence === 'daily' ? '1 day later' : fields.recurrence === 'weekly' ? '1 week later' : '1 month later'}.
+                  </p>
+                )}
+              </>
             )}
           </div>
 
