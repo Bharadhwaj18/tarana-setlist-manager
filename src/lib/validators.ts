@@ -58,9 +58,17 @@ export const eventManagementSchema = z.object({
   notes: z.string().nullable().optional(),
 })
 
+export const unavailabilitySchema = z.object({
+  member_id: z.string().min(1, 'Pick a member'),
+  start_date: z.string().min(1, 'Start date is required'),
+  end_date: z.string().min(1, 'End date is required'),
+  reason: z.string().nullable().optional(),
+})
+
 export type LoginFormData = z.infer<typeof loginSchema>
 export type MagicLinkFormData = z.infer<typeof magicLinkSchema>
 export type SongFormData = z.infer<typeof songSchema>
 export type SetlistFormData = z.infer<typeof setlistSchema>
 export type ShowFormData = z.infer<typeof showSchema>
 export type EventManagementFormData = z.infer<typeof eventManagementSchema>
+export type UnavailabilityFormData = z.infer<typeof unavailabilitySchema>

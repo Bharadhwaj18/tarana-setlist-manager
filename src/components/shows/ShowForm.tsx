@@ -14,6 +14,8 @@ interface ShowFormProps {
   show?: Show
   eventManagementCompanies?: EventManagement[]
   onSubmit: (data: ShowFormData) => Promise<{ error?: string; id?: string } | void>
+  /** Pre-fills the show date — e.g. opened from a specific day on the Calendar. Ignored when editing an existing show. */
+  initialDate?: string
 }
 
 const DIRECT_BOOKING = 'direct'
@@ -35,10 +37,10 @@ function computeTds(fee: number, tdsPercentage: number) {
   return { tdsAmount: grossFee - fee, grossFee }
 }
 
-function fieldsFrom(show: Show | undefined) {
+function fieldsFrom(show: Show | undefined, initialDate: string | undefined) {
   return {
     title: show?.title ?? '',
-    show_date: show?.show_date ?? '',
+    show_date: show?.show_date ?? initialDate ?? '',
     venue: show?.venue ?? '',
     fee: show?.fee != null ? String(show.fee) : '',
     fee_received: show?.fee_received ?? false,
@@ -73,8 +75,8 @@ function Toggle({ label, active, onClick }: { label: string; active: boolean; on
   )
 }
 
-export function ShowForm({ show, eventManagementCompanies = [], onSubmit }: ShowFormProps) {
-  const [fields, setFields] = useState(() => fieldsFrom(show))
+export function ShowForm({ show, eventManagementCompanies = [], onSubmit, initialDate }: ShowFormProps) {
+  const [fields, setFields] = useState(() => fieldsFrom(show, initialDate))
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 

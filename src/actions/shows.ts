@@ -21,6 +21,7 @@ export async function createShow(data: ShowFormData): Promise<{ error?: string; 
   revalidatePath('/shows')
   revalidatePath('/finance')
   revalidatePath('/finance/split')
+  revalidatePath('/calendar')
   redirect(`/shows/${show.id}`)
 }
 
@@ -36,6 +37,7 @@ export async function updateShow(id: string, data: ShowFormData): Promise<{ erro
   revalidatePath(`/shows/${id}`)
   revalidatePath('/finance')
   revalidatePath('/finance/split')
+  revalidatePath('/calendar')
   redirect(`/shows/${id}`)
 }
 
@@ -47,5 +49,6 @@ export async function deleteShow(id: string): Promise<{ error?: string }> {
   revalidatePath('/shows')
   revalidatePath('/finance')
   revalidatePath('/finance/split')
+  revalidatePath('/calendar')
   redirect('/shows')
 }

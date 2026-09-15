@@ -4,8 +4,15 @@ import { ShowForm } from '@/components/shows/ShowForm'
 import { createShow } from '@/actions/shows'
 import { getCachedEventManagementCompanies } from '@/lib/data'
 
-export default async function NewShowPage() {
-  const eventManagementCompanies = await getCachedEventManagementCompanies()
+interface Props {
+  searchParams: Promise<{ date?: string }>
+}
+
+export default async function NewShowPage({ searchParams }: Props) {
+  const [eventManagementCompanies, { date }] = await Promise.all([
+    getCachedEventManagementCompanies(),
+    searchParams,
+  ])
 
   return (
     <div className="max-w-xl">
@@ -13,7 +20,7 @@ export default async function NewShowPage() {
         <ChevronLeft className="h-4 w-4" /> Shows
       </Link>
       <h1 className="mb-8 text-2xl font-bold text-gray-900">New Show</h1>
-      <ShowForm eventManagementCompanies={eventManagementCompanies} onSubmit={createShow} />
+      <ShowForm eventManagementCompanies={eventManagementCompanies} onSubmit={createShow} initialDate={date} />
     </div>
   )
 }

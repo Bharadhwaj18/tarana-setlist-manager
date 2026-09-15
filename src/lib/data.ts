@@ -141,3 +141,11 @@ export const getCachedNotifications = cache(async (recipientId: string) => {
     .order('created_at', { ascending: false })
   return data ?? []
 })
+
+// Every member-unavailability range — small table, the Calendar just
+// fetches all of it and filters client-side per visible month.
+export const getCachedUnavailability = cache(async () => {
+  const supabase = await createClient()
+  const { data } = await supabase.from('unavailability').select('*').order('start_date')
+  return data ?? []
+})

@@ -487,6 +487,33 @@ export type Database = {
         }
         Relationships: []
       }
+      unavailability: {
+        Row: {
+          id: string
+          member_id: string
+          start_date: string
+          end_date: string
+          reason: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          member_id: string
+          start_date: string
+          end_date: string
+          reason?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          member_id?: string
+          start_date?: string
+          end_date?: string
+          reason?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           id: string

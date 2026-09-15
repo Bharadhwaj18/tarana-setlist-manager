@@ -37,7 +37,12 @@ export function addMonthsISO(dateStr: string, n: number) {
   return toISODate(d)
 }
 
-function toISODate(d: Date) {
+/** Parses a YYYY-MM-DD string into a local-midnight Date — the counterpart to toISODate(), always paired to dodge UTC-shift bugs. */
+export function parseISODate(dateStr: string) {
+  return new Date(dateStr + 'T00:00:00')
+}
+
+export function toISODate(d: Date) {
   const pad = (num: number) => String(num).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
