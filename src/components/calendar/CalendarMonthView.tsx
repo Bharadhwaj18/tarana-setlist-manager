@@ -66,7 +66,7 @@ export function CalendarMonthView({ shows, tasks, unavailability, members, nameB
             splits the fixed height evenly across however many week-rows this
             month has) instead of shrink-wrapping to content, which used to
             leave the calendar looking cramped under a lot of empty page. */}
-        <div className="grid h-[calc(100dvh-230px)] min-h-[420px] auto-rows-fr grid-cols-7 sm:h-auto sm:min-h-0 sm:auto-rows-auto">
+        <div className="grid h-[calc((100dvh-230px)*0.8)] min-h-[336px] auto-rows-fr grid-cols-7 sm:h-auto sm:min-h-0 sm:auto-rows-auto">
           {weeks.flat().map(day => {
             const items = byDate[day.date]
             const isToday = day.date === today
