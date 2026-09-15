@@ -7,6 +7,7 @@ import { deleteNote, toggleNoteComplete, toggleChecklistItem, togglePin, toggleA
 import { useToast } from '@/components/ui/Toaster'
 import { cn } from '@/lib/utils'
 import { countdownLabel } from '@/lib/dates'
+import { linkifyText } from '@/lib/linkify'
 import { NOTE_COLOR_CLASSES, RECURRENCE_LABELS, type NoteColor, type Recurrence } from '@/types/notes'
 import type { Note, ChecklistItem } from '@/types'
 
@@ -90,7 +91,10 @@ export function NoteCard({ note, checklistItems, members, authorLine, assigneeNa
       onClick={() => setEditOpen(true)}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditOpen(true) } }}
       className={cn(
-        'flex cursor-pointer flex-col gap-2 rounded-xl border p-4 text-left shadow-sm transition-colors hover:border-brand-400',
+        // min-w-0 overrides the grid item's default min-width:auto — without
+        // it, one long unbroken token (a URL with no spaces, say) forces the
+        // whole grid column wider than the viewport instead of wrapping.
+        'flex min-w-0 cursor-pointer flex-col gap-2 rounded-xl border p-4 text-left shadow-sm transition-colors hover:border-brand-400',
         colorClasses,
         isDone && 'opacity-60'
       )}
@@ -128,7 +132,7 @@ export function NoteCard({ note, checklistItems, members, authorLine, assigneeNa
       </div>
 
       {note.content && (
-        <p className="whitespace-pre-wrap break-words text-sm text-gray-600">{note.content}</p>
+        <p className="whitespace-pre-wrap break-words text-sm text-gray-600">{linkifyText(note.content)}</p>
       )}
 
       {checklistItems.length > 0 && (
