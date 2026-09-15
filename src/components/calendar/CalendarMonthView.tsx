@@ -45,13 +45,6 @@ export function CalendarMonthView({ shows, tasks, unavailability, members, nameB
           </button>
           <button
             type="button"
-            onClick={() => setCurrentMonth(parseISODate(today))}
-            className="rounded-md px-2.5 py-1 text-xs font-semibold text-gray-500 hover:bg-brand-100 hover:text-gray-900"
-          >
-            Today
-          </button>
-          <button
-            type="button"
             onClick={() => setCurrentMonth(m => addMonths(m, 1))}
             aria-label="Next month"
             className="rounded-md p-1.5 text-gray-500 hover:bg-brand-100 hover:text-gray-900"
@@ -61,15 +54,19 @@ export function CalendarMonthView({ shows, tasks, unavailability, members, nameB
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-brand-200">
-        <div className="grid grid-cols-7 border-b border-brand-200 bg-brand-50">
+      <div className="flex flex-col overflow-hidden rounded-xl border border-brand-200">
+        <div className="grid shrink-0 grid-cols-7 border-b border-brand-200 bg-brand-50">
           {WEEKDAY_LABELS.map(label => (
             <div key={label} className="px-1 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-gray-500 sm:text-xs">
               {label}
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-7">
+        {/* Phones get a grid that fills most of the viewport (auto-rows-fr
+            splits the fixed height evenly across however many week-rows this
+            month has) instead of shrink-wrapping to content, which used to
+            leave the calendar looking cramped under a lot of empty page. */}
+        <div className="grid h-[calc(100dvh-230px)] min-h-[420px] auto-rows-fr grid-cols-7 sm:h-auto sm:min-h-0 sm:auto-rows-auto">
           {weeks.flat().map(day => {
             const items = byDate[day.date]
             const isToday = day.date === today
@@ -79,44 +76,34 @@ export function CalendarMonthView({ shows, tasks, unavailability, members, nameB
                 type="button"
                 onClick={() => setSelectedDate(day.date)}
                 className={cn(
-                  'flex min-h-16 flex-col items-center gap-1 border-b border-r border-brand-100 p-1 text-left transition-colors last:border-r-0 hover:bg-brand-50 sm:min-h-24 sm:items-start sm:p-2',
+                  'flex min-h-0 flex-col items-start gap-1 overflow-hidden border-b border-r border-brand-100 p-1 text-left transition-colors last:border-r-0 hover:bg-brand-50 sm:p-2',
                   !day.inCurrentMonth && 'bg-gray-50/60 text-gray-300'
                 )}
               >
                 <span className={cn(
-                  'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-medium',
+                  'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-medium sm:h-6 sm:w-6 sm:text-xs',
                   isToday ? 'bg-brand-400 text-white' : day.inCurrentMonth ? 'text-gray-700' : 'text-gray-300'
                 )}>
                   {parseISODate(day.date).getDate()}
                 </span>
 
                 {items && (
-                  <>
-                    {/* Dots-only under sm:, full labels from sm: up — this grid is
-                        denser than anything else in the app so mobile needs its
-                        own compact treatment. */}
-                    <div className="flex flex-wrap gap-0.5 sm:hidden">
-                      {items.shows.length > 0 && <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />}
-                      {items.tasks.length > 0 && <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />}
-                      {items.unavailability.length > 0 && <span className="h-1.5 w-1.5 rounded-full bg-gray-400" />}
-                    </div>
-                    <div className="hidden w-full flex-col gap-0.5 sm:flex">
-                      {items.shows.slice(0, 2).map(s => (
-                        <span key={s.id} className="truncate rounded bg-brand-100 px-1 py-0.5 text-[10px] font-medium text-brand-700">{s.title}</span>
-                      ))}
-                      {items.tasks.slice(0, 2).map(t => (
-                        <span key={t.id} className={cn('truncate rounded bg-violet-100 px-1 py-0.5 text-[10px] font-medium text-violet-700', t.completed_at && 'line-through opacity-60')}>{t.title}</span>
-                      ))}
-                      {items.unavailability.length > 0 && (
-                        <span className="truncate rounded bg-gray-100 px-1 py-0.5 text-[10px] font-medium text-gray-500">
-                          {items.unavailability.map(u => nameById[u.member_id] ?? 'Someone').join(', ')} unavailable
-                        </span>
-                      )}
-                      {(items.shows.length + items.tasks.length) > 4 && (
-                        <span className="text-[10px] text-gray-400">+more</span>
-                      )}
-                    </div>
-                  </>
+                  <div className="flex w-full min-h-0 flex-1 flex-col gap-0.5 overflow-hidden">
+                    {items.shows.slice(0, 2).map(s => (
+                      <span key={s.id} className="truncate rounded bg-brand-100 px-1 py-0.5 text-[9px] font-medium text-brand-700 sm:text-[10px]">{s.title}</span>
+                    ))}
+                    {items.tasks.slice(0, 2).map(t => (
+                      <span key={t.id} className={cn('truncate rounded bg-violet-100 px-1 py-0.5 text-[9px] font-medium text-violet-700 sm:text-[10px]', t.completed_at && 'line-through opacity-60')}>{t.title}</span>
+                    ))}
+                    {items.unavailability.length > 0 && (
+                      <span className="truncate rounded bg-gray-100 px-1 py-0.5 text-[9px] font-medium text-gray-500 sm:text-[10px]">
+                        {items.unavailability.map(u => nameById[u.member_id] ?? 'Someone').join(', ')} unavailable
+                      </span>
+                    )}
+                    {(items.shows.length + items.tasks.length) > 4 && (
+                      <span className="text-[9px] text-gray-400 sm:text-[10px]">+more</span>
+                    )}
+                  </div>
                 )}
               </button>
             )
