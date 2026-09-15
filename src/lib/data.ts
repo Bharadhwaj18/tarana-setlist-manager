@@ -108,6 +108,15 @@ export const getCachedNotes = cache(async () => {
   return data ?? []
 })
 
+// Every checklist item for every note in one query (grouped by note_id
+// client-side) rather than one query per note — same "fetch all, group in
+// JS" convention as getCachedShowTransactions.
+export const getCachedChecklistItems = cache(async () => {
+  const supabase = await createClient()
+  const { data } = await supabase.from('note_checklist_items').select('*').order('position')
+  return data ?? []
+})
+
 // Every unpaid split payment still waiting on someone to actually hand the
 // money over — the reminder banner (Finance page) and the Sidebar's badge
 // both read this, plus Split History shows them alongside paid ones.

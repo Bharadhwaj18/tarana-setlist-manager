@@ -1,17 +1,38 @@
 import { StickyNote } from 'lucide-react'
-import { getCachedNotes, getCachedAllProfiles, getCachedUser } from '@/lib/data'
+import { getCachedNotes, getCachedChecklistItems, getCachedAllProfiles, getCachedUser } from '@/lib/data'
+import { todayISO } from '@/lib/shows'
 import { NoteModal } from '@/components/notes/NoteModal'
-import { NoteCard } from '@/components/notes/NoteCard'
+import { NotesList } from '@/components/notes/NotesList'
+import type { ChecklistItem } from '@/types'
 
 export default async function NotesPage() {
-  const [notes, profiles, { data: { user } }] = await Promise.all([
+  const [notes, checklistItems, profiles, { data: { user } }] = await Promise.all([
     getCachedNotes(),
+    getCachedChecklistItems(),
     getCachedAllProfiles(),
     getCachedUser(),
   ])
 
   const nameOf = (id: string) =>
     id === user?.id ? 'You' : (profiles.find(p => p.id === id)?.display_name ?? 'Band member')
+
+  const members = profiles.map(p => ({ id: p.id, name: p.id === user?.id ? 'You' : (p.display_name ?? 'Band member') }))
+
+  const checklistByNote: Record<string, ChecklistItem[]> = {}
+  for (const item of checklistItems) {
+    (checklistByNote[item.note_id] ??= []).push(item)
+  }
+
+  // Sender/assignee names resolved server-side into plain strings, keyed
+  // by note id — never pass a resolver function to the client NotesList.
+  const authorLines: Record<string, string> = {}
+  const assigneeNames: Record<string, string | null> = {}
+  for (const note of notes) {
+    authorLines[note.id] =
+      `${note.updated_by ? `Last edited by ${nameOf(note.updated_by)}` : `Added by ${nameOf(note.created_by)}`}` +
+      ` · ${new Date(note.updated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}`
+    assigneeNames[note.id] = note.assigned_to ? nameOf(note.assigned_to) : null
+  }
 
   return (
     <div className="max-w-3xl">
@@ -20,7 +41,7 @@ export default async function NotesPage() {
           <h1 className="text-2xl font-bold text-gray-900">Notes</h1>
           <p className="mt-1 text-sm text-gray-500">{notes.length} note{notes.length !== 1 ? 's' : ''} — a shared board for the band</p>
         </div>
-        <NoteModal />
+        <NoteModal members={members} />
       </div>
 
       {!notes.length ? (
@@ -30,21 +51,18 @@ export default async function NotesPage() {
             <p className="font-medium text-gray-500">No notes yet</p>
             <p className="text-sm text-gray-400">Ideas, todos, reminders — anything the band should keep track of</p>
           </div>
-          <NoteModal />
+          <NoteModal members={members} />
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {notes.map(note => (
-            <NoteCard
-              key={note.id}
-              note={note}
-              authorLine={
-                `${note.updated_by ? `Last edited by ${nameOf(note.updated_by)}` : `Added by ${nameOf(note.created_by)}`}` +
-                ` · ${new Date(note.updated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}`
-              }
-            />
-          ))}
-        </div>
+        <NotesList
+          notes={notes}
+          checklistByNote={checklistByNote}
+          members={members}
+          currentUserId={user?.id ?? ''}
+          authorLines={authorLines}
+          assigneeNames={assigneeNames}
+          today={todayISO()}
+        />
       )}
     </div>
   )

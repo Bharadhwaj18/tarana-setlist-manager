@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Search, CalendarDays, MapPin, CheckCircle2, Circle, Sparkles, Building2 } from 'lucide-react'
 import { isUpcoming } from '@/lib/shows'
+import { countdownLabel } from '@/lib/dates'
 import type { Show } from '@/types'
 
 interface ShowSearchListProps {
@@ -18,18 +19,6 @@ interface ShowSearchListProps {
 
 function fmt(n: number) {
   return `₹${Math.abs(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
-}
-
-function daysUntil(showDate: string, today: string) {
-  const ms = new Date(showDate + 'T00:00:00').getTime() - new Date(today + 'T00:00:00').getTime()
-  return Math.round(ms / 86400000)
-}
-
-function countdownLabel(showDate: string, today: string) {
-  const days = daysUntil(showDate, today)
-  if (days === 0) return 'Today'
-  if (days === 1) return 'Tomorrow'
-  return `In ${days} days`
 }
 
 function ShowCard({ s, net, setlist, today, badge, agency }: {

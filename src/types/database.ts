@@ -307,6 +307,15 @@ export type Database = {
           updated_by: string | null
           created_at: string
           updated_at: string
+          assigned_to: string | null
+          due_date: string | null
+          completed_at: string | null
+          remind_days_before: number | null
+          pinned: boolean
+          archived_at: string | null
+          color: string | null
+          recurrence: string | null
+          labels: string[] | null
         }
         Insert: {
           id?: string
@@ -316,6 +325,15 @@ export type Database = {
           updated_by?: string | null
           created_at?: string
           updated_at?: string
+          assigned_to?: string | null
+          due_date?: string | null
+          completed_at?: string | null
+          remind_days_before?: number | null
+          pinned?: boolean
+          archived_at?: string | null
+          color?: string | null
+          recurrence?: string | null
+          labels?: string[] | null
         }
         Update: {
           id?: string
@@ -325,6 +343,42 @@ export type Database = {
           updated_by?: string | null
           created_at?: string
           updated_at?: string
+          assigned_to?: string | null
+          due_date?: string | null
+          completed_at?: string | null
+          remind_days_before?: number | null
+          pinned?: boolean
+          archived_at?: string | null
+          color?: string | null
+          recurrence?: string | null
+          labels?: string[] | null
+        }
+        Relationships: []
+      }
+      note_checklist_items: {
+        Row: {
+          id: string
+          note_id: string
+          text: string
+          done: boolean
+          position: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          note_id: string
+          text: string
+          done?: boolean
+          position?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          note_id?: string
+          text?: string
+          done?: boolean
+          position?: number
+          created_at?: string
         }
         Relationships: []
       }

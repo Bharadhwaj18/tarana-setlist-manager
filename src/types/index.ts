@@ -6,7 +6,7 @@ export type Setlist = Database['public']['Tables']['setlists']['Row']
 export type SetlistSong = Database['public']['Tables']['setlist_songs']['Row']
 
 export type { Show, ShowInsert, ShowUpdate } from './shows'
-export type { Note, NoteInsert, NoteUpdate } from './notes'
+export type { Note, NoteInsert, NoteUpdate, ChecklistItem, ChecklistItemInsert } from './notes'
 export type { PendingPayment } from './pending-payments'
 export type { EventManagement, EventManagementInsert, EventManagementUpdate } from './event-management'
 export type { AppNotification, AppNotificationInsert, AppNotificationUpdate, PushSubscriptionRow, PushSubscriptionInsert, NotificationItem } from './notifications'
