@@ -2,12 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Music2, ListMusic, Wallet, LogOut, Menu, X, CalendarDays, StickyNote, Building2 } from 'lucide-react'
+import { Music2, ListMusic, Wallet, LogOut, Menu, X, CalendarDays, StickyNote, Building2, Settings } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { ACTIVE_SETLIST_COOKIE } from '@/lib/setlist-context'
 import { useState } from 'react'
 import type { User } from '@supabase/supabase-js'
+import { NotificationBell } from './NotificationBell'
+import type { NotificationItem } from '@/types/notifications'
 
 function LogoImage() {
   const [imgError, setImgError] = useState(false)
@@ -34,6 +36,8 @@ interface SidebarProps {
   user: User
   /** How many split payments this person still owes a bandmate — badged on the Finance link until each one's marked paid. */
   pendingPaymentCount?: number
+  /** This user's notifications, sender names already resolved server-side. */
+  notifications?: NotificationItem[]
 }
 
 const navItems = [
@@ -43,9 +47,10 @@ const navItems = [
   { href: '/finance', label: 'Finance', icon: Wallet },
   { href: '/event-management', label: 'Event Management', icon: Building2 },
   { href: '/notes', label: 'Notes', icon: StickyNote },
+  { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
-export function Sidebar({ user, pendingPaymentCount = 0 }: SidebarProps) {
+export function Sidebar({ user, pendingPaymentCount = 0, notifications = [] }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -125,8 +130,9 @@ export function Sidebar({ user, pendingPaymentCount = 0 }: SidebarProps) {
     <>
       {/* Desktop sidebar */}
       <aside className="hidden w-56 shrink-0 flex-col border-r border-brand-200 bg-brand-300 lg:flex">
-        <div className="flex items-center border-b border-brand-200 px-4 py-4">
+        <div className="flex items-center justify-between border-b border-brand-200 px-4 py-4">
           {logo}
+          <NotificationBell notifications={notifications} />
         </div>
         <div className="flex flex-1 flex-col overflow-y-auto px-3">
           {nav}
@@ -137,9 +143,12 @@ export function Sidebar({ user, pendingPaymentCount = 0 }: SidebarProps) {
       {/* Mobile top bar */}
       <div className="fixed inset-x-0 top-0 z-40 flex items-center justify-between border-b border-brand-200 bg-brand-300 px-4 py-3 lg:hidden">
         {logo}
-        <button onClick={() => setMobileOpen(v => !v)} className="rounded-md p-1.5 text-gray-600 hover:bg-brand-100">
-          {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
+        <div className="flex items-center gap-1">
+          <NotificationBell notifications={notifications} />
+          <button onClick={() => setMobileOpen(v => !v)} className="rounded-md p-1.5 text-gray-600 hover:bg-brand-100">
+            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
       </div>
 
       {/* Mobile drawer */}

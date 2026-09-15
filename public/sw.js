@@ -32,6 +32,29 @@ self.addEventListener('message', event => {
   }
 })
 
+self.addEventListener('push', event => {
+  let data = {}
+  try {
+    data = event.data ? event.data.json() : {}
+  } catch {
+    // Not JSON — fall through to the defaults below.
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'Tarana', {
+      body: data.body || '',
+      data: { link: data.link || '/' },
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+    })
+  )
+})
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close()
+  const link = (event.notification.data && event.notification.data.link) || '/'
+  event.waitUntil(clients.openWindow(link))
+})
+
 self.addEventListener('fetch', event => {
   if (event.request.mode !== 'navigate') return
 

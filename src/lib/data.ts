@@ -120,3 +120,15 @@ export const getCachedPendingPayments = cache(async () => {
     .order('created_at', { ascending: false })
   return data ?? []
 })
+
+// A profile's own notifications, newest first — reused for both the
+// Sidebar bell's unread badge and the full inbox page.
+export const getCachedNotifications = cache(async (recipientId: string) => {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('notifications')
+    .select('*')
+    .eq('recipient_id', recipientId)
+    .order('created_at', { ascending: false })
+  return data ?? []
+})

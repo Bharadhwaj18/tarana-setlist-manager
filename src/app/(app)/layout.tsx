@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { getCachedUser, getCachedPendingPayments } from '@/lib/data'
+import { getCachedUser, getCachedPendingPayments, getCachedNotifications, getCachedAllProfiles } from '@/lib/data'
+import { resolveNotificationItems } from '@/lib/notifications'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { OfflineUserSync } from '@/components/OfflineUserSync'
 import type { ReactNode } from 'react'
@@ -37,10 +38,16 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const pendingPayments = await getCachedPendingPayments()
   const pendingCount = pendingPayments.filter(p => p.from_member === effectiveUser.id).length
 
+  const [notifications, profiles] = await Promise.all([
+    getCachedNotifications(effectiveUser.id),
+    getCachedAllProfiles(),
+  ])
+  const notificationItems = resolveNotificationItems(notifications, profiles, effectiveUser.id)
+
   return (
     <div className="flex h-screen">
       <OfflineUserSync email={effectiveUser.email ?? ''} displayName={profile?.display_name ?? ''} />
-      <Sidebar user={effectiveUser} pendingPaymentCount={pendingCount} />
+      <Sidebar user={effectiveUser} pendingPaymentCount={pendingCount} notifications={notificationItems} />
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-5xl px-4 pb-8 pt-20 sm:px-6 lg:px-8 lg:pt-8">
           {children}
