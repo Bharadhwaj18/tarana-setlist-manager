@@ -45,7 +45,7 @@ const navItems = [
   { href: '/songs', label: 'Songs', icon: Music2 },
   { href: '/setlists', label: 'Setlists', icon: ListMusic },
   { href: '/finance', label: 'Finance', icon: Wallet },
-  { href: '/event-management', label: 'Event Management', icon: Building2 },
+  { href: '/event-management', label: 'Marketing', icon: Building2 },
   { href: '/notes', label: 'Notes', icon: StickyNote },
   { href: '/calendar', label: 'Calendar', icon: CalendarRange },
   { href: '/settings', label: 'Settings', icon: Settings },
@@ -121,10 +121,10 @@ export function Sidebar({ user, pendingPaymentCount = 0, notifications = [] }: S
   )
 
   const logo = (
-    <div className="flex items-center gap-2.5">
+    <Link href="/shows" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5">
       <LogoImage />
       <span className="font-bold text-gray-900">Tarana</span>
-    </div>
+    </Link>
   )
 
   return (
