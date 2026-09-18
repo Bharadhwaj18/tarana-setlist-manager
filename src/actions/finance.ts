@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { todayISO } from '@/lib/shows'
-import { sendNotification } from '@/actions/notifications'
+import { sendNotification, sendNotificationToAll } from '@/actions/notifications'
 
 async function requireTreasurer(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<string | null> {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle()
@@ -78,6 +78,19 @@ export async function addTransaction(data: TransactionInput): Promise<{ error?: 
     recorded_by: user.id,
   })
   if (error) return { error: error.message }
+
+  // Money coming in is worth telling the whole band about — an expense
+  // (negative amount) isn't, that's just routine bookkeeping.
+  if (data.amount > 0) {
+    const { data: actor } = await supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle()
+    await sendNotificationToAll({
+      title: `${actor?.display_name ?? 'Someone'} logged a credit of ₹${data.amount.toLocaleString('en-IN')}`,
+      body: data.description,
+      link: '/finance',
+      type: 'transaction_credit',
+    })
+  }
+
   revalidatePath('/finance')
   revalidatePath('/finance/split')
   revalidatePath('/finance/history')
