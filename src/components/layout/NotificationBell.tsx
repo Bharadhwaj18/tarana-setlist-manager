@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Bell } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { markNotificationRead } from '@/actions/notifications'
+import { markNotificationRead, markAllNotificationsRead } from '@/actions/notifications'
 import type { NotificationItem } from '@/types/notifications'
 
 interface Props {
@@ -25,10 +26,43 @@ function timeAgo(iso: string) {
 
 export function NotificationBell({ notifications }: Props) {
   const [open, setOpen] = useState(false)
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
   const [, startTransition] = useTransition()
   const router = useRouter()
   const unreadCount = notifications.filter(n => !n.read).length
   const recent = notifications.slice(0, 8)
+
+  const DROPDOWN_WIDTH = 320 // matches w-80
+  const VIEWPORT_MARGIN = 8
+
+  // Opens to the right of the bell, portaled to <body> so it's never
+  // clipped/misplaced by a narrow ancestor (the desktop sidebar is only
+  // ~14rem wide). Clamped so it still fits on screen if the bell sits near
+  // the right edge (mobile top bar, or a narrow window).
+  const reposition = () => {
+    if (!buttonRef.current) return
+    const rect = buttonRef.current.getBoundingClientRect()
+    const maxLeft = window.innerWidth - DROPDOWN_WIDTH - VIEWPORT_MARGIN
+    setPosition({ top: rect.bottom + 8, left: Math.max(VIEWPORT_MARGIN, Math.min(rect.left, maxLeft)) })
+  }
+
+  useEffect(() => {
+    if (!open) return
+    const onResize = () => reposition()
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [open])
+
+  const handleToggle = () => {
+    if (!open) {
+      reposition()
+      // Seeing the dropdown IS reading it — no separate "mark all read"
+      // action needed, matches how every other notification tray behaves.
+      if (unreadCount > 0) startTransition(() => { markAllNotificationsRead() })
+    }
+    setOpen(v => !v)
+  }
 
   const handleClick = (n: NotificationItem) => {
     setOpen(false)
@@ -39,7 +73,8 @@ export function NotificationBell({ notifications }: Props) {
   return (
     <div className="relative">
       <button
-        onClick={() => setOpen(v => !v)}
+        ref={buttonRef}
+        onClick={handleToggle}
         aria-label="Notifications"
         className="relative rounded-md p-1.5 text-gray-600 hover:bg-brand-100"
       >
@@ -51,10 +86,13 @@ export function NotificationBell({ notifications }: Props) {
         )}
       </button>
 
-      {open && (
+      {open && position && createPortal(
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full z-50 mt-2 w-80 max-w-[90vw] rounded-xl border border-brand-200 bg-white shadow-lg">
+          <div
+            className="fixed z-50 w-80 max-w-[90vw] rounded-xl border border-brand-200 bg-white shadow-lg"
+            style={{ top: position.top, left: position.left }}
+          >
             <div className="flex items-center justify-between border-b border-brand-100 px-4 py-2.5">
               <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Notifications</span>
               <Link href="/notifications" onClick={() => setOpen(false)} className="text-xs font-medium text-brand-600 hover:underline">
@@ -87,7 +125,8 @@ export function NotificationBell({ notifications }: Props) {
               </div>
             )}
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   )
