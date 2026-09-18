@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { todayISO } from '@/lib/shows'
+import { sendNotification } from '@/actions/notifications'
 
 async function requireTreasurer(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<string | null> {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle()
@@ -215,6 +216,17 @@ export async function splitShows(shows: ShowSplitInput[], payments: SplitPayment
     }))
     const { error: pendingErr } = await supabase.from('pending_payments').insert(pending)
     if (pendingErr) return { error: pendingErr.message }
+
+    for (const p of crossPayments) {
+      if (p.from === user.id) continue // don't ping yourself about your own debt
+      await sendNotification({
+        recipientId: p.from,
+        title: `You owe ₹${p.amount.toLocaleString('en-IN')}`,
+        body: p.description,
+        link: '/finance',
+        type: 'payment_owed',
+      })
+    }
   }
 
   const { error: showErr } = await supabase

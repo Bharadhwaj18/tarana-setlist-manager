@@ -114,7 +114,7 @@ export async function updateNote(id: string, data: NoteFormData): Promise<{ erro
 
   // Only ping the assignee if the assignment actually changed on this save
   // — re-saving an already-assigned task shouldn't re-notify every time.
-  const { data: existing } = await supabase.from('notes').select('assigned_to').eq('id', id).maybeSingle()
+  const { data: existing } = await supabase.from('notes').select('title, due_date, assigned_to').eq('id', id).maybeSingle()
 
   const { error } = await supabase.from('notes').update({
     title: data.title.trim(),
@@ -131,8 +131,25 @@ export async function updateNote(id: string, data: NoteFormData): Promise<{ erro
   if (error) return { error: error.message }
 
   await syncChecklistItems(supabase, id, data.checklistItems, user.id, data.title.trim())
-  if (data.assignedTo && data.assignedTo !== existing?.assigned_to) {
-    await notifyAssignment(supabase, user.id, data.assignedTo, data.title.trim())
+
+  const title = data.title.trim()
+  const assigneeChanged = data.assignedTo && data.assignedTo !== existing?.assigned_to
+  if (assigneeChanged) {
+    await notifyAssignment(supabase, user.id, data.assignedTo!, title)
+  } else if (
+    data.assignedTo && data.assignedTo !== user.id && existing &&
+    (existing.title !== title || existing.due_date !== data.dueDate)
+  ) {
+    // Same assignee as before, but something they'd care about changed —
+    // a renamed task or a moved due date, not just a checklist tick.
+    const { data: actor } = await supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle()
+    await sendNotification({
+      recipientId: data.assignedTo,
+      title: `${actor?.display_name ?? 'Someone'} updated "${title}"`,
+      body: existing.due_date !== data.dueDate ? `Due date is now ${data.dueDate ?? 'unset'}` : 'Details changed',
+      link: '/notes',
+      type: 'task_updated',
+    })
   }
 
   revalidatePath('/notes')
@@ -142,8 +159,22 @@ export async function updateNote(id: string, data: NoteFormData): Promise<{ erro
 
 export async function deleteNote(id: string): Promise<{ error?: string }> {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: note } = await supabase.from('notes').select('title, assigned_to').eq('id', id).maybeSingle()
+
   const { error } = await supabase.from('notes').delete().eq('id', id)
   if (error) return { error: error.message }
+
+  if (note?.assigned_to && user && note.assigned_to !== user.id) {
+    const { data: actor } = await supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle()
+    await sendNotification({
+      recipientId: note.assigned_to,
+      title: `${actor?.display_name ?? 'Someone'} deleted "${note.title}"`,
+      body: 'This task was removed.',
+      link: '/notes',
+      type: 'task_deleted',
+    })
+  }
 
   revalidatePath('/notes')
   revalidatePath('/calendar')

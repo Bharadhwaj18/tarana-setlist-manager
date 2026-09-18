@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { sendNotificationToAll } from '@/actions/notifications'
 import type { SetlistFormData } from '@/lib/validators'
 import type { ParsedSong } from '@/lib/setlist-parser'
 
@@ -18,6 +19,16 @@ export async function createSetlist(data: SetlistFormData) {
     .single()
 
   if (error) throw new Error(error.message)
+
+  if (data.show_id) {
+    const { data: actor } = await supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle()
+    await sendNotificationToAll({
+      title: `${actor?.display_name ?? 'Someone'} added a setlist`,
+      body: `"${data.title}"${data.show_date ? ` for ${data.show_date}` : ''}`,
+      link: `/setlists/${setlist.id}`,
+      type: 'setlist_created',
+    })
+  }
 
   revalidatePath('/setlists')
   redirect(`/setlists/${setlist.id}`)

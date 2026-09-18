@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { todayISO } from '@/lib/shows'
+import { sendNotification } from '@/actions/notifications'
 
 /**
  * The payer marks a pending split payment as paid, once they've actually
@@ -50,6 +51,17 @@ export async function markPendingPaymentPaid(id: string): Promise<{ error?: stri
     .update({ paid_at: new Date().toISOString(), paid_transaction_id: txn.id })
     .eq('id', id)
   if (updateErr) return { error: updateErr.message }
+
+  if (pending.to_member !== user.id) {
+    const { data: actor } = await supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle()
+    await sendNotification({
+      recipientId: pending.to_member,
+      title: `${actor?.display_name ?? 'Someone'} paid you ₹${pending.amount.toLocaleString('en-IN')}`,
+      body: pending.description,
+      link: '/finance/history',
+      type: 'payment_received',
+    })
+  }
 
   revalidatePath('/finance')
   revalidatePath('/finance/history')
