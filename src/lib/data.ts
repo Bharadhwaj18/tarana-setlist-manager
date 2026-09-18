@@ -149,3 +149,11 @@ export const getCachedUnavailability = cache(async () => {
   const { data } = await supabase.from('unavailability').select('*').order('start_date')
   return data ?? []
 })
+
+// Freeform calendar entries — same "fetch all, filter client-side" pattern
+// as unavailability, small table.
+export const getCachedCalendarEvents = cache(async () => {
+  const supabase = await createClient()
+  const { data } = await supabase.from('calendar_events').select('*').order('start_date')
+  return data ?? []
+})

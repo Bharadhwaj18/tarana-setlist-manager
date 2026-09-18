@@ -487,6 +487,36 @@ export type Database = {
         }
         Relationships: []
       }
+      calendar_events: {
+        Row: {
+          id: string
+          title: string
+          start_date: string
+          end_date: string
+          notes: string | null
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          start_date: string
+          end_date: string
+          notes?: string | null
+          created_by: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          start_date?: string
+          end_date?: string
+          notes?: string | null
+          created_by?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       unavailability: {
         Row: {
           id: string

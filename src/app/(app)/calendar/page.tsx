@@ -1,12 +1,13 @@
-import { getCachedShows, getCachedNotes, getCachedUnavailability, getCachedAllProfiles, getCachedUser } from '@/lib/data'
+import { getCachedShows, getCachedNotes, getCachedUnavailability, getCachedCalendarEvents, getCachedAllProfiles, getCachedUser } from '@/lib/data'
 import { todayISO } from '@/lib/shows'
 import { CalendarMonthView } from '@/components/calendar/CalendarMonthView'
 
 export default async function CalendarPage() {
-  const [shows, notes, unavailability, profiles, { data: { user } }] = await Promise.all([
+  const [shows, notes, unavailability, events, profiles, { data: { user } }] = await Promise.all([
     getCachedShows(),
     getCachedNotes(),
     getCachedUnavailability(),
+    getCachedCalendarEvents(),
     getCachedAllProfiles(),
     getCachedUser(),
   ])
@@ -21,15 +22,16 @@ export default async function CalendarPage() {
   const members = profiles.map(p => ({ id: p.id, name: nameById[p.id] }))
 
   return (
-    <div className="max-w-4xl">
+    <div className="max-w-4xl sm:max-w-5xl">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Calendar</h1>
-        <p className="mt-1 text-sm text-gray-500">Shows, task deadlines, and who&apos;s unavailable — all in one view</p>
+        <p className="mt-1 text-sm text-gray-500">Shows, task deadlines, unavailability, and anything else — all in one view</p>
       </div>
       <CalendarMonthView
         shows={shows}
         tasks={tasks}
         unavailability={unavailability}
+        events={events}
         members={members}
         nameById={nameById}
         today={todayISO()}

@@ -11,6 +11,7 @@ export type { PendingPayment } from './pending-payments'
 export type { EventManagement, EventManagementInsert, EventManagementUpdate } from './event-management'
 export type { AppNotification, AppNotificationInsert, AppNotificationUpdate, PushSubscriptionRow, PushSubscriptionInsert, NotificationItem } from './notifications'
 export type { Unavailability, UnavailabilityInsert, UnavailabilityUpdate } from './unavailability'
+export type { CalendarEvent, CalendarEventInsert, CalendarEventUpdate } from './calendar-event'
 
 export type SongInsert = Omit<Song, 'id' | 'created_at' | 'updated_at' | 'created_by'>
 export type SongUpdate = Partial<SongInsert>

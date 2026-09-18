@@ -2,13 +2,14 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Plus, Trash2, CalendarDays, StickyNote, UserX } from 'lucide-react'
+import { Plus, Trash2, CalendarDays, StickyNote, UserX, Tag } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
 import { NoteModal } from '@/components/notes/NoteModal'
 import { addUnavailability, deleteUnavailability } from '@/actions/unavailability'
+import { addCalendarEvent, deleteCalendarEvent } from '@/actions/calendar-events'
 import { useToast } from '@/components/ui/Toaster'
 import { parseISODate } from '@/lib/dates'
 import { cn } from '@/lib/utils'
@@ -31,11 +32,15 @@ export function DayDetailPanel({ date, items, members, nameById, open, onOpenCha
   const [memberId, setMemberId] = useState(members[0]?.id ?? '')
   const [endDate, setEndDate] = useState(date)
   const [reason, setReason] = useState('')
+  const [addingEvent, setAddingEvent] = useState(false)
+  const [eventTitle, setEventTitle] = useState('')
+  const [eventEndDate, setEventEndDate] = useState(date)
+  const [eventNotes, setEventNotes] = useState('')
   const [isPending, startTransition] = useTransition()
   const toast = useToast()
 
   const title = parseISODate(date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-  const hasAnything = items.shows.length > 0 || items.tasks.length > 0 || items.unavailability.length > 0
+  const hasAnything = items.shows.length > 0 || items.tasks.length > 0 || items.unavailability.length > 0 || items.events.length > 0
 
   const handleAddUnavailable = (e: React.FormEvent) => {
     e.preventDefault()
@@ -58,10 +63,32 @@ export function DayDetailPanel({ date, items, members, nameById, open, onOpenCha
     })
   }
 
+  const handleAddEvent = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!eventTitle.trim()) return
+    startTransition(async () => {
+      const result = await addCalendarEvent({ title: eventTitle, start_date: date, end_date: eventEndDate || date, notes: eventNotes.trim() || null })
+      if (result.error) toast(result.error, 'error')
+      else {
+        toast('Added', 'success')
+        setAddingEvent(false)
+        setEventTitle('')
+        setEventNotes('')
+      }
+    })
+  }
+
+  const handleDeleteEvent = (id: string) => {
+    startTransition(async () => {
+      const result = await deleteCalendarEvent(id)
+      if (result.error) toast(result.error, 'error')
+    })
+  }
+
   return (
     <Modal open={open} onOpenChange={onOpenChange} title={title} className="max-w-md">
       <div className="space-y-5">
-        {!hasAnything && !addingUnavailable && (
+        {!hasAnything && !addingUnavailable && !addingEvent && (
           <p className="text-sm text-gray-400">Nothing on this day yet</p>
         )}
 
@@ -106,6 +133,21 @@ export function DayDetailPanel({ date, items, members, nameById, open, onOpenCha
           </div>
         )}
 
+        {items.events.length > 0 && (
+          <div className="space-y-1.5">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500">Events</h3>
+            {items.events.map(e => (
+              <div key={e.id} className="flex items-center gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-gray-800">
+                <Tag className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+                <span className="min-w-0 flex-1 truncate">{e.title}{e.notes ? ` — ${e.notes}` : ''}</span>
+                <button type="button" onClick={() => handleDeleteEvent(e.id)} disabled={isPending} className="shrink-0 text-gray-400 hover:text-red-500 disabled:opacity-50" aria-label="Remove">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {addingUnavailable ? (
           <form onSubmit={handleAddUnavailable} className="space-y-3 rounded-lg border border-brand-200 bg-brand-50 p-3">
             <div>
@@ -132,6 +174,25 @@ export function DayDetailPanel({ date, items, members, nameById, open, onOpenCha
               <Button type="submit" size="sm" loading={isPending} disabled={!memberId}>Save</Button>
             </div>
           </form>
+        ) : addingEvent ? (
+          <form onSubmit={handleAddEvent} className="space-y-3 rounded-lg border border-brand-200 bg-brand-50 p-3">
+            <div>
+              <Label htmlFor="event-title">What&apos;s happening</Label>
+              <Input id="event-title" placeholder="Rehearsal, deadline, anything" className="mt-1" value={eventTitle} onChange={e => setEventTitle(e.target.value)} autoFocus />
+            </div>
+            <div>
+              <Label htmlFor="event-end">Through</Label>
+              <Input id="event-end" type="date" className="mt-1" value={eventEndDate} min={date} onChange={e => setEventEndDate(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="event-notes">Notes</Label>
+              <Input id="event-notes" placeholder="Optional" className="mt-1" value={eventNotes} onChange={e => setEventNotes(e.target.value)} />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="secondary" size="sm" onClick={() => setAddingEvent(false)}>Cancel</Button>
+              <Button type="submit" size="sm" loading={isPending} disabled={!eventTitle.trim()}>Save</Button>
+            </div>
+          </form>
         ) : (
           <div className="flex flex-wrap gap-2 border-t border-brand-100 pt-4">
             <Button variant="secondary" size="sm" asChild>
@@ -142,6 +203,9 @@ export function DayDetailPanel({ date, items, members, nameById, open, onOpenCha
             </Button>
             <Button variant="secondary" size="sm" onClick={() => { setEndDate(date); setAddingUnavailable(true) }}>
               <Plus className="h-3.5 w-3.5" /> Unavailable
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => { setEventEndDate(date); setAddingEvent(true) }}>
+              <Plus className="h-3.5 w-3.5" /> Event
             </Button>
           </div>
         )}

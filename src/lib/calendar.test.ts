@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { buildMonthGrid, groupItemsByDate } from './calendar'
-import type { Show, Note, Unavailability } from '@/types'
+import type { Show, Note, Unavailability, CalendarEvent } from '@/types'
 
 describe('buildMonthGrid', () => {
   it('covers all 29 days of a leap-year February without dropping any', () => {
@@ -49,5 +49,14 @@ describe('groupItemsByDate', () => {
     expect(byDate['2026-09-19'].unavailability).toEqual([unavailability])
     expect(byDate['2026-09-20'].unavailability).toEqual([unavailability])
     expect(byDate['2026-09-17']).toBeUndefined()
+  })
+
+  it('buckets a single-day event and expands a multi-day one, same as unavailability', () => {
+    const singleDay = { start_date: '2026-09-22', end_date: '2026-09-22' } as unknown as CalendarEvent
+    const multiDay = { start_date: '2026-09-24', end_date: '2026-09-25' } as unknown as CalendarEvent
+    const byDate = groupItemsByDate([], [], [], [singleDay, multiDay])
+    expect(byDate['2026-09-22'].events).toEqual([singleDay])
+    expect(byDate['2026-09-24'].events).toEqual([multiDay])
+    expect(byDate['2026-09-25'].events).toEqual([multiDay])
   })
 })

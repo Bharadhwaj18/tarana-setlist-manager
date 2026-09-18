@@ -7,7 +7,7 @@ import { buildMonthGrid, groupItemsByDate } from '@/lib/calendar'
 import { parseISODate } from '@/lib/dates'
 import { cn } from '@/lib/utils'
 import { DayDetailPanel } from './DayDetailPanel'
-import type { Show, Note, Unavailability } from '@/types'
+import type { Show, Note, Unavailability, CalendarEvent } from '@/types'
 
 interface Member { id: string; name: string }
 
@@ -15,6 +15,7 @@ interface Props {
   shows: Show[]
   tasks: Note[]
   unavailability: Unavailability[]
+  events: CalendarEvent[]
   members: Member[]
   /** profile id -> display name, resolved server-side. */
   nameById: Record<string, string>
@@ -23,17 +24,17 @@ interface Props {
 
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-export function CalendarMonthView({ shows, tasks, unavailability, members, nameById, today }: Props) {
+export function CalendarMonthView({ shows, tasks, unavailability, events, members, nameById, today }: Props) {
   const [currentMonth, setCurrentMonth] = useState(() => parseISODate(today))
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
   const weeks = useMemo(() => buildMonthGrid(currentMonth), [currentMonth])
-  const byDate = useMemo(() => groupItemsByDate(shows, tasks, unavailability), [shows, tasks, unavailability])
+  const byDate = useMemo(() => groupItemsByDate(shows, tasks, unavailability, events), [shows, tasks, unavailability, events])
 
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-900">{format(currentMonth, 'MMMM yyyy')}</h2>
+        <h2 className="text-lg font-semibold text-gray-900 sm:text-xl">{format(currentMonth, 'MMMM yyyy')}</h2>
         <div className="flex items-center gap-1">
           <button
             type="button"
@@ -57,7 +58,7 @@ export function CalendarMonthView({ shows, tasks, unavailability, members, nameB
       <div className="flex flex-col overflow-hidden rounded-xl border border-brand-200">
         <div className="grid shrink-0 grid-cols-7 border-b border-brand-200 bg-brand-50">
           {WEEKDAY_LABELS.map(label => (
-            <div key={label} className="px-1 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-gray-500 sm:text-xs">
+            <div key={label} className="px-1 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-gray-500 sm:py-2 sm:text-sm">
               {label}
             </div>
           ))}
@@ -65,8 +66,12 @@ export function CalendarMonthView({ shows, tasks, unavailability, members, nameB
         {/* Phones get a grid that fills most of the viewport (auto-rows-fr
             splits the fixed height evenly across however many week-rows this
             month has) instead of shrink-wrapping to content, which used to
-            leave the calendar looking cramped under a lot of empty page. */}
-        <div className="grid h-[calc((100dvh-230px)*0.8)] min-h-[336px] auto-rows-fr grid-cols-7 sm:h-auto sm:min-h-0 sm:auto-rows-auto">
+            leave the calendar looking cramped under a lot of empty page.
+            Desktop rows instead get an explicit min-height per cell (below)
+            — about 20% larger than before — since content there already
+            drives row height via auto-rows-auto rather than a fixed
+            container. */}
+        <div className="grid h-[calc((100dvh-230px)*0.84)] min-h-[353px] auto-rows-fr grid-cols-7 sm:h-auto sm:min-h-0 sm:auto-rows-auto">
           {weeks.flat().map(day => {
             const items = byDate[day.date]
             const isToday = day.date === today
@@ -76,12 +81,12 @@ export function CalendarMonthView({ shows, tasks, unavailability, members, nameB
                 type="button"
                 onClick={() => setSelectedDate(day.date)}
                 className={cn(
-                  'flex min-h-0 flex-col items-start gap-1 overflow-hidden border-b border-r border-brand-100 p-1 text-left transition-colors last:border-r-0 hover:bg-brand-50 sm:p-2',
+                  'flex min-h-0 flex-col items-start gap-1 overflow-hidden border-b border-r border-brand-100 p-1 text-left transition-colors last:border-r-0 hover:bg-brand-100 sm:min-h-[5.5rem] sm:p-2',
                   !day.inCurrentMonth && 'bg-gray-50/60 text-gray-300'
                 )}
               >
                 <span className={cn(
-                  'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-medium sm:h-6 sm:w-6 sm:text-xs',
+                  'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-medium sm:h-7 sm:w-7 sm:text-sm',
                   isToday ? 'bg-brand-400 text-white' : day.inCurrentMonth ? 'text-gray-700' : 'text-gray-300'
                 )}>
                   {parseISODate(day.date).getDate()}
@@ -90,18 +95,21 @@ export function CalendarMonthView({ shows, tasks, unavailability, members, nameB
                 {items && (
                   <div className="flex w-full min-h-0 flex-1 flex-col gap-0.5 overflow-hidden">
                     {items.shows.slice(0, 2).map(s => (
-                      <span key={s.id} className="truncate rounded bg-brand-100 px-1 py-0.5 text-[9px] font-medium text-brand-700 sm:text-[10px]">{s.title}</span>
+                      <span key={s.id} className="truncate rounded bg-brand-100 px-1 py-0.5 text-[9px] font-medium text-brand-700 sm:text-[11px]">{s.title}</span>
                     ))}
                     {items.tasks.slice(0, 2).map(t => (
-                      <span key={t.id} className={cn('truncate rounded bg-violet-100 px-1 py-0.5 text-[9px] font-medium text-violet-700 sm:text-[10px]', t.completed_at && 'line-through opacity-60')}>{t.title}</span>
+                      <span key={t.id} className={cn('truncate rounded bg-violet-100 px-1 py-0.5 text-[9px] font-medium text-violet-700 sm:text-[11px]', t.completed_at && 'line-through opacity-60')}>{t.title}</span>
                     ))}
                     {items.unavailability.length > 0 && (
-                      <span className="truncate rounded bg-gray-100 px-1 py-0.5 text-[9px] font-medium text-gray-500 sm:text-[10px]">
+                      <span className="truncate rounded bg-gray-100 px-1 py-0.5 text-[9px] font-medium text-gray-500 sm:text-[11px]">
                         {items.unavailability.map(u => nameById[u.member_id] ?? 'Someone').join(', ')} unavailable
                       </span>
                     )}
-                    {(items.shows.length + items.tasks.length) > 4 && (
-                      <span className="text-[9px] text-gray-400 sm:text-[10px]">+more</span>
+                    {items.events.slice(0, 2).map(e => (
+                      <span key={e.id} className="truncate rounded bg-amber-100 px-1 py-0.5 text-[9px] font-medium text-amber-700 sm:text-[11px]">{e.title}</span>
+                    ))}
+                    {(items.shows.length + items.tasks.length + items.events.length) > 4 && (
+                      <span className="text-[9px] text-gray-400 sm:text-[11px]">+more</span>
                     )}
                   </div>
                 )}
@@ -114,7 +122,7 @@ export function CalendarMonthView({ shows, tasks, unavailability, members, nameB
       {selectedDate && (
         <DayDetailPanel
           date={selectedDate}
-          items={byDate[selectedDate] ?? { shows: [], tasks: [], unavailability: [] }}
+          items={byDate[selectedDate] ?? { shows: [], tasks: [], unavailability: [], events: [] }}
           members={members}
           nameById={nameById}
           open={!!selectedDate}
