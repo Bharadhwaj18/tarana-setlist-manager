@@ -6,7 +6,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { addTransaction, updateTransaction, addShow } from '@/actions/finance'
 import { useToast } from '@/components/ui/Toaster'
-import { TRANSACTION_CATEGORIES } from '@/types/finance'
+import { DEBIT_CATEGORIES, CREDIT_CATEGORIES, CREDIT_CATEGORY_LABELS } from '@/types/finance'
 import { cn } from '@/lib/utils'
 import { todayISO } from '@/lib/shows'
 import type { FinanceTransaction } from '@/types/finance'
@@ -29,11 +29,15 @@ const inputCls = 'w-full rounded-md border border-brand-200 bg-white px-3 py-2.5
 const NEW_SHOW = '__new__'
 const AUTO = '__auto__'
 
+function categoryLabel(dir: 'credit' | 'debit', c: string) {
+  return dir === 'credit' ? (CREDIT_CATEGORY_LABELS[c as keyof typeof CREDIT_CATEGORY_LABELS] ?? c) : c.charAt(0).toUpperCase() + c.slice(1)
+}
+
 function fieldsFrom(transaction: FinanceTransaction | undefined, unsplitShows: Show[], lockedShow?: { id: string; title: string }) {
   if (!transaction) {
     return {
       tag: (lockedShow ? 'show' : null) as 'misc' | 'show' | null,
-      category: TRANSACTION_CATEGORIES[0],
+      category: CREDIT_CATEGORIES[0] as string,
       showId: lockedShow?.id ?? unsplitShows[0]?.id ?? NEW_SHOW,
       memberId: AUTO,
       amount: '',
@@ -42,13 +46,15 @@ function fieldsFrom(transaction: FinanceTransaction | undefined, unsplitShows: S
       date: todayISO(),
     }
   }
+  const dir = (transaction.amount >= 0 ? 'credit' : 'debit') as 'credit' | 'debit'
+  const categories = dir === 'credit' ? CREDIT_CATEGORIES : DEBIT_CATEGORIES
   return {
     tag: (transaction.show_id ? 'show' : 'misc') as 'misc' | 'show',
-    category: transaction.category ?? TRANSACTION_CATEGORIES[0],
+    category: (transaction.category && (categories as readonly string[]).includes(transaction.category)) ? transaction.category : categories[0],
     showId: transaction.show_id ?? (unsplitShows[0]?.id ?? NEW_SHOW),
     memberId: transaction.member_id ?? AUTO,
     amount: String(Math.abs(transaction.amount)),
-    dir: (transaction.amount >= 0 ? 'credit' : 'debit') as 'credit' | 'debit',
+    dir,
     description: transaction.description,
     date: transaction.date,
   }
@@ -207,30 +213,35 @@ export function AddTransactionModal({ members, shows, transaction, lockedShow, o
             </div>
           )}
 
-          {/* Sub type — mandatory once a tag is picked */}
+          {/* Credit / Debit — skipped for Reimbursement, which is always a
+              debit: money the band owes someone back, never money in.
+              Switching direction resets Sub type to that direction's own
+              first option — travel/food/etc. and show_fee/sponsorship/etc.
+              are different lists, a stale pick from the other one wouldn't
+              be valid. */}
+          {!isReimbursement && (
+            <div className="flex gap-2">
+              <button type="button" onClick={() => { set('dir', 'credit'); set('category', CREDIT_CATEGORIES[0]) }}
+                className={`flex-1 rounded-md py-2 text-sm font-semibold transition-colors ${dir === 'credit' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                + Credit (add money)
+              </button>
+              <button type="button" onClick={() => { set('dir', 'debit'); set('category', DEBIT_CATEGORIES[0]) }}
+                className={`flex-1 rounded-md py-2 text-sm font-semibold transition-colors ${dir === 'debit' ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                − Debit (subtract)
+              </button>
+            </div>
+          )}
+
+          {/* Sub type — mandatory once a tag is picked; the option list
+              follows whichever direction is currently selected. */}
           {tag && (
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Sub type *</label>
               <select value={category} onChange={e => set('category', e.target.value)} className={inputCls}>
-                {TRANSACTION_CATEGORIES.map(c => (
-                  <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+                {(dir === 'credit' ? CREDIT_CATEGORIES : DEBIT_CATEGORIES).map(c => (
+                  <option key={c} value={c}>{categoryLabel(dir, c)}</option>
                 ))}
               </select>
-            </div>
-          )}
-
-          {/* Credit / Debit — skipped for Reimbursement, which is always a
-              debit: money the band owes someone back, never money in. */}
-          {!isReimbursement && (
-            <div className="flex gap-2">
-              <button type="button" onClick={() => set('dir', 'credit')}
-                className={`flex-1 rounded-md py-2 text-sm font-semibold transition-colors ${dir === 'credit' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-                + Credit (add money)
-              </button>
-              <button type="button" onClick={() => set('dir', 'debit')}
-                className={`flex-1 rounded-md py-2 text-sm font-semibold transition-colors ${dir === 'debit' ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-                − Debit (subtract)
-              </button>
             </div>
           )}
 
