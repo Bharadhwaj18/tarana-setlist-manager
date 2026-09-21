@@ -22,31 +22,17 @@ interface TransactionInput {
 }
 
 /**
- * Shared by add and update: a Misc debit (no show tag) still can't take a
- * member below zero — there's no show pool to eventually cover the gap. A
- * show-tagged expense CAN go negative temporarily: the reimbursement floor
- * is resolved when that show is split (see lib/finance/settlement.ts), not
- * blocked up front. `excludeTransactionId` backs a transaction's own current
- * amount out of the balance check when editing it, not just adding it.
+ * Shared by add and update. A debit is always allowed to take a member's
+ * balance below zero, show-tagged or not — there's no up-front check for
+ * it. A negative balance just means they're owed a reimbursement; the
+ * Finance page flags it live (anyone currently below ₹0), and a show-tagged
+ * front also gets made whole automatically when that show is split (see
+ * lib/finance/settlement.ts's computeBalanceTopUp).
  */
 async function validateTransactionWrite(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  data: TransactionInput,
-  excludeTransactionId?: string
+  data: TransactionInput
 ): Promise<string | null> {
-  if (data.amount < 0 && data.member_id && !data.show_id) {
-    const { data: txns } = await supabase
-      .from('finance_transactions')
-      .select('id, amount')
-      .eq('member_id', data.member_id)
-    const balance = (txns ?? [])
-      .filter(t => t.id !== excludeTransactionId)
-      .reduce((s, t) => s + t.amount, 0)
-    if (balance + data.amount < 0) {
-      return `Insufficient balance. Current balance: ₹${balance.toLocaleString('en-IN')}`
-    }
-  }
-
   // A show that's already been split is locked — redirect this to a Misc
   // expense instead of reopening the split (per the decided policy).
   if (data.show_id) {
@@ -104,7 +90,7 @@ export async function updateTransaction(id: string, data: TransactionInput): Pro
 
   data = { ...data, member_id: data.member_id ?? user.id }
 
-  const validationError = await validateTransactionWrite(supabase, data, id)
+  const validationError = await validateTransactionWrite(supabase, data)
   if (validationError) return { error: validationError }
 
   const { error } = await supabase.from('finance_transactions').update({
