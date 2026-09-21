@@ -3,7 +3,7 @@
 import { useState, useTransition, useMemo } from 'react'
 import { Check, ArrowRight, Download, X, Plus } from 'lucide-react'
 import { splitShows, type ShowSplitInput, type SplitPayment } from '@/actions/finance'
-import { computeEntitlements, computeAbsorbedAmount, computeShowSettlement, poolShowSettlements, routeSettlement, settlementMemberIds, type Payment } from '@/lib/finance/settlement'
+import { computeEntitlements, computeBalanceTopUp, computeShowSettlement, poolShowSettlements, routeSettlement, settlementMemberIds, type Payment } from '@/lib/finance/settlement'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toaster'
 import { cn } from '@/lib/utils'
@@ -72,36 +72,10 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
     return round2(txns.reduce((s, t) => s + t.amount, 0))
   }
 
-  // Standing balance "before this batch" — back out every selected show's
-  // own contribution to a member's current overall balance, since none of
-  // that has actually been settled yet. Excludes category:'reimbursement'
-  // transactions from that backout, same as `memberBalances` itself
-  // already excludes them (they were never Band Fund money to begin with)
-  // — including them here would double-subtract an amount that was never
-  // added in the first place.
-  const standingBalanceBeforeBatch = (memberId: string) => {
-    const batchContribution = selectedShows.reduce((sum, s) => {
-      const positions = cashPositionsFor((txnsByShow[s.id] ?? []).filter(t => t.category !== 'reimbursement'))
-      return sum + (positions[memberId] ?? 0)
-    }, 0)
-    return round2((memberBalances[memberId] ?? 0) - batchContribution)
-  }
-
-  // Per-show computation: ideal equal split, cash positions, reimbursements,
-  // and this show's capacity/amountOwed contribution. Memoized since it
-  // feeds both the preview and submit.
+  // Per-show computation: ideal equal split, cash positions, guaranteed
+  // reimbursements, and this show's capacity/amountOwed contribution.
+  // Memoized since it feeds both the preview and submit.
   const perShow = useMemo(() => {
-    // Absorption (how much of a front the fronter's own balance already
-    // covers) is computed sequentially across the batch's shows, not
-    // independently per show — otherwise the same person fronting expenses
-    // in two selected shows would have their one standing-balance cushion
-    // checked against each front separately and counted twice.
-    const availableStanding: Record<string, number> = {}
-    const standingFor = (id: string) => {
-      if (!(id in availableStanding)) availableStanding[id] = standingBalanceBeforeBatch(id)
-      return availableStanding[id]
-    }
-
     return selectedShows.map(show => {
       const involved = [...(involvedByShow[show.id] ?? new Set())]
       const showTxns = txnsByShow[show.id] ?? []
@@ -121,49 +95,22 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
       // Band Fund's) base cut is the standard % split of that already-
       // shrunk net, same as a normal show expense. What's special about it
       // is only that the fronter is guaranteed their money back in full,
-      // added on top of their base cut — see the reimbursement loop below
-      // — never subject to the absorption floor a normal fronted expense
-      // gets.
+      // added on top of their base cut. Any other fronted expense isn't
+      // reimbursed per show at all — if it ever leaves someone's overall
+      // balance negative, that's handled once, batch-wide, as a Balance
+      // Top-up (see below), not here.
       const net = netForShow(show.id)
       const { memberShares, bandFundAmount } = computeEntitlements(net, involved, bandPct)
       const cashPositions = cashPositionsFor(showTxns)
       const bandFundHolderId = holderFor(showTxns, members[0]?.id ?? '')
 
-      // Real cash still owed back for a fronted expense, after the
-      // fronter's own standing balance covers what it can — the
-      // reimbursement floor. 0 whenever their balance never would've gone
-      // below ₹0. A guaranteed (category:'reimbursement') amount skips
-      // this floor entirely — it's always paid back in full, tracked
-      // separately in guaranteedReimbursements so the split screen and
-      // report can show it as its own line instead of silently folding it
-      // into "absorbed, no cash needs to move."
-      const reimbursements: Record<string, number> = {}
       const guaranteedReimbursements: Record<string, number> = {}
       for (const id of settlementIds) {
-        const cashPosition = cashPositions[id] ?? 0
         const guaranteed = round2(
           showTxns.filter(t => t.member_id === id && t.category === 'reimbursement' && t.amount < 0)
             .reduce((sum, t) => sum - t.amount, 0)
         )
-        let totalReimbursed = 0
-        if (guaranteed > 0) {
-          guaranteedReimbursements[id] = guaranteed
-          totalReimbursed += guaranteed
-        }
-
-        // The absorption floor only ever applies to the *general* fronted
-        // portion — back the guaranteed amount out first so it's never
-        // checked against standing balance.
-        const generalCashPosition = round2(cashPosition + guaranteed)
-        if (generalCashPosition < 0) {
-          const fronted = -generalCashPosition
-          const standing = standingFor(id)
-          const absorbed = computeAbsorbedAmount(standing, fronted)
-          availableStanding[id] = round2(standing - absorbed) // consume the cushion for later shows in this batch
-          totalReimbursed += round2(fronted - absorbed)
-        }
-
-        if (totalReimbursed > 0) reimbursements[id] = round2(totalReimbursed)
+        if (guaranteed > 0) guaranteedReimbursements[id] = guaranteed
       }
 
       const settlement = computeShowSettlement({
@@ -172,21 +119,50 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
         bandFundAmount,
         bandFundHolderId,
         cashPositions,
-        reimbursements,
+        reimbursements: guaranteedReimbursements,
       })
 
-      return { show, net, involved, settlementIds, memberShares, bandFundAmount, bandFundHolderId, cashPositions, reimbursements, guaranteedReimbursements, settlement }
+      return { show, net, involved, settlementIds, memberShares, bandFundAmount, bandFundHolderId, cashPositions, guaranteedReimbursements, settlement }
     })
-    // netForShow/standingBalanceBeforeBatch derive purely from the args
-    // already listed here, and `members` only supplies a fallback id —
-    // listing the functions themselves would just churn on every render.
+    // netForShow derives purely from txnsByShow, already listed below, and
+    // `members` only supplies a fallback id — listing the function itself
+    // would just churn on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedShows, involvedByShow, bandPct, txnsByShow, memberBalances])
+  }, [selectedShows, involvedByShow, bandPct, txnsByShow])
 
-  const pooled = useMemo(
-    () => poolShowSettlements(perShow.map(p => p.settlement)),
-    [perShow]
-  )
+  // Anyone who fronted general (non-guaranteed) money somewhere in this
+  // batch gets made whole once, using their real current Band Fund balance
+  // — which already reflects every front and every collection across
+  // every selected show, not a hypothetical "before this show" figure. If
+  // that's still ≥ ₹0, their own money already covered it and nothing
+  // needs to move; if it's negative, top it up to exactly ₹0. Deliberately
+  // batch-wide, not per-show: someone who fronts money in one show and
+  // collects it back in another, within the same batch, should net
+  // against themselves before any of it counts as a real shortfall.
+  const balanceTopUp = useMemo(() => {
+    const frontedIds = new Set<string>()
+    for (const p of perShow) {
+      for (const id of p.settlementIds) {
+        const generalPosition = round2((p.cashPositions[id] ?? 0) + (p.guaranteedReimbursements[id] ?? 0))
+        if (generalPosition < 0) frontedIds.add(id)
+      }
+    }
+    const result: Record<string, number> = {}
+    for (const id of frontedIds) {
+      const topUp = computeBalanceTopUp(memberBalances[id] ?? 0)
+      if (topUp > 0) result[id] = topUp
+    }
+    return result
+  }, [perShow, memberBalances])
+
+  const pooled = useMemo(() => {
+    const base = poolShowSettlements(perShow.map(p => p.settlement))
+    const amountOwed = { ...base.amountOwed }
+    for (const [id, amount] of Object.entries(balanceTopUp)) {
+      amountOwed[id] = round2((amountOwed[id] ?? 0) + amount)
+    }
+    return { capacity: base.capacity, amountOwed }
+  }, [perShow, balanceTopUp])
   // Auto mode's routed payments — a member's own spare capacity from this
   // batch, then their pre-existing Band Fund, cover their own share first;
   // whatever's left routes to whoever can pay it with the fewest, cleanest
@@ -213,13 +189,11 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
     showTitle: string
     entitlement: number
     cashPosition: number
-    /** Total reimbursement for this show — guaranteed (fuel etc., see guaranteedReimbursed) plus any general-fronting shortfall. */
-    reimbursed: number
-    /** The guaranteed portion of `reimbursed` — a category:'reimbursement' expense, always paid back in full, never subject to the absorption floor. Shown as its own line. */
+    /** A category:'reimbursement' expense (fuel etc.) for this show, always paid back in full on top of the cut. */
     guaranteedReimbursed: number
     isBandFundHolder: boolean
     bandFundAmount: number
-    /** What this show adds to their pooled amount owed — their cut, plus any real reimbursement for fronting. */
+    /** What this show adds to their pooled amount owed — their cut, plus any guaranteed reimbursement. Doesn't include Balance Top-up, which isn't attributable to one show — see balanceTopUp. */
     owedFromShow: number
   }
   const breakdownByPerson = useMemo(() => {
@@ -228,18 +202,16 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
       for (const id of p.settlementIds) {
         const entitlement = p.memberShares[id] ?? 0
         const cashPosition = p.cashPositions[id] ?? 0
-        const reimbursed = p.reimbursements[id] ?? 0
         const guaranteedReimbursed = p.guaranteedReimbursements[id] ?? 0
         const isBandFundHolder = id === p.bandFundHolderId
         ;(map[id] ??= []).push({
           showTitle: p.show.title,
           entitlement,
           cashPosition,
-          reimbursed,
           guaranteedReimbursed,
           isBandFundHolder,
           bandFundAmount: p.bandFundAmount,
-          owedFromShow: round2(entitlement + reimbursed),
+          owedFromShow: round2(entitlement + guaranteedReimbursed),
         })
       }
     }
@@ -379,6 +351,7 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
           name: realNameOf(id),
           lines,
           owed: amountOwedFor(id),
+          balanceTopUp: balanceTopUp[id] ?? 0,
           selfPaid: self?.amount ?? 0,
           outgoing: outgoing.map(p => ({ to: realNameOf(p.to), amount: p.amount })),
           incoming: incoming.map(p => ({ from: realNameOf(p.from), amount: p.amount })),
@@ -573,8 +546,8 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
               const remaining = round2(owed - assigned)
               const lines = breakdownByPerson[id] ?? []
               const cut = round2(lines.reduce((s, l) => s + l.entitlement, 0))
-              const reimbursement = round2(lines.reduce((s, l) => s + l.reimbursed, 0))
               const guaranteedReimbursement = round2(lines.reduce((s, l) => s + l.guaranteedReimbursed, 0))
+              const topUp = balanceTopUp[id] ?? 0
 
               return (
                 <div key={id} className="rounded-lg bg-white p-3 shadow-sm">
@@ -582,10 +555,11 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
                     <span className="text-sm font-medium text-gray-700">{nameOf(id)}</span>
                     <span className="text-sm font-bold tabular-nums text-green-600">Gets {fmt(owed)}</span>
                   </div>
-                  {reimbursement > 0.01 && (
+                  {(guaranteedReimbursement > 0.01 || topUp > 0.01) && (
                     <p className="mt-0.5 text-xs text-gray-400">
-                      {fmt(cut)} cut + {fmt(reimbursement)} reimbursement
-                      {guaranteedReimbursement > 0.01 && ` (incl. ${fmt(guaranteedReimbursement)} fuel/expense reimbursement)`}
+                      {fmt(cut)} cut
+                      {guaranteedReimbursement > 0.01 && ` + ${fmt(guaranteedReimbursement)} fuel/expense reimbursement`}
+                      {topUp > 0.01 && ` + ${fmt(topUp)} balance top-up`}
                     </p>
                   )}
                   <div className="mt-2 space-y-1.5">
@@ -693,6 +667,7 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
             {allInvolvedIds.map(id => {
               const lines = breakdownByPerson[id] ?? []
               const owed = amountOwedFor(id)
+              const topUp = balanceTopUp[id] ?? 0
               const outgoing = payments.filter(p => p.from === id && p.to !== id)
               const self = payments.find(p => p.from === id && p.to === id)
               const incoming = payments.filter(p => p.to === id && p.from !== id)
@@ -724,18 +699,10 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
                             </div>
                           )}
                           {line.cashPosition < 0 && (
-                            <>
-                              <div className="flex items-center justify-between text-gray-400">
-                                <span>Fronted from balance</span>
-                                <span className="tabular-nums">−{fmt(line.cashPosition)}</span>
-                              </div>
-                              {round2(line.reimbursed - line.guaranteedReimbursed) > 0 && (
-                                <div className="flex items-center justify-between text-green-600">
-                                  <span>Reimbursement (balance would&apos;ve gone below ₹0)</span>
-                                  <span className="tabular-nums">+{fmt(line.reimbursed - line.guaranteedReimbursed)}</span>
-                                </div>
-                              )}
-                            </>
+                            <div className="flex items-center justify-between text-gray-400">
+                              <span>Fronted from balance</span>
+                              <span className="tabular-nums">−{fmt(line.cashPosition)}</span>
+                            </div>
                           )}
                           {line.cashPosition > 0 && (
                             <div className="flex items-center justify-between text-red-500">
@@ -757,6 +724,12 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
                       </div>
                     ))}
                   </div>
+                  {topUp > 0.01 && (
+                    <div className="flex items-center justify-between pt-2.5 text-xs">
+                      <span className="text-gray-500">Balance top-up <span className="text-gray-400">(brings their real balance back to ₹0)</span></span>
+                      <span className="tabular-nums font-medium text-green-600">+{fmt(topUp)}</span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between pt-2.5 text-sm font-semibold text-gray-800">
                     <span>Total owed</span>
                     <span className="tabular-nums text-green-600">{fmt(owed)}</span>

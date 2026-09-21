@@ -1,4 +1,6 @@
-import { round2, computeAutoReimbursement } from './reimbursement'
+export function round2(n: number): number {
+  return Math.round(n * 100) / 100
+}
 
 /**
  * Everyone whose cash position/reimbursement needs tracking for a show —
@@ -50,17 +52,17 @@ export function computeEntitlements(
 }
 
 /**
- * How much of a fronted show expense a member's own standing balance (from
- * before this show) already covers. This portion doesn't need to be paid
- * back in real cash — it's already reflected in what they're holding, and
- * the reimbursement floor is: don't ask anyone to pay back money that
- * would've just sat in a positive balance anyway. See `computeShowSettlement`
- * for how the remaining real shortfall (if any) becomes part of what they're
- * owed.
+ * How much to top up a member's real current Band Fund balance back to
+ * ₹0. Only meaningful for someone who fronted money somewhere in this
+ * batch — their balance already has every front and every collection
+ * from every selected show netted into it (it's their actual balance,
+ * not a hypothetical "before this show" figure), so if it's still ≥ ₹0
+ * after all that nets out, nothing ever needs to move: their own money
+ * already covered it. If it's negative, top it up to exactly ₹0 — never
+ * more, since anything beyond that isn't this batch's shortfall to fix.
  */
-export function computeAbsorbedAmount(standingBalanceBeforeShow: number, amountFronted: number): number {
-  const reimbursed = computeAutoReimbursement(standingBalanceBeforeShow, amountFronted)
-  return round2(Math.max(0, amountFronted - reimbursed))
+export function computeBalanceTopUp(currentBalance: number): number {
+  return round2(Math.max(0, -currentBalance))
 }
 
 export interface Payment {
@@ -245,23 +247,23 @@ export interface ShowSettlementInput {
   bandFundHolderId: string
   /** raw cash each involved member handled for this show (credits positive, expenses negative) */
   cashPositions: Record<string, number>
-  /** memberId -> real cash still owed back for a fronted expense, after their own standing balance covers what it can (from computeAbsorbedAmount) */
+  /** memberId -> a guaranteed (category:'reimbursement') expense for this show, always paid back in full on top of their cut. A general fronted expense that isn't tagged 'reimbursement' doesn't go here — see computeBalanceTopUp for how that's made whole, once, batch-wide. */
   reimbursements?: Record<string, number>
 }
 
 export interface ShowSettlementResult {
   /** memberId -> spare cash this show leaves them holding, beyond their own Band Fund obligation if they're the holder. Can be negative (e.g. they fronted an expense). */
   capacity: Record<string, number>
-  /** memberId -> what they're owed from this show — their cut plus any real reimbursement for fronting. */
+  /** memberId -> what they're owed from this show — their cut plus any guaranteed reimbursement. */
   amountOwed: Record<string, number>
 }
 
 /**
  * One show's contribution to the batch: how much spare cash each involved
  * member is left holding (capacity), and how much each is owed (their cut,
- * plus a real reimbursement if they fronted something that wasn't fully
- * absorbed by their own standing balance). Pool these across every show in
- * a batch (poolShowSettlements) before calling routeSettlement.
+ * plus any guaranteed reimbursement for that show). Pool these across every
+ * show in a batch (poolShowSettlements), then add computeBalanceTopUp on
+ * top once per member, batch-wide, before calling routeSettlement.
  */
 export function computeShowSettlement(input: ShowSettlementInput): ShowSettlementResult {
   const capacity: Record<string, number> = {}

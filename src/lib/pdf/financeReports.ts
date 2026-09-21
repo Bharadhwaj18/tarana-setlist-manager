@@ -67,8 +67,7 @@ export interface SplitReportLine {
   showTitle: string
   entitlement: number
   cashPosition: number
-  reimbursed: number
-  /** The guaranteed portion of `reimbursed` — a category:'reimbursement' expense (fuel, etc.), always paid back in full regardless of standing balance. Shown as its own line. */
+  /** A category:'reimbursement' expense (fuel, etc.) for this show, always paid back in full on top of the cut. */
   guaranteedReimbursed: number
   isBandFundHolder: boolean
   bandFundAmount: number
@@ -79,6 +78,8 @@ export interface SplitReportRow {
   name: string
   lines: SplitReportLine[]
   owed: number
+  /** Made whole once, batch-wide, if fronting money anywhere in this split left their real balance negative — not attributable to any one show, so it's its own column rather than folded into a show's line. */
+  balanceTopUp: number
   selfPaid: number
   outgoing: { to: string; amount: number }[]
   incoming: { from: string; amount: number }[]
@@ -114,12 +115,15 @@ export function buildSplitReportPdf(
 
   pdf.paragraph(
     `This report covers ${shows.length} show${shows.length === 1 ? '' : 's'}. Each show's money is split ${bandPct}% ` +
-    `to the Band Fund and the rest equally among everyone who played it. Anyone who spent their own money on a show ` +
-    `gets it back — but only the part that would've taken their own balance below Rs. 0; if their existing balance ` +
-    `already covers it, no cash needs to move for that part. Every payment (including someone covering their own ` +
-    `share from their own Band Fund) is a straightforward payer-to-recipient debit — nobody is ever credited: money ` +
-    `paid out becomes personal the moment it's paid. Each show below is broken down on its own; the overall ` +
-    `settlement and everyone's combined Band Fund appear at the end.`,
+    `to the Band Fund and the rest equally among everyone who played it. A guaranteed expense (fuel, parking — ` +
+    `logged as a reimbursement) is always paid back in full, on top of the cut, for that show. Anyone else who ` +
+    `spent their own money on a show is made whole separately: if fronting it anywhere in this split still leaves ` +
+    `their real Band Fund balance below Rs. 0 once every show here is netted together, they're topped up back to ` +
+    `exactly Rs. 0 — shown as its own "Balance Top-up" column below, since it isn't any one show's expense to ` +
+    `attribute. Every payment (including someone covering their own share from their own Band Fund) is a ` +
+    `straightforward payer-to-recipient debit — nobody is ever credited: money paid out becomes personal the ` +
+    `moment it's paid. Each show below is broken down on its own; the overall settlement and everyone's combined ` +
+    `Band Fund appear at the end.`,
     { gap: 6 }
   )
 
@@ -181,7 +185,7 @@ export function buildSplitReportPdf(
       body: showLines.map(({ r, line }) => [
         r.name,
         fmt(line.entitlement),
-        line.reimbursed > 0 ? fmt(line.reimbursed) : '—',
+        line.guaranteedReimbursed > 0 ? fmt(line.guaranteedReimbursed) : '—',
         fmt(line.owedFromShow),
       ]),
       columnStyles: {
@@ -210,10 +214,6 @@ export function buildSplitReportPdf(
       }
       if (line.cashPosition < 0) {
         lines.push({ label: `${r.name} paid out of pocket for the show`, value: `- ${fmt(line.cashPosition)}`, indent: true, muted: true })
-        const generalReimbursed = line.reimbursed - line.guaranteedReimbursed
-        if (generalReimbursed > 0.01) {
-          lines.push({ label: `Paid back (would’ve dropped ${r.name}'s balance below Rs. 0)`, value: `+ ${fmt(generalReimbursed)}`, indent: true, valueColor: COLORS.positive })
-        }
       }
       if (line.cashPosition > 0) {
         lines.push({ label: `${r.name} collected cash for the show — goes back`, value: `- ${fmt(line.cashPosition)}`, indent: true, valueColor: COLORS.negative })
@@ -262,19 +262,20 @@ export function buildSplitReportPdf(
   autoTable(pdf.doc, {
     ...TABLE_THEME,
     startY: pdf.y,
-    head: [['Member', ...shows.map(s => s.showTitle), 'Total']],
+    head: [['Member', ...shows.map(s => s.showTitle), 'Balance Top-up', 'Total']],
     body: rows.map(r => [
       r.name,
       ...shows.map(s => {
         const line = r.lines.find(l => l.showTitle === s.showTitle)
         return line ? fmt(line.owedFromShow) : '—'
       }),
+      r.balanceTopUp > 0.01 ? fmt(r.balanceTopUp) : '—',
       fmt(r.owed),
     ]),
     columnStyles: { 0: { cellWidth: 'auto' } },
     didParseCell: data => {
       if (data.section === 'body' && data.column.index > 0) data.cell.styles.halign = 'right'
-      if (data.section === 'body' && data.column.index === shows.length + 1) {
+      if (data.section === 'body' && data.column.index === shows.length + 2) {
         data.cell.styles.textColor = COLORS.accentDark
         data.cell.styles.fontStyle = 'bold'
       }

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   computeEntitlements,
-  computeAbsorbedAmount,
+  computeBalanceTopUp,
   routeSettlement,
   computeShowSettlement,
   poolShowSettlements,
@@ -46,16 +46,22 @@ describe('computeEntitlements', () => {
   })
 })
 
-describe('computeAbsorbedAmount', () => {
-  it('absorbs fully when standing balance covers the front', () => {
-    expect(computeAbsorbedAmount(5000, 2000)).toBe(2000)
+describe('computeBalanceTopUp', () => {
+  it('tops up nothing when the current balance already covers everything', () => {
+    // The reported bug: Sujju fronted Rs 20,000 for a show he wasn't
+    // involved in, but also collected Rs 15,000 in another show in the
+    // same batch, and had a healthy balance from before either of them —
+    // his real current balance (Rs 2,999, everything already netted in)
+    // never actually went negative, so nothing needs reimbursing.
+    expect(computeBalanceTopUp(2999)).toBe(0)
   })
-  it('absorbs nothing when standing balance is already zero/negative', () => {
-    expect(computeAbsorbedAmount(0, 2000)).toBe(0)
-    expect(computeAbsorbedAmount(-500, 2000)).toBe(0)
+
+  it('tops up exactly enough to reach zero when the current balance is negative', () => {
+    expect(computeBalanceTopUp(-4000)).toBe(4000)
   })
-  it('partially absorbs up to the standing balance', () => {
-    expect(computeAbsorbedAmount(1200, 2000)).toBe(1200)
+
+  it('is a no-op at exactly zero', () => {
+    expect(computeBalanceTopUp(0)).toBe(0)
   })
 })
 
@@ -124,10 +130,11 @@ describe('routeSettlement — the Babai Tiffins HSR example (canonical)', () => 
     expect(ragaLeftHolding).toBe(bandFundAmount)
   })
 
-  it('a fully-absorbed front simply never becomes a payment — nobody pays it, so it never dents the band fund', () => {
-    // You fronts 20000 for the show but their own standing balance is
-    // healthy enough to absorb all of it, so reimbursements is empty —
-    // exactly the same amountOwed for You as if they'd fronted nothing.
+  it('a negative cash position with no matching reimbursements entry never becomes a payment — computeShowSettlement only applies what it is given, it never decides reimbursement itself', () => {
+    // You fronts 20000 for the show but reimbursements is empty (e.g.
+    // computeBalanceTopUp decided their real balance never went
+    // negative) — exactly the same amountOwed for You as if they'd
+    // fronted nothing.
     const involved = ['bRao', 'raga', 'you']
     const entitlements = { bRao: 11827, raga: 11827, you: 11827 }
     const withFront = computeShowSettlement({
@@ -241,7 +248,7 @@ describe('computeShowSettlement + poolShowSettlements', () => {
       bandFundAmount: 200,
       bandFundHolderId: 'a',
       cashPositions: { a: 1000, b: -300 },
-      reimbursements: { b: 150 }, // b fronted 300, but only 150 wasn't absorbed by standing balance
+      reimbursements: { b: 150 }, // e.g. b fronted 300 total, of which 150 was a guaranteed (category:'reimbursement') expense
     })
     expect(result.capacity.b).toBe(-300)
     expect(result.amountOwed.b).toBe(550)
