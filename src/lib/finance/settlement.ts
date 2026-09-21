@@ -1,5 +1,19 @@
 import { round2, computeAutoReimbursement } from './reimbursement'
 
+/**
+ * Everyone whose cash position/reimbursement needs tracking for a show —
+ * not just the "involved" members (who get an equal-split cut), but also
+ * anyone with a transaction for this show who isn't involved, e.g. someone
+ * who fronted an expense (fuel, a deposit) for a show they didn't perform
+ * in. Without this union, a non-involved member's reimbursement gets
+ * silently dropped: nothing in computeShowSettlement's amountOwed for
+ * them, no line anywhere in the split screen or report — they just never
+ * show up as owed anything.
+ */
+export function settlementMemberIds(involvedMemberIds: string[], transactionMemberIds: string[]): string[] {
+  return [...new Set([...involvedMemberIds, ...transactionMemberIds])]
+}
+
 export interface EntitlementResult {
   /** memberId -> their share of this show's net */
   memberShares: Record<string, number>

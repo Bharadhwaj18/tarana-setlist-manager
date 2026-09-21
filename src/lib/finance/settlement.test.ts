@@ -5,12 +5,30 @@ import {
   routeSettlement,
   computeShowSettlement,
   poolShowSettlements,
+  settlementMemberIds,
   type Payment,
 } from './settlement'
 
 function sumBy(payments: Payment[], key: 'from' | 'to', id: string) {
   return payments.filter(p => p[key] === id).reduce((s, p) => s + p.amount, 0)
 }
+
+describe('settlementMemberIds', () => {
+  it('includes a non-involved member who has a transaction for the show', () => {
+    // The reported bug: Sujju wasn't performing at this show (not
+    // "involved"), but fronted a reimbursable expense for it — he still
+    // needs to show up so he gets paid back.
+    expect(settlementMemberIds(['a', 'b'], ['a', 'sujju'])).toEqual(['a', 'b', 'sujju'])
+  })
+
+  it('is a no-op when every transaction belongs to an involved member', () => {
+    expect(settlementMemberIds(['a', 'b'], ['a', 'b'])).toEqual(['a', 'b'])
+  })
+
+  it('de-duplicates', () => {
+    expect(settlementMemberIds(['a', 'a'], ['a', 'a'])).toEqual(['a'])
+  })
+})
 
 describe('computeEntitlements', () => {
   it('splits equally after the band fund cut', () => {
@@ -227,6 +245,23 @@ describe('computeShowSettlement + poolShowSettlements', () => {
     })
     expect(result.capacity.b).toBe(-300)
     expect(result.amountOwed.b).toBe(550)
+  })
+
+  it('owes a non-involved member their reimbursement, with no cut — the reported bug: Sujju front a show expense without performing at it', () => {
+    // settlementMemberIds(involved, txnMemberIds) is what SplitWizard now
+    // passes as involvedMemberIds — sujju isn't in `involved` (no equal
+    // share, correctly absent from `entitlements`) but is in the union
+    // because he has a transaction, so his reimbursement isn't dropped.
+    const result = computeShowSettlement({
+      involvedMemberIds: settlementMemberIds(['a', 'b'], ['a', 'b', 'sujju']),
+      entitlements: { a: 400, b: 400 }, // sujju gets no entitlement — he wasn't involved
+      bandFundAmount: 200,
+      bandFundHolderId: 'a',
+      cashPositions: { a: 1000, sujju: -100 },
+      reimbursements: { sujju: 100 },
+    })
+    expect(result.amountOwed.sujju).toBe(100)
+    expect(result.capacity.sujju).toBe(-100)
   })
 
   it('pools capacity and amountOwed across multiple shows', () => {

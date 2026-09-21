@@ -3,7 +3,7 @@
 import { useState, useTransition, useMemo } from 'react'
 import { Check, ArrowRight, Download, X, Plus } from 'lucide-react'
 import { splitShows, type ShowSplitInput, type SplitPayment } from '@/actions/finance'
-import { computeEntitlements, computeAbsorbedAmount, computeShowSettlement, poolShowSettlements, routeSettlement, type Payment } from '@/lib/finance/settlement'
+import { computeEntitlements, computeAbsorbedAmount, computeShowSettlement, poolShowSettlements, routeSettlement, settlementMemberIds, type Payment } from '@/lib/finance/settlement'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toaster'
 import { cn } from '@/lib/utils'
@@ -106,6 +106,15 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
       const involved = [...(involvedByShow[show.id] ?? new Set())]
       const showTxns = txnsByShow[show.id] ?? []
 
+      // Anyone who fronted money for this show needs to be paid back even
+      // if they're not "involved" (not entitled to an equal-split cut) —
+      // e.g. someone who covered fuel for a show they didn't perform in.
+      // Everything below that computes cash positions/reimbursements runs
+      // over this wider set; only the equal-split cut itself (memberShares,
+      // via computeEntitlements) stays scoped to `involved`.
+      const txnMemberIds = [...new Set(showTxns.filter(t => t.member_id).map(t => t.member_id as string))]
+      const settlementIds = settlementMemberIds(involved, txnMemberIds)
+
       // A `category: 'reimbursement'` expense (fuel, parking, a personal
       // cost for the show) is a debit like any other for the purposes of
       // net and the equal split — it shrinks net, and everyone's (incl.
@@ -130,7 +139,7 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
       // into "absorbed, no cash needs to move."
       const reimbursements: Record<string, number> = {}
       const guaranteedReimbursements: Record<string, number> = {}
-      for (const id of involved) {
+      for (const id of settlementIds) {
         const cashPosition = cashPositions[id] ?? 0
         const guaranteed = round2(
           showTxns.filter(t => t.member_id === id && t.category === 'reimbursement' && t.amount < 0)
@@ -158,7 +167,7 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
       }
 
       const settlement = computeShowSettlement({
-        involvedMemberIds: involved,
+        involvedMemberIds: settlementIds,
         entitlements: memberShares,
         bandFundAmount,
         bandFundHolderId,
@@ -166,7 +175,7 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
         reimbursements,
       })
 
-      return { show, net, involved, memberShares, bandFundAmount, bandFundHolderId, cashPositions, reimbursements, guaranteedReimbursements, settlement }
+      return { show, net, involved, settlementIds, memberShares, bandFundAmount, bandFundHolderId, cashPositions, reimbursements, guaranteedReimbursements, settlement }
     })
     // netForShow/standingBalanceBeforeBatch derive purely from the args
     // already listed here, and `members` only supplies a fallback id —
@@ -216,7 +225,7 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
   const breakdownByPerson = useMemo(() => {
     const map: Record<string, BreakdownLine[]> = {}
     for (const p of perShow) {
-      for (const id of p.involved) {
+      for (const id of p.settlementIds) {
         const entitlement = p.memberShares[id] ?? 0
         const cashPosition = p.cashPositions[id] ?? 0
         const reimbursed = p.reimbursements[id] ?? 0
@@ -240,8 +249,9 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
   const totalNet = perShow.reduce((s, p) => s + p.net, 0)
   const totalBandFund = perShow.reduce((s, p) => s + p.bandFundAmount, 0)
 
-  // Everyone touched by any selected show, in a stable order.
-  const allInvolvedIds = members.map(m => m.id).filter(id => perShow.some(p => p.involved.includes(id)))
+  // Everyone touched by any selected show, in a stable order — includes
+  // anyone owed a reimbursement even if they weren't "involved" (no cut).
+  const allInvolvedIds = members.map(m => m.id).filter(id => perShow.some(p => p.settlementIds.includes(id)))
 
   // Rounded to the whole rupee — real settlements are always whole-rupee
   // amounts, and `fmt()` only ever displays whole rupees too. Keeping this
@@ -390,7 +400,7 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
           memberName: t.member_id ? realNameOf(t.member_id) : null,
           amount: t.amount,
         })),
-        cuts: p.involved.map(id => ({ name: realNameOf(id), cut: p.memberShares[id] ?? 0, reimbursement: p.guaranteedReimbursements[id] ?? 0 })),
+        cuts: p.settlementIds.map(id => ({ name: realNameOf(id), cut: p.memberShares[id] ?? 0, reimbursement: p.guaranteedReimbursements[id] ?? 0 })),
         bandFundHolderName: realNameOf(p.bandFundHolderId),
         bandFundAmount: p.bandFundAmount,
       }))
@@ -484,16 +494,20 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
                     </div>
 
                     {/* Ideal equal split preview — the plain {bandPct}/{100-bandPct} split, plus
-                        whatever anyone's owed back on top for a guaranteed (fuel etc.) reimbursement */}
-                    {showData && showData.involved.length > 0 && (
+                        whatever anyone's owed back on top for a guaranteed (fuel etc.) reimbursement.
+                        Includes anyone owed a reimbursement even if they're not "involved" (no cut) —
+                        e.g. someone who fronted an expense for a show they didn't perform in. */}
+                    {showData && showData.settlementIds.length > 0 && (
                       <div className="space-y-1 border-t border-brand-100 pt-2 text-xs">
-                        {showData.involved.map(id => {
+                        {showData.settlementIds.map(id => {
                           const cut = showData.memberShares[id] ?? 0
                           const reimbursement = showData.guaranteedReimbursements[id] ?? 0
+                          const notInvolved = !showData.involved.includes(id)
                           return (
                             <div key={id} className="flex items-center justify-between text-gray-600">
                               <span>
                                 {nameOf(id)}
+                                {notInvolved && <span className="ml-1.5 text-[10px] font-medium text-gray-400">(not involved)</span>}
                                 {reimbursement > 0 && <span className="ml-1.5 text-[10px] font-medium text-blue-500">+{fmt(reimbursement)} reimb.</span>}
                               </span>
                               <span className="font-semibold tabular-nums">{fmt(cut + reimbursement)}</span>
@@ -692,10 +706,17 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
                       <div key={i} className="text-xs">
                         <p className="mb-1 font-medium text-gray-500">{line.showTitle}</p>
                         <div className="space-y-0.5 pl-2 text-gray-600">
-                          <div className="flex items-center justify-between">
-                            <span>Equal share</span>
-                            <span className="tabular-nums">+{fmt(line.entitlement)}</span>
-                          </div>
+                          {line.entitlement > 0 ? (
+                            <div className="flex items-center justify-between">
+                              <span>Equal share</span>
+                              <span className="tabular-nums">+{fmt(line.entitlement)}</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-between text-gray-400">
+                              <span>Not involved in this show</span>
+                              <span className="tabular-nums">+{fmt(0)}</span>
+                            </div>
+                          )}
                           {line.guaranteedReimbursed > 0 && (
                             <div className="flex items-center justify-between text-blue-600">
                               <span>Reimbursement (fuel etc. — paid back in full)</span>
