@@ -6,6 +6,7 @@ import { getCachedShow, getCachedAllProfiles, getCachedUser, getCachedEventManag
 import { Button } from '@/components/ui/Button'
 import { DeleteShowButton } from '@/components/shows/DeleteShowButton'
 import { AddTransactionModal } from '@/components/finance/AddTransactionModal'
+import { computeTds } from '@/lib/finance/tds'
 import { cn } from '@/lib/utils'
 
 function fmt(n: number) {
@@ -40,6 +41,14 @@ export default async function ShowDetailPage({ params }: Props) {
 
   const net = (txns ?? []).reduce((s, t) => s + t.amount, 0)
   const isSplit = !!show.split_at
+
+  // TDS to claim is derived from what was actually credited for this show
+  // (the real finance transactions), not the separately-typed "Amount
+  // received" on the show's own edit form — a treasurer who logs income as
+  // a transaction (the normal flow everywhere else in this app) never has
+  // to duplicate that figure just to see the TDS math.
+  const creditsTotal = (txns ?? []).filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0)
+  const { tdsAmount: tdsToClaim, grossFee: tdsGrossFee } = computeTds(creditsTotal, show.tds_percentage ?? 0)
   const date = show.show_date
     ? new Date(show.show_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
     : null
@@ -199,10 +208,10 @@ export default async function ShowDetailPage({ params }: Props) {
               {show.tds_percentage != null && (
                 <div className="flex justify-between"><dt className="text-gray-500">Rate</dt><dd className="font-medium text-gray-800">{show.tds_percentage}%</dd></div>
               )}
-              {show.fee != null && show.tds_amount != null && (
-                <div className="flex justify-between"><dt className="text-gray-500">Gross fee</dt><dd className="font-medium text-gray-800">{fmt(show.fee + show.tds_amount)}</dd></div>
+              {creditsTotal > 0 && (
+                <div className="flex justify-between"><dt className="text-gray-500">Gross fee</dt><dd className="font-medium text-gray-800">{fmt(tdsGrossFee)}</dd></div>
               )}
-              <div className="flex justify-between"><dt className="text-gray-500">TDS to claim</dt><dd className="font-medium text-gray-800">{show.tds_amount != null ? fmt(show.tds_amount) : '—'}</dd></div>
+              <div className="flex justify-between"><dt className="text-gray-500">TDS to claim</dt><dd className="font-medium text-gray-800">{creditsTotal > 0 ? fmt(tdsToClaim) : '—'}</dd></div>
               <div className="flex justify-between">
                 <dt className="text-gray-500">Filed</dt>
                 <dd className={cn('font-medium', show.tds_filed ? 'text-green-600' : 'text-amber-600')}>{show.tds_filed ? 'Yes' : 'Not yet'}</dd>

@@ -1,8 +1,8 @@
 import Link from 'next/link'
 import { ChevronLeft, Plus, CalendarDays } from 'lucide-react'
 import { SetlistForm } from '@/components/setlists/SetlistForm'
-import { createSetlist } from '@/actions/setlists'
-import { getCachedShow, getCachedShows } from '@/lib/data'
+import { createSetlist, createSetlistFromShow } from '@/actions/setlists'
+import { getCachedShow, getCachedShows, getCachedSetlistsByShow } from '@/lib/data'
 import { todayISO, isUpcoming } from '@/lib/shows'
 
 interface Props {
@@ -18,10 +18,13 @@ export default async function NewSetlistPage({ searchParams }: Props) {
   // when a show record already has all of it. `?blank=1` skips straight to
   // the plain form (used by the "start blank" link below).
   if (!show && !blank) {
-    const shows = await getCachedShows()
+    const [shows, setlistsByShow] = await Promise.all([getCachedShows(), getCachedSetlistsByShow()])
     const today = todayISO()
+    // A show that already has a setlist has nothing left to quick-pick for
+    // — skip it so the next upcoming show without one takes its place.
+    const showIdsWithSetlist = new Set(setlistsByShow.map(s => s.show_id))
     const upcoming = shows
-      .filter(s => isUpcoming(s.show_date, today))
+      .filter(s => isUpcoming(s.show_date, today) && !showIdsWithSetlist.has(s.id))
       .sort((a, b) => (a.show_date ?? '').localeCompare(b.show_date ?? ''))
       .slice(0, 3)
 
@@ -32,26 +35,27 @@ export default async function NewSetlistPage({ searchParams }: Props) {
         </Link>
         <h1 className="mb-1 text-2xl font-bold text-gray-900">New Setlist</h1>
         <p className="mb-7 text-sm text-gray-500">
-          {upcoming.length > 0 ? 'Pick an upcoming show to reuse its details, or start blank.' : 'Give your setlist a title to get started.'}
+          {upcoming.length > 0 ? 'Pick an upcoming show to create its setlist immediately, or start blank.' : 'Give your setlist a title to get started.'}
         </p>
 
         {upcoming.length > 0 && (
           <div className="mb-6 space-y-2">
             {upcoming.map(s => (
-              <Link
-                key={s.id}
-                href={`/setlists/new?showId=${s.id}`}
-                className="flex items-center justify-between rounded-lg border border-brand-200 bg-white px-4 py-3 shadow-sm transition-colors hover:border-brand-400 hover:bg-brand-50"
-              >
-                <div>
-                  <p className="font-medium text-gray-900">{s.title}</p>
-                  <p className="text-xs text-gray-400">
-                    {s.show_date && new Date(s.show_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'long' })}
-                    {s.venue ? ` · ${s.venue}` : ''}
-                  </p>
-                </div>
-                <CalendarDays className="h-4 w-4 shrink-0 text-brand-300" />
-              </Link>
+              <form key={s.id} action={createSetlistFromShow.bind(null, s.id)}>
+                <button
+                  type="submit"
+                  className="flex w-full items-center justify-between rounded-lg border border-brand-200 bg-white px-4 py-3 text-left shadow-sm transition-colors hover:border-brand-400 hover:bg-brand-50"
+                >
+                  <div>
+                    <p className="font-medium text-gray-900">{s.title}</p>
+                    <p className="text-xs text-gray-400">
+                      {s.show_date && new Date(s.show_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'long' })}
+                      {s.venue ? ` · ${s.venue}` : ''}
+                    </p>
+                  </div>
+                  <CalendarDays className="h-4 w-4 shrink-0 text-brand-300" />
+                </button>
+              </form>
             ))}
           </div>
         )}

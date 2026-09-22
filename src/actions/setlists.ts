@@ -34,6 +34,26 @@ export async function createSetlist(data: SetlistFormData) {
   redirect(`/setlists/${setlist.id}`)
 }
 
+/**
+ * The "New Setlist" picker's quick-pick path: a show's title/date/venue is
+ * already sitting on its own record, so picking it creates the setlist
+ * immediately — no intermediate form to re-confirm details that were just
+ * shown on the picker card itself. Only the blank ("start from scratch")
+ * option still goes through SetlistForm.
+ */
+export async function createSetlistFromShow(showId: string) {
+  const supabase = await createClient()
+  const { data: show } = await supabase.from('shows').select('title, show_date, venue').eq('id', showId).single()
+  if (!show) throw new Error('Show not found')
+
+  await createSetlist({
+    title: show.title,
+    show_date: show.show_date ?? undefined,
+    venue: show.venue ?? undefined,
+    show_id: showId,
+  })
+}
+
 export async function updateSetlist(id: string, data: SetlistFormData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

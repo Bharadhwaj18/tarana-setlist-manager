@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
 import { Textarea } from '@/components/ui/Textarea'
 import { cn } from '@/lib/utils'
+import { computeTds } from '@/lib/finance/tds'
 import type { ShowFormData } from '@/lib/validators'
 import type { Show, EventManagement } from '@/types'
 import { BOOKING_STATUSES, SHOW_FORMATS } from '@/types/shows'
@@ -22,19 +23,6 @@ const DIRECT_BOOKING = 'direct'
 
 function fmt(n: number) {
   return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
-}
-
-/**
- * `fee` is what actually hit the bank account (after TDS was withheld at
- * source), not the pre-tax contract value — so TDS is the OTHER
- * percentage, not a cut out of fee itself. e.g. fee ₹90,000 at a 10% TDS
- * rate means ₹90,000 is the 90% received, and the 10% still to claim via
- * the certificate is ₹10,000 (fee/(1-rate) - fee), not ₹9,000.
- */
-function computeTds(fee: number, tdsPercentage: number) {
-  if (!fee || !tdsPercentage || tdsPercentage <= 0 || tdsPercentage >= 100) return { tdsAmount: 0, grossFee: fee }
-  const grossFee = fee / (1 - tdsPercentage / 100)
-  return { tdsAmount: grossFee - fee, grossFee }
 }
 
 function fieldsFrom(show: Show | undefined, initialDate: string | undefined) {
