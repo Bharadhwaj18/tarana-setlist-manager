@@ -146,7 +146,7 @@ export function BulkImportModal({ setlistId, existingSongs, currentSongTitles }:
         title={step === 'input' ? 'Bulk Import Songs' : `Match ${unmatched.length} unmatched song${unmatched.length !== 1 ? 's' : ''}`}
         description={
           step === 'input'
-            ? 'Paste a numbered setlist. Songs are auto-created in the library if they don\'t exist.'
+            ? 'Paste a setlist, numbered or not. Songs are auto-created in the library if they don\'t exist.'
             : 'Search your library for each song, or leave blank to create a new entry.'
         }
         className="max-w-2xl"
@@ -176,7 +176,7 @@ export function BulkImportModal({ setlistId, existingSongs, currentSongTitles }:
             <textarea
               className="w-full rounded-md border border-brand-200 bg-white px-3 py-2.5 font-mono text-sm leading-relaxed placeholder-gray-400 focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
               rows={10}
-              placeholder={`Paste your setlist here, e.g.:\n\nMain Set\n1. Manovega E\n2. Om shivoham C#\n3. Aigiri D\n\nExtra\n1. Nagumo C\n2. Baaro krishnayya`}
+              placeholder={`Paste your setlist here, e.g.:\n\nMain Set\n1. Manovega E\n2. Om shivoham C#\n3. Aigiri D\n\nExtra\n1. Nagumo C\n2. Baaro krishnayya\n\nOr, with no numbering at all (one section, auto-numbered):\n\nManovega E\nOm shivoham C#\nAigiri D`}
               value={text}
               onChange={e => setText(e.target.value)}
               autoFocus
@@ -247,7 +247,7 @@ export function BulkImportModal({ setlistId, existingSongs, currentSongTitles }:
 
             {!parsed.length && text.trim() && (
               <p className="text-sm text-brand-500">
-                No numbered items detected. Make sure lines start with a number like &ldquo;1. Song title&rdquo;.
+                No songs detected — check for stray punctuation or blank lines.
               </p>
             )}
 

@@ -13,37 +13,52 @@ const NUMBERED_ITEM_RE = /^\d+[.)]\s+(.+)/
 
 const DEFAULT_SECTION = 'Main Set'
 
+// Shared by both the numbered and plain-list paths: strips trailing
+// punctuation, pulls a trailing musical key off the title if present, and
+// falls back to the un-stripped title if stripping the key would leave
+// nothing behind.
+function parseSongLine(rawTitle: string, section: string): ParsedSong | null {
+  const stripped = rawTitle.replace(/[!?]+$/, '').trim()
+  const keyMatch = stripped.match(KEY_SUFFIX_RE)
+  let title = stripped
+  let song_key: string | undefined
+
+  if (keyMatch && keyMatch.index !== undefined) {
+    song_key = keyMatch[1]
+    title = stripped.slice(0, keyMatch.index).trim()
+    if (!title) title = stripped
+  }
+
+  return title ? { title, song_key, section } : null
+}
+
 export function parseSetlistText(text: string): ParsedSong[] {
-  const lines = text.split('\n')
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
+  if (lines.length === 0) return []
+
+  // A plain list with no numbering anywhere — every line is a song, one
+  // per line, auto-numbered later on the way out (see
+  // serializeSetlistText). Without at least one numbered line as a signal,
+  // there's no way left to tell a section header apart from a song title,
+  // so this deliberately doesn't support sections: paste with numbers
+  // (even just on the section headers) if you need more than one.
+  if (!lines.some(l => NUMBERED_ITEM_RE.test(l))) {
+    const songs: ParsedSong[] = []
+    for (const line of lines) {
+      const song = parseSongLine(line, DEFAULT_SECTION)
+      if (song) songs.push(song)
+    }
+    return songs
+  }
+
   const songs: ParsedSong[] = []
   let currentSection = DEFAULT_SECTION
 
-  for (const rawLine of lines) {
-    const line = rawLine.trim()
-    if (!line) continue
-
+  for (const line of lines) {
     const itemMatch = line.match(NUMBERED_ITEM_RE)
     if (itemMatch) {
-      // It's a song entry
-      const rawTitle = itemMatch[1].trim()
-
-      // Strip trailing punctuation before key detection
-      const stripped = rawTitle.replace(/[!?]+$/, '').trim()
-
-      const keyMatch = stripped.match(KEY_SUFFIX_RE)
-      let title = stripped
-      let song_key: string | undefined
-
-      if (keyMatch && keyMatch.index !== undefined) {
-        song_key = keyMatch[1]
-        title = stripped.slice(0, keyMatch.index).trim()
-        // Sanity check: title shouldn't be empty after stripping key
-        if (!title) title = stripped
-      }
-
-      if (title) {
-        songs.push({ title, song_key, section: currentSection })
-      }
+      const song = parseSongLine(itemMatch[1].trim(), currentSection)
+      if (song) songs.push(song)
     } else {
       // Treat as section header — strip trailing punctuation/colons
       const sectionName = line.replace(/[!?:]+$/, '').trim()

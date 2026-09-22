@@ -47,6 +47,37 @@ describe('parseSetlistText', () => {
   })
 })
 
+describe('parseSetlistText — plain, non-numbered list', () => {
+  it('treats every line as a song under the default section when nothing in the paste is numbered', () => {
+    const result = parseSetlistText('Manovega E\nOm shivoham C#\nAigiri D')
+    expect(result).toEqual([
+      { title: 'Manovega', song_key: 'E', section: 'Main Set' },
+      { title: 'Om shivoham', song_key: 'C#', section: 'Main Set' },
+      { title: 'Aigiri', song_key: 'D', section: 'Main Set' },
+    ])
+  })
+
+  it('handles a single unnumbered line', () => {
+    expect(parseSetlistText('Manovega E')).toEqual([{ title: 'Manovega', song_key: 'E', section: 'Main Set' }])
+  })
+
+  it('a line that would otherwise read as a section header is still a song, since nothing here is numbered', () => {
+    const result = parseSetlistText('Main Set\nManovega E\nAigiri D')
+    expect(result).toEqual([
+      { title: 'Main Set', song_key: undefined, section: 'Main Set' },
+      { title: 'Manovega', song_key: 'E', section: 'Main Set' },
+      { title: 'Aigiri', song_key: 'D', section: 'Main Set' },
+    ])
+  })
+
+  it('a single numbered line anywhere in the paste switches the whole thing back to section-aware parsing', () => {
+    // "Manovega E" isn't numbered, so once numbering appears anywhere it's
+    // read as a section header, same as the original numbered-only rule.
+    const result = parseSetlistText('Manovega E\n1. Aigiri D')
+    expect(result).toEqual([{ title: 'Aigiri', song_key: 'D', section: 'Manovega E' }])
+  })
+})
+
 describe('serializeSetlistText', () => {
   it('numbers songs within a section starting at 1', () => {
     const text = serializeSetlistText([
