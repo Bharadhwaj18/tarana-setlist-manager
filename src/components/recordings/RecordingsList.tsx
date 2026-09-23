@@ -93,8 +93,15 @@ function SongTagPicker({ songs, currentSongId, onSelect, onClose }: {
 
 export function RecordingsList({ recordings, songs }: Props) {
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const [playingId, setPlayingId] = useState<string | null>(null)
-  const [currentTime, setCurrentTime] = useState(0) // seconds, current playing row only
+  // `activeId` is whichever recording is currently loaded into the shared
+  // <audio> element — it stays set across a pause, unlike a single
+  // "playingId". Reassigning `audio.src` reloads the element from scratch
+  // (resets position to 0), so re-fetching a signed URL and re-setting
+  // `src` must only happen when actually switching to a *different*
+  // recording, never on a plain pause/resume of the one already loaded.
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const [isPlayingNow, setIsPlayingNow] = useState(false)
+  const [currentTime, setCurrentTime] = useState(0) // seconds, active row only
   const [liveDuration, setLiveDuration] = useState<number | null>(null) // from the audio element once its metadata loads
   const [editingId, setEditingId] = useState<string | null>(null)
   const [renameDraft, setRenameDraft] = useState('')
@@ -107,9 +114,15 @@ export function RecordingsList({ recordings, songs }: Props) {
     const audio = audioRef.current
     if (!audio) return
 
-    if (playingId === recording.id) {
-      audio.pause()
-      setPlayingId(null)
+    if (activeId === recording.id) {
+      // Already loaded — just pause/resume in place, keeping position.
+      if (isPlayingNow) {
+        audio.pause()
+        setIsPlayingNow(false)
+      } else {
+        await audio.play()
+        setIsPlayingNow(true)
+      }
       return
     }
 
@@ -123,7 +136,8 @@ export function RecordingsList({ recordings, songs }: Props) {
       }
       audio.src = data.signedUrl
       await audio.play()
-      setPlayingId(recording.id)
+      setActiveId(recording.id)
+      setIsPlayingNow(true)
       setCurrentTime(0)
       setLiveDuration(null)
     } catch {
@@ -200,12 +214,20 @@ export function RecordingsList({ recordings, songs }: Props) {
         ref={audioRef}
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
-        onEnded={() => { setPlayingId(null); setCurrentTime(0); setLiveDuration(null) }}
+        onEnded={() => {
+          // A natural end-of-track rewind, unlike a user-initiated pause —
+          // only this resets position, so replaying starts over instead of
+          // trying to play from the end.
+          if (audioRef.current) audioRef.current.currentTime = 0
+          setIsPlayingNow(false)
+          setCurrentTime(0)
+        }}
         className="hidden"
       />
 
       {recordings.map(r => {
-        const isPlaying = playingId === r.id
+        const isActive = activeId === r.id
+        const isPlaying = isActive && isPlayingNow
         const isEditing = editingId === r.id
         const isTagging = taggingId === r.id
         const isBusy = busyId === r.id
@@ -276,7 +298,7 @@ export function RecordingsList({ recordings, songs }: Props) {
               </button>
             </div>
 
-            {isPlaying && (
+            {isActive && (
               <div className="mt-2 flex items-center gap-2">
                 <span className="w-9 shrink-0 text-right text-[10px] tabular-nums text-gray-400">{formatDuration(currentTime)}</span>
                 <input
