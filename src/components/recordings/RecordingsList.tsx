@@ -94,8 +94,10 @@ function SongTagPicker({ songs, currentSongId, onSelect, onClose }: {
 export function RecordingsList({ recordings, songs }: Props) {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [playingId, setPlayingId] = useState<string | null>(null)
-  const [progress, setProgress] = useState(0) // 0-1, current playing row only
+  const [currentTime, setCurrentTime] = useState(0) // seconds, current playing row only
+  const [liveDuration, setLiveDuration] = useState<number | null>(null) // from the audio element once its metadata loads
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [renameDraft, setRenameDraft] = useState('')
   const [taggingId, setTaggingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -122,7 +124,8 @@ export function RecordingsList({ recordings, songs }: Props) {
       audio.src = data.signedUrl
       await audio.play()
       setPlayingId(recording.id)
-      setProgress(0)
+      setCurrentTime(0)
+      setLiveDuration(null)
     } catch {
       toast('Failed to play recording', 'error')
     } finally {
@@ -132,13 +135,33 @@ export function RecordingsList({ recordings, songs }: Props) {
 
   const handleTimeUpdate = () => {
     const audio = audioRef.current
-    if (!audio || !audio.duration) return
-    setProgress(audio.currentTime / audio.duration)
+    if (!audio) return
+    setCurrentTime(audio.currentTime)
   }
 
-  const startEditing = (recording: RecordingWithSong) => setEditingId(recording.id)
+  const handleLoadedMetadata = () => {
+    const audio = audioRef.current
+    if (audio && Number.isFinite(audio.duration)) setLiveDuration(audio.duration)
+  }
 
-  const handleRenameSubmit = async (id: string, title: string) => {
+  // Dragging or tapping anywhere on the slider jumps playback there — a
+  // passive progress bar isn't a player, being able to jump to a section
+  // is the whole point.
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const audio = audioRef.current
+    if (!audio) return
+    const value = Number(e.target.value)
+    audio.currentTime = value
+    setCurrentTime(value)
+  }
+
+  const startEditing = (recording: RecordingWithSong) => {
+    setEditingId(recording.id)
+    setRenameDraft(recording.title)
+  }
+
+  const handleRenameSave = async (id: string) => {
+    const title = renameDraft
     setEditingId(null)
     if (!title.trim()) return
     const result = await renameRecording(id, title)
@@ -176,7 +199,8 @@ export function RecordingsList({ recordings, songs }: Props) {
       <audio
         ref={audioRef}
         onTimeUpdate={handleTimeUpdate}
-        onEnded={() => { setPlayingId(null); setProgress(0) }}
+        onLoadedMetadata={handleLoadedMetadata}
+        onEnded={() => { setPlayingId(null); setCurrentTime(0); setLiveDuration(null) }}
         className="hidden"
       />
 
@@ -200,16 +224,24 @@ export function RecordingsList({ recordings, songs }: Props) {
 
               <div className="min-w-0 flex-1">
                 {isEditing ? (
-                  <input
-                    autoFocus
-                    defaultValue={r.title}
-                    onBlur={e => handleRenameSubmit(r.id, e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') e.currentTarget.blur()
-                      if (e.key === 'Escape') setEditingId(null)
-                    }}
-                    className="w-full rounded border border-brand-300 px-1.5 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-400"
-                  />
+                  <div className="flex items-center gap-1">
+                    <input
+                      autoFocus
+                      value={renameDraft}
+                      onChange={e => setRenameDraft(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') handleRenameSave(r.id)
+                        if (e.key === 'Escape') setEditingId(null)
+                      }}
+                      className="w-full min-w-0 rounded border border-brand-300 px-1.5 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-400"
+                    />
+                    <button onClick={() => handleRenameSave(r.id)} className="shrink-0 text-brand-600 hover:text-brand-800" aria-label="Save">
+                      <Check className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => setEditingId(null)} className="shrink-0 text-gray-400 hover:text-gray-600" aria-label="Cancel">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
                 ) : (
                   <button onClick={() => startEditing(r)} className="group flex items-center gap-1.5 truncate text-left">
                     <span className="truncate text-sm font-medium text-gray-900">{r.title}</span>
@@ -245,8 +277,19 @@ export function RecordingsList({ recordings, songs }: Props) {
             </div>
 
             {isPlaying && (
-              <div className="mt-2 h-1 overflow-hidden rounded-full bg-brand-100">
-                <div className="h-full rounded-full bg-brand-400 transition-[width]" style={{ width: `${progress * 100}%` }} />
+              <div className="mt-2 flex items-center gap-2">
+                <span className="w-9 shrink-0 text-right text-[10px] tabular-nums text-gray-400">{formatDuration(currentTime)}</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={liveDuration ?? r.duration_seconds ?? 0}
+                  step={0.1}
+                  value={Math.min(currentTime, liveDuration ?? r.duration_seconds ?? 0)}
+                  onChange={handleSeek}
+                  className="h-1 flex-1 cursor-pointer accent-brand-400"
+                  aria-label="Seek"
+                />
+                <span className="w-9 shrink-0 text-[10px] tabular-nums text-gray-400">{formatDuration(liveDuration ?? r.duration_seconds)}</span>
               </div>
             )}
 
