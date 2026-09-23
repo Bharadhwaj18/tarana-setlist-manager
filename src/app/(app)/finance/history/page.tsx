@@ -25,6 +25,14 @@ export default async function FinanceHistoryPage() {
 
   const showTitleById = Object.fromEntries((shows ?? []).map(s => [s.id, s.title]))
 
+  // category:'split' already has its own dedicated Split History page —
+  // showing it here too is just duplication. Filtered in JS rather than a
+  // query-level .neq('category', 'split'): that operator excludes rows
+  // where category IS NULL too (Postgres's <> is NULL, not true, for a
+  // NULL operand), which would have silently hidden every transaction with
+  // no category at all.
+  const historyTxns = (txns ?? []).filter(t => t.category !== 'split')
+
   return (
     <div className="max-w-2xl">
       <Link href="/finance" className="mb-6 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
@@ -36,10 +44,10 @@ export default async function FinanceHistoryPage() {
           Split History →
         </Link>
       </div>
-      <p className="mb-6 text-sm text-gray-500">Every transaction — Misc, show income and expenses, and every split.</p>
+      <p className="mb-6 text-sm text-gray-500">Every transaction — Misc, show income and expenses. Splits are in Split History.</p>
 
       <FinanceHistoryList
-        transactions={txns ?? []}
+        transactions={historyTxns}
         members={members}
         shows={shows ?? []}
         showTitleById={showTitleById}

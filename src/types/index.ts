@@ -12,6 +12,7 @@ export type { EventManagement, EventManagementInsert, EventManagementUpdate } fr
 export type { AppNotification, AppNotificationInsert, AppNotificationUpdate, PushSubscriptionRow, PushSubscriptionInsert, NotificationItem } from './notifications'
 export type { Unavailability, UnavailabilityInsert, UnavailabilityUpdate } from './unavailability'
 export type { CalendarEvent, CalendarEventInsert, CalendarEventUpdate } from './calendar-event'
+export type { Recording, RecordingInsert, RecordingUpdate, RecordingWithSong } from './recording'
 
 export type SongInsert = Omit<Song, 'id' | 'created_at' | 'updated_at' | 'created_by'>
 export type SongUpdate = Partial<SongInsert>

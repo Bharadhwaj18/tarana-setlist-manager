@@ -157,3 +157,15 @@ export const getCachedCalendarEvents = cache(async () => {
   const { data } = await supabase.from('calendar_events').select('*').order('start_date')
   return data ?? []
 })
+
+// Voice memos, newest first, with the tagged song's title joined in (if
+// any) for the list's optional tag badge — same join pattern as
+// getCachedSetlistSongs.
+export const getCachedRecordings = cache(async () => {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('recordings')
+    .select('*, song:songs(id, title)')
+    .order('created_at', { ascending: false })
+  return data ?? []
+})

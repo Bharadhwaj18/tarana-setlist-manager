@@ -580,6 +580,46 @@ export type Database = {
         }
         Relationships: []
       }
+      recordings: {
+        Row: {
+          id: string
+          title: string
+          file_path: string
+          duration_seconds: number
+          mime_type: string
+          song_id: string | null
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          file_path: string
+          duration_seconds: number
+          mime_type: string
+          song_id?: string | null
+          created_by: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          file_path?: string
+          duration_seconds?: number
+          mime_type?: string
+          song_id?: string | null
+          created_by?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recordings_song_id_fkey"
+            columns: ["song_id"]
+            referencedRelation: "songs"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: { [_ in never]: never }
     Functions: { [_ in never]: never }
