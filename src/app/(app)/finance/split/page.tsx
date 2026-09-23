@@ -5,7 +5,6 @@ import { createClient } from '@/lib/supabase/server'
 import { getCachedAllProfiles, getCachedUser } from '@/lib/data'
 import { todayISO, isUpcoming } from '@/lib/shows'
 import { SplitWizard } from '@/components/finance/SplitWizard'
-import { FinanceFloatingNav } from '@/components/finance/FinanceFloatingNav'
 import type { FinanceTransaction } from '@/types/finance'
 
 export default async function SplitPage() {
@@ -80,8 +79,6 @@ export default async function SplitPage() {
         memberBalances={balances}
         memberFundBalances={fundBalances}
       />
-
-      <FinanceFloatingNav hasUnsplitShows={shows.length > 0} />
     </div>
   )
 }

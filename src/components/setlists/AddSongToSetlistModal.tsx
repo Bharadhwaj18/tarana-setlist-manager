@@ -28,6 +28,22 @@ export function AddSongToSetlistModal({ setlistId, allSongs, currentSongIds, ava
   const [, startTransition] = useTransition()
   const toast = useToast()
 
+  // Render-time state reset — this modal's own component stays mounted
+  // across the whole page visit, so its local copies of currentSongIds/
+  // allSongs would otherwise stay frozen at whatever they were when the
+  // page first loaded, even after a song gets added elsewhere (Bulk
+  // Import) and the server sends fresh props down.
+  const [prevCurrentSongIds, setPrevCurrentSongIds] = useState(currentSongIds)
+  if (currentSongIds !== prevCurrentSongIds) {
+    setPrevCurrentSongIds(currentSongIds)
+    setAddedIds(currentSongIds)
+  }
+  const [prevAllSongs, setPrevAllSongs] = useState(allSongs)
+  if (allSongs !== prevAllSongs) {
+    setPrevAllSongs(allSongs)
+    setLocalSongs(allSongs)
+  }
+
   const q = query.trim()
 
   const scored = q

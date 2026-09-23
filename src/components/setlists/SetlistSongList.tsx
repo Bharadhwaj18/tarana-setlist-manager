@@ -29,6 +29,17 @@ interface SetlistSongListProps {
 
 export function SetlistSongList({ setlistId, initialItems }: SetlistSongListProps) {
   const [items, setItems] = useState(initialItems)
+  // Render-time state reset (no useEffect, same pattern used elsewhere in
+  // this app) — a song added via the "Add Songs"/"Bulk Import" modals
+  // lives outside this component, so the only way this list finds out is
+  // through the fresh `initialItems` the server sends after its
+  // revalidatePath. Without this, local `items` stays exactly as it was
+  // at mount forever, and the new song only shows up after a hard reload.
+  const [prevInitialItems, setPrevInitialItems] = useState(initialItems)
+  if (initialItems !== prevInitialItems) {
+    setPrevInitialItems(initialItems)
+    setItems(initialItems)
+  }
   const toast = useToast()
 
   const sensors = useSensors(
