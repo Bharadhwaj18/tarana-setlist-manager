@@ -2,13 +2,15 @@ import { notFound } from 'next/navigation'
 import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { ChevronLeft, Pencil, Clock, Hash, Music } from 'lucide-react'
-import { getCachedSong, getCachedAllProfiles, getCachedSetlistSongs, getCachedUser } from '@/lib/data'
+import { getCachedSong, getCachedAllProfiles, getCachedSetlistSongs, getCachedUser, getCachedRecordings, getCachedSongs } from '@/lib/data'
 import { ChordViewer } from '@/components/songs/ChordViewer'
 import { ActiveSetlistSync } from '@/components/setlists/ActiveSetlistSync'
+import { RecordingsList } from '@/components/recordings/RecordingsList'
 import { Button } from '@/components/ui/Button'
 import { DeleteSongButton } from '@/components/songs/DeleteSongButton'
 import { SongPdfExport } from '@/components/pdf/SongPdfExport'
 import { ACTIVE_SETLIST_COOKIE } from '@/lib/setlist-context'
+import type { RecordingWithSong } from '@/types'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -30,14 +32,18 @@ export default async function SongPage({ params, searchParams }: Props) {
   const setlistId = explicitSetlistId ?? cookieSetlistId
   const canonicalFrom = setlistId ? `/setlists/${setlistId}` : null
 
-  const [song, profiles, { data: { user } }, setlistSongs] = await Promise.all([
+  const [song, profiles, { data: { user } }, setlistSongs, recordings, allSongs] = await Promise.all([
     getCachedSong(id),
     getCachedAllProfiles(),
     getCachedUser(),
     setlistId ? getCachedSetlistSongs(setlistId) : Promise.resolve([]),
+    getCachedRecordings(),
+    getCachedSongs(),
   ])
 
   if (!song) notFound()
+
+  const taggedRecordings = (recordings as RecordingWithSong[]).filter(r => r.song_id === id)
 
   const nameOf = (uid: string) =>
     uid === user?.id ? 'You' : (profiles.find(p => p.id === uid)?.display_name ?? 'Band member')
@@ -97,6 +103,18 @@ export default async function SongPage({ params, searchParams }: Props) {
         <div className="mb-6 rounded-lg bg-brand-50 px-4 py-3 text-sm text-brand-700 ring-1 ring-brand-200">
           <strong className="block mb-1">Notes</strong>
           <span className="whitespace-pre-wrap">{song.notes}</span>
+        </div>
+      )}
+
+      {/* Recordings tagged to this song — reuses the same list component as
+          /recordings, filtered down to this song's own tag. */}
+      {taggedRecordings.length > 0 && (
+        <div className="mb-6">
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">Recordings</h2>
+          <RecordingsList
+            recordings={taggedRecordings}
+            songs={allSongs.map(s => ({ id: s.id, title: s.title }))}
+          />
         </div>
       )}
 

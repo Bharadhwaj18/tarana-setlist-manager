@@ -13,6 +13,18 @@ interface CreateRecordingInput {
   songId?: string | null
 }
 
+// A tagged recording also shows up on that song's own page (RecordingsList,
+// reused there) — every write here needs to revalidate both /recordings
+// and any song page(s) it could affect, not just /recordings, or an edit
+// made from the song page silently wouldn't show up there until a hard
+// reload.
+function revalidateRecordingPaths(...songIds: (string | null | undefined)[]) {
+  revalidatePath('/recordings')
+  for (const songId of songIds) {
+    if (songId) revalidatePath(`/songs/${songId}`)
+  }
+}
+
 // The audio blob itself is already sitting in Storage by the time this
 // runs — uploaded straight from the browser (see lib/audio-recorder.ts),
 // not routed through this action, since a several-MB voice memo would
@@ -33,7 +45,7 @@ export async function createRecording(input: CreateRecordingInput): Promise<{ er
   }).select('id').single()
   if (error) return { error: error.message }
 
-  revalidatePath('/recordings')
+  revalidateRecordingPaths(input.songId)
   return { id: data.id }
 }
 
@@ -42,19 +54,25 @@ export async function renameRecording(id: string, title: string): Promise<{ erro
   if (!trimmed) return { error: 'Title is required' }
 
   const supabase = await createClient()
-  const { error } = await supabase.from('recordings').update({ title: trimmed }).eq('id', id)
+  const { data, error } = await supabase.from('recordings').update({ title: trimmed }).eq('id', id).select('song_id').maybeSingle()
   if (error) return { error: error.message }
 
-  revalidatePath('/recordings')
+  revalidateRecordingPaths(data?.song_id)
   return {}
 }
 
 export async function tagRecordingToSong(id: string, songId: string | null): Promise<{ error?: string }> {
   const supabase = await createClient()
+
+  // The previous tag needs revalidating too — moving a recording off a
+  // song should make it disappear from that song's page, not just make it
+  // appear on the new one.
+  const { data: before } = await supabase.from('recordings').select('song_id').eq('id', id).maybeSingle()
+
   const { error } = await supabase.from('recordings').update({ song_id: songId }).eq('id', id)
   if (error) return { error: error.message }
 
-  revalidatePath('/recordings')
+  revalidateRecordingPaths(before?.song_id, songId)
   return {}
 }
 
@@ -63,7 +81,7 @@ export async function deleteRecording(id: string): Promise<{ error?: string }> {
 
   const { data: recording, error: fetchError } = await supabase
     .from('recordings')
-    .select('file_path')
+    .select('file_path, song_id')
     .eq('id', id)
     .maybeSingle()
   if (fetchError) return { error: fetchError.message }
@@ -78,6 +96,6 @@ export async function deleteRecording(id: string): Promise<{ error?: string }> {
     await supabase.storage.from(BUCKET).remove([recording.file_path])
   }
 
-  revalidatePath('/recordings')
+  revalidateRecordingPaths(recording?.song_id)
   return {}
 }

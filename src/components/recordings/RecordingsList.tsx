@@ -1,13 +1,15 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { Play, Pause, Pencil, Trash2, Tag, X } from 'lucide-react'
+import { Play, Pause, Pencil, Trash2, Tag, X, Search, Check } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/Toaster'
 import { createClient } from '@/lib/supabase/client'
 import { renameRecording, tagRecordingToSong, deleteRecording } from '@/actions/recordings'
 import { formatDuration } from '@/lib/audio-recorder'
+import { similarity, FUZZY_THRESHOLD } from '@/lib/fuzzy'
+import { cn } from '@/lib/utils'
 import type { RecordingWithSong } from '@/types'
 
 const BUCKET = 'recordings'
@@ -20,6 +22,73 @@ interface Props {
 
 function dateLabel(iso: string) {
   return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+}
+
+// Same fuzzy-search-then-list pattern as AddSongToSetlistModal/
+// BulkImportModal's resolve step — a plain <select> doesn't scale once the
+// song library gets big enough that scrolling through it to tag one
+// recording becomes the slow part.
+function SongTagPicker({ songs, currentSongId, onSelect, onClose }: {
+  songs: Song[]
+  currentSongId: string | null
+  onSelect: (songId: string | null) => void
+  onClose: () => void
+}) {
+  const [query, setQuery] = useState('')
+  const q = query.trim()
+  const results = (q
+    ? songs
+        .map(s => ({ song: s, score: similarity(q, s.title) }))
+        .filter(x => x.score >= FUZZY_THRESHOLD)
+        .sort((a, b) => b.score - a.score)
+        .map(x => x.song)
+    : songs
+  ).slice(0, 6)
+
+  return (
+    <div className="mt-2 rounded-md bg-brand-50 px-2.5 py-2">
+      <div className="mb-1.5 flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-brand-300" />
+          <input
+            autoFocus
+            type="text"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search songs…"
+            className="w-full rounded border border-brand-200 bg-white py-1 pl-6 pr-2 text-xs focus:outline-none focus:ring-1 focus:ring-brand-400"
+          />
+        </div>
+        <button onClick={onClose} className="shrink-0 text-gray-400 hover:text-gray-600" aria-label="Close">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="max-h-36 space-y-0.5 overflow-y-auto">
+        {currentSongId && (
+          <button onClick={() => onSelect(null)} className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs text-gray-500 hover:bg-white">
+            <X className="h-3 w-3" /> Remove tag
+          </button>
+        )}
+        {results.length === 0 ? (
+          <p className="px-2 py-1 text-xs text-gray-400">No songs found</p>
+        ) : (
+          results.map(s => (
+            <button
+              key={s.id}
+              onClick={() => onSelect(s.id)}
+              className={cn(
+                'flex w-full items-center justify-between gap-2 rounded px-2 py-1 text-left text-xs hover:bg-white',
+                s.id === currentSongId ? 'font-semibold text-brand-700' : 'text-gray-700'
+              )}
+            >
+              <span className="truncate">{s.title}</span>
+              {s.id === currentSongId && <Check className="h-3 w-3 shrink-0" />}
+            </button>
+          ))
+        )}
+      </div>
+    </div>
+  )
 }
 
 export function RecordingsList({ recordings, songs }: Props) {
@@ -182,20 +251,12 @@ export function RecordingsList({ recordings, songs }: Props) {
             )}
 
             {isTagging && (
-              <div className="mt-2 flex items-center gap-2 rounded-md bg-brand-50 px-2.5 py-2">
-                <select
-                  autoFocus
-                  defaultValue={r.song_id ?? ''}
-                  onChange={e => handleTag(r.id, e.target.value || null)}
-                  className="flex-1 rounded border border-brand-200 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand-400"
-                >
-                  <option value="">No song</option>
-                  {songs.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
-                </select>
-                <button onClick={() => setTaggingId(null)} className="text-gray-400 hover:text-gray-600">
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
+              <SongTagPicker
+                songs={songs}
+                currentSongId={r.song_id}
+                onSelect={songId => handleTag(r.id, songId)}
+                onClose={() => setTaggingId(null)}
+              />
             )}
           </div>
         )

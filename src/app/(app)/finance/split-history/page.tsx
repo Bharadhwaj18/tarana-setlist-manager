@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedAllProfiles, getCachedPendingPayments } from '@/lib/data'
+import { todayISO, isUpcoming } from '@/lib/shows'
 import { SplitHistoryList } from '@/components/finance/SplitHistoryList'
 import { FinanceFloatingNav } from '@/components/finance/FinanceFloatingNav'
 import type { FinanceTransaction } from '@/types/finance'
@@ -14,7 +15,7 @@ export default async function SplitHistoryPage() {
     getCachedAllProfiles(),
     supabase.from('shows').select('*').not('split_at', 'is', null).order('split_at', { ascending: false }),
     supabase.from('finance_transactions').select('*').eq('category', 'split'),
-    supabase.from('shows').select('id').is('split_at', null),
+    supabase.from('shows').select('id, show_date').is('split_at', null),
     getCachedPendingPayments(),
   ])
 
@@ -48,7 +49,11 @@ export default async function SplitHistoryPage() {
         <SplitHistoryList shows={shows} txnsByShow={txnsByShow} pendingByShow={pendingByShow} profiles={profiles} />
       )}
 
-      <FinanceFloatingNav hasUnsplitShows={(unsplitShows ?? []).length > 0} />
+      {/* A show that hasn't happened yet has nothing to split — same rule
+          /finance/split itself enforces (404s if every unsplit show is
+          still upcoming). Without this, the floating Split button could
+          show up here even when pressing it would 404. */}
+      <FinanceFloatingNav hasUnsplitShows={(unsplitShows ?? []).some(s => !isUpcoming(s.show_date, todayISO()))} />
     </div>
   )
 }

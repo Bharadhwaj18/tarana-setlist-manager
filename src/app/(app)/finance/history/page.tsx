@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedAllProfiles, getCachedUser } from '@/lib/data'
+import { todayISO, isUpcoming } from '@/lib/shows'
 import { FinanceHistoryList } from '@/components/finance/FinanceHistoryList'
 import { FinanceFloatingNav } from '@/components/finance/FinanceFloatingNav'
 
@@ -33,6 +34,13 @@ export default async function FinanceHistoryPage() {
   // no category at all.
   const historyTxns = (txns ?? []).filter(t => t.category !== 'split')
 
+  // A show that hasn't happened yet has nothing to split — same rule
+  // /finance/split itself enforces (404s if every unsplit show is still
+  // upcoming). Without this, the floating Split button could show up here
+  // even when pressing it would 404.
+  const today = todayISO()
+  const hasUnsplitShows = (shows ?? []).some(s => !s.split_at && !isUpcoming(s.show_date, today))
+
   return (
     <div className="max-w-2xl">
       <Link href="/finance" className="mb-6 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
@@ -53,7 +61,7 @@ export default async function FinanceHistoryPage() {
         showTitleById={showTitleById}
       />
 
-      <FinanceFloatingNav hasUnsplitShows={(shows ?? []).some(s => !s.split_at)} />
+      <FinanceFloatingNav hasUnsplitShows={hasUnsplitShows} />
     </div>
   )
 }
