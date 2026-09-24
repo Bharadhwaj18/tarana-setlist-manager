@@ -4,6 +4,7 @@ import { getCachedUser, getCachedPendingPayments, getCachedNotifications, getCac
 import { resolveNotificationItems } from '@/lib/notifications'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { OfflineUserSync } from '@/components/OfflineUserSync'
+import { IdentifyUser } from '@/components/analytics/IdentifyUser'
 import type { ReactNode } from 'react'
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
@@ -47,6 +48,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-screen">
       <OfflineUserSync email={effectiveUser.email ?? ''} displayName={profile?.display_name ?? ''} />
+      <IdentifyUser userId={effectiveUser.id} email={effectiveUser.email} name={profile?.display_name} />
       <Sidebar user={effectiveUser} pendingPaymentCount={pendingCount} notifications={notificationItems} />
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-5xl px-4 pb-8 pt-20 sm:px-6 lg:px-8 lg:pt-8">
