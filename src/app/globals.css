@@ -19,3 +19,17 @@ body {
   background-color: #fefae0;
   color: #1a1a1a;
 }
+
+/* iOS Safari auto-zooms the whole page when focusing any input/select/
+   textarea rendered below 16px — nearly every form field in this app uses
+   Tailwind's text-sm (14px) or text-xs (12px), so this hit basically
+   every form on an iPhone. Forcing 16px specifically on phone-width
+   viewports fixes it without bumping desktop text sizes or having to
+   touch every individual input scattered across the app. !important is
+   deliberate here — it needs to beat the text-sm/text-xs utility classes
+   already on those same elements. */
+@media (max-width: 767px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
