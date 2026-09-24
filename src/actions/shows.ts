@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { sendNotificationToAll } from '@/actions/notifications'
+import { formatDateDMY } from '@/lib/dates'
 import type { ShowFormData } from '@/lib/validators'
 
 async function actorName(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
@@ -26,7 +27,7 @@ export async function createShow(data: ShowFormData): Promise<{ error?: string; 
 
   await sendNotificationToAll({
     title: `${await actorName(supabase, user.id)} booked a new show`,
-    body: data.show_date ? `"${data.title}" on ${data.show_date}` : `"${data.title}"`,
+    body: data.show_date ? `"${data.title}" on ${formatDateDMY(data.show_date)}` : `"${data.title}"`,
     link: `/shows/${show.id}`,
     type: 'show_created',
   })
@@ -51,7 +52,7 @@ export async function updateShow(id: string, data: ShowFormData): Promise<{ erro
   if (existing) {
     const changes: string[] = []
     if (data.booking_status !== undefined && data.booking_status !== existing.booking_status) changes.push(`Status → ${data.booking_status ?? '—'}`)
-    if (data.show_date !== undefined && data.show_date !== existing.show_date) changes.push(`Date → ${data.show_date ?? '—'}`)
+    if (data.show_date !== undefined && data.show_date !== existing.show_date) changes.push(`Date → ${data.show_date ? formatDateDMY(data.show_date) : '—'}`)
     if (data.venue !== undefined && data.venue !== existing.venue) changes.push(`Venue → ${data.venue ?? '—'}`)
 
     if (changes.length) {
@@ -83,7 +84,7 @@ export async function deleteShow(id: string): Promise<{ error?: string }> {
   if (show && user) {
     await sendNotificationToAll({
       title: `${await actorName(supabase, user.id)} removed "${show.title}"`,
-      body: show.show_date ? `Was on ${show.show_date}` : undefined,
+      body: show.show_date ? `Was on ${formatDateDMY(show.show_date)}` : undefined,
       link: '/shows',
       type: 'show_cancelled',
     })

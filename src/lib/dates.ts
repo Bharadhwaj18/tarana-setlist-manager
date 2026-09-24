@@ -46,3 +46,16 @@ export function toISODate(d: Date) {
   const pad = (num: number) => String(num).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
+
+/**
+ * DD/MM/YYYY — this app's plain-text date format for notification titles
+ * and bodies. A stored YYYY-MM-DD string interpolated directly reads as
+ * "on 2026-09-30", and anything MM/DD-ordered reads as the wrong date
+ * entirely for a band based in India; this is unambiguous either way,
+ * with no Date parsing (and therefore no timezone) involved at all — it's
+ * just a straight reordering of the string this app already stores.
+ */
+export function formatDateDMY(dateStr: string): string {
+  const [year, month, day] = dateStr.split('-')
+  return `${day}/${month}/${year}`
+}

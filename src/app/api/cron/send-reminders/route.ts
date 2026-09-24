@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { sendPushToProfile } from '@/lib/push'
 import { todayISO } from '@/lib/shows'
-import { addDaysISO } from '@/lib/dates'
+import { addDaysISO, formatDateDMY } from '@/lib/dates'
 
 // Runs once/day (Vercel Hobby-tier cron limit — see vercel.json). For every
 // task with a due date + a configured reminder lead time (remind_days_before,
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
   let sent = 0
   for (const task of toRemind) {
     const recipientId = task.assigned_to ?? task.created_by
-    const dueLabel = task.due_date === today ? 'today' : `on ${task.due_date}`
+    const dueLabel = task.due_date === today ? 'today' : `on ${formatDateDMY(task.due_date!)}`
     const { error } = await supabase.from('notifications').insert({
       recipient_id: recipientId,
       sender_id: null,

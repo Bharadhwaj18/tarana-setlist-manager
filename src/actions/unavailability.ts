@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { sendNotification, sendNotificationToAll } from '@/actions/notifications'
+import { formatDateDMY } from '@/lib/dates'
 import type { UnavailabilityFormData } from '@/lib/validators'
 
 export async function addUnavailability(data: UnavailabilityFormData): Promise<{ error?: string; id?: string }> {
@@ -20,7 +21,9 @@ export async function addUnavailability(data: UnavailabilityFormData): Promise<{
 
   const { data: member } = await supabase.from('profiles').select('display_name').eq('id', data.member_id).maybeSingle()
   const memberName = member?.display_name ?? 'A member'
-  const dateRange = data.start_date === data.end_date ? data.start_date : `${data.start_date} to ${data.end_date}`
+  const dateRange = data.start_date === data.end_date
+    ? formatDateDMY(data.start_date)
+    : `${formatDateDMY(data.start_date)} to ${formatDateDMY(data.end_date)}`
 
   await sendNotificationToAll({
     title: `${memberName} is unavailable ${dateRange}`,
@@ -42,7 +45,7 @@ export async function addUnavailability(data: UnavailabilityFormData): Promise<{
     if (show.created_by === user.id) continue
     await sendNotification({
       recipientId: show.created_by,
-      title: `${memberName} is unavailable on ${show.show_date}`,
+      title: `${memberName} is unavailable on ${show.show_date ? formatDateDMY(show.show_date) : 'that date'}`,
       body: `Conflicts with "${show.title}"`,
       link: `/shows/${show.id}`,
       type: 'unavailability_conflict',

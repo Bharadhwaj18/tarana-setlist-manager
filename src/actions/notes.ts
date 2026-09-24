@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { sendNotification } from '@/actions/notifications'
-import { addDaysISO, addMonthsISO } from '@/lib/dates'
+import { addDaysISO, addMonthsISO, formatDateDMY } from '@/lib/dates'
 import type { Recurrence } from '@/types/notes'
 
 export interface ChecklistItemInput {
@@ -146,7 +146,7 @@ export async function updateNote(id: string, data: NoteFormData): Promise<{ erro
     await sendNotification({
       recipientId: data.assignedTo,
       title: `${actor?.display_name ?? 'Someone'} updated "${title}"`,
-      body: existing.due_date !== data.dueDate ? `Due date is now ${data.dueDate ?? 'unset'}` : 'Details changed',
+      body: existing.due_date !== data.dueDate ? `Due date is now ${data.dueDate ? formatDateDMY(data.dueDate) : 'unset'}` : 'Details changed',
       link: '/notes',
       type: 'task_updated',
     })

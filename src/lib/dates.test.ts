@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { daysUntil, countdownLabel, addDaysISO, addMonthsISO } from './dates'
+import { daysUntil, countdownLabel, addDaysISO, addMonthsISO, formatDateDMY } from './dates'
 
 describe('daysUntil', () => {
   it('is 0 for today', () => {
@@ -55,5 +55,14 @@ describe('addMonthsISO', () => {
   })
   it('handles a leap-year February correctly', () => {
     expect(addMonthsISO('2028-01-31', 1)).toBe('2028-02-29')
+  })
+})
+
+describe('formatDateDMY', () => {
+  it('reorders a stored YYYY-MM-DD string to DD/MM/YYYY', () => {
+    expect(formatDateDMY('2026-09-16')).toBe('16/09/2026')
+  })
+  it('keeps single-digit day/month zero-padded, same as the stored string', () => {
+    expect(formatDateDMY('2026-01-05')).toBe('05/01/2026')
   })
 })
