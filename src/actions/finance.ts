@@ -20,6 +20,7 @@ interface TransactionInput {
   description: string
   category?: string | null
   show_id?: string | null
+  budget_id?: string | null
   date?: string
 }
 
@@ -35,6 +36,11 @@ async function validateTransactionWrite(
   supabase: Awaited<ReturnType<typeof createClient>>,
   data: TransactionInput
 ): Promise<string | null> {
+  // A budget only ever tracks Misc spending: a debit with no show attached.
+  if (data.budget_id && (data.amount >= 0 || data.show_id || data.category === 'reimbursement')) {
+    return 'Only Misc expenses (not show-related, not a credit) can be tagged to a budget.'
+  }
+
   // A show that's already been split is locked — redirect this to a Misc
   // expense instead of reopening the split (per the decided policy).
   if (data.show_id) {

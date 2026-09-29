@@ -11,11 +11,14 @@ import { cn } from '@/lib/utils'
 import { todayISO } from '@/lib/shows'
 import type { FinanceTransaction } from '@/types/finance'
 import type { Show } from '@/types/shows'
+import type { Budget } from '@/types/budget'
 
 interface Member { id: string; name: string }
 interface Props {
   members: Member[]
   shows: Show[]
+  /** Budgets a Misc expense can be tagged to. Omit to hide the field. */
+  budgets?: Budget[]
   /** Present = edit this transaction instead of creating a new one. */
   transaction?: FinanceTransaction
   /** Present = pin this transaction to one specific show — used for "add a missed expense" from inside that show's own review (e.g. the Split screen). Hides the Tag/Which-show pickers since both are already implied. */
@@ -28,6 +31,7 @@ interface Props {
 const inputCls = 'w-full rounded-md border border-brand-200 bg-white px-3 py-2.5 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400'
 const NEW_SHOW = '__new__'
 const AUTO = '__auto__'
+const NO_BUDGET = ''
 
 function categoryLabel(dir: 'credit' | 'debit', c: string) {
   return dir === 'credit' ? (CREDIT_CATEGORY_LABELS[c as keyof typeof CREDIT_CATEGORY_LABELS] ?? c) : c.charAt(0).toUpperCase() + c.slice(1)
@@ -44,6 +48,7 @@ function fieldsFrom(transaction: FinanceTransaction | undefined, unsplitShows: S
       dir: 'credit' as 'credit' | 'debit',
       description: '',
       date: todayISO(),
+      budgetId: NO_BUDGET,
     }
   }
   const dir = (transaction.amount >= 0 ? 'credit' : 'debit') as 'credit' | 'debit'
@@ -57,10 +62,11 @@ function fieldsFrom(transaction: FinanceTransaction | undefined, unsplitShows: S
     dir,
     description: transaction.description,
     date: transaction.date,
+    budgetId: transaction.budget_id ?? NO_BUDGET,
   }
 }
 
-export function AddTransactionModal({ members, shows, transaction, lockedShow, open: controlledOpen, onOpenChange }: Props) {
+export function AddTransactionModal({ members, shows, budgets = [], transaction, lockedShow, open: controlledOpen, onOpenChange }: Props) {
   const isEdit = !!transaction
   const isControlled = controlledOpen !== undefined && onOpenChange !== undefined
   const unsplitShows = shows.filter(s => !s.split_at)
@@ -79,7 +85,7 @@ export function AddTransactionModal({ members, shows, transaction, lockedShow, o
   const [isPending, startTransition] = useTransition()
   const toast = useToast()
 
-  const { tag, category, showId, memberId, amount, dir, description, date } = fields
+  const { tag, category, showId, memberId, amount, dir, description, date, budgetId } = fields
   const set = <K extends keyof typeof fields>(key: K, value: typeof fields[K]) =>
     setFields(prev => ({ ...prev, [key]: value }))
 
@@ -104,6 +110,10 @@ export function AddTransactionModal({ members, shows, transaction, lockedShow, o
   // it's for — the member field stops being an optional "who recorded
   // this" and becomes the one thing this form exists to capture.
   const isReimbursement = category === 'reimbursement'
+
+  // Only Misc debits can be tagged to a budget. Editing keeps a closed budget selectable if it's already the one attached.
+  const budgetOptions = budgets.filter(b => b.status === 'active' || b.id === transaction?.budget_id)
+  const showBudgetField = tag === 'misc' && dir === 'debit' && !isReimbursement && budgetOptions.length > 0
 
   const canSubmit = tag !== null
     && !!category
@@ -139,6 +149,7 @@ export function AddTransactionModal({ members, shows, transaction, lockedShow, o
         description: description.trim() || (isReimbursement ? 'Reimbursement' : effectiveDir === 'credit' ? 'Credit' : 'Debit'),
         category,
         show_id: resolvedShowId,
+        budget_id: tag === 'misc' && effectiveDir === 'debit' && !isReimbursement && budgetId ? budgetId : null,
         date,
       }
       const result = isEdit ? await updateTransaction(transaction.id, payload) : await addTransaction(payload)
@@ -241,6 +252,18 @@ export function AddTransactionModal({ members, shows, transaction, lockedShow, o
                 {(dir === 'credit' ? CREDIT_CATEGORIES : DEBIT_CATEGORIES).map(c => (
                   <option key={c} value={c}>{categoryLabel(dir, c)}</option>
                 ))}
+              </select>
+            </div>
+          )}
+
+          {showBudgetField && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Budget <span className="font-normal text-gray-400">(optional)</span>
+              </label>
+              <select value={budgetId} onChange={e => set('budgetId', e.target.value)} className={inputCls}>
+                <option value={NO_BUDGET}>No budget</option>
+                {budgetOptions.map(b => <option key={b.id} value={b.id}>{b.name}{b.status === 'closed' ? ' (closed)' : ''}</option>)}
               </select>
             </div>
           )}

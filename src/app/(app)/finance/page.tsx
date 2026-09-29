@@ -8,6 +8,8 @@ import { ExportModal } from '@/components/finance/ExportModal'
 import { FinanceFloatingNav } from '@/components/finance/FinanceFloatingNav'
 import { ReimburseButton } from '@/components/finance/ReimburseButton'
 import { PendingPaymentsBanner } from '@/components/finance/PendingPaymentsBanner'
+import { BudgetsSection } from '@/components/finance/BudgetsSection'
+import { computeBudgetProgress, unallocatedFund } from '@/lib/finance/budgets'
 import { cn } from '@/lib/utils'
 
 function fmt(n: number) {
@@ -17,12 +19,13 @@ function fmt(n: number) {
 export default async function FinancePage() {
   const supabase = await createClient()
 
-  const [{ data: { user } }, profiles, { data: txns }, { data: shows }, pendingPayments] = await Promise.all([
+  const [{ data: { user } }, profiles, { data: txns }, { data: shows }, pendingPayments, { data: budgets }] = await Promise.all([
     getCachedUser(),
     getCachedAllProfiles(),
     supabase.from('finance_transactions').select('*').order('created_at', { ascending: false }),
     supabase.from('shows').select('*').order('show_date', { ascending: false }),
     getCachedPendingPayments(),
+    supabase.from('budgets').select('*').order('created_at', { ascending: true }),
   ])
 
   // Balance per member. There's no separate Band Fund bucket — whatever a
@@ -60,6 +63,12 @@ export default async function FinancePage() {
   const nameOf = (id: string | null) =>
     id === null ? 'Unattributed' : id === user?.id ? 'You' : (profiles.find(p => p.id === id)?.display_name ?? 'Member')
 
+  const budgetProgress = (budgets ?? []).map(b => computeBudgetProgress(b, txns ?? [], today))
+  const unallocated = unallocatedFund(memberTotal, budgetProgress)
+  const { data: roleRow } = user ? await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle() : { data: null }
+  const isTreasurer = roleRow?.role === 'treasurer'
+  const memberNames = Object.fromEntries(profiles.map(p => [p.id, p.display_name ?? 'Member']))
+
   const memberOptions = profiles.map(p => ({ id: p.id, name: p.id === user?.id ? 'You' : (p.display_name ?? 'Member') }))
   const myPendingPayments = user ? pendingPayments.filter(p => p.from_member === user.id) : []
 
@@ -74,7 +83,7 @@ export default async function FinancePage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <AddTransactionModal members={memberOptions} shows={shows ?? []} />
+          <AddTransactionModal members={memberOptions} shows={shows ?? []} budgets={budgets ?? []} />
           <ExportModal members={profiles.map(p => ({ id: p.id, name: p.display_name ?? 'Member' }))} />
         </div>
       </div>
@@ -118,6 +127,8 @@ export default async function FinancePage() {
           ))}
         </div>
       </section>
+
+      <BudgetsSection progress={budgetProgress} unallocated={unallocated} isTreasurer={isTreasurer} memberNames={memberNames} />
 
       {/* Unsplit shows */}
       {unsplitShows.length > 0 && (
@@ -164,6 +175,7 @@ export default async function FinancePage() {
                 transaction={t}
                 members={memberOptions}
                 shows={shows ?? []}
+                budgets={budgets ?? []}
                 payerName={nameOf(t.member_id)}
               />
             ))}

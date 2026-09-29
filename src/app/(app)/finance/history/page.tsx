@@ -9,7 +9,7 @@ import { FinanceFloatingNav } from '@/components/finance/FinanceFloatingNav'
 export default async function FinanceHistoryPage() {
   const supabase = await createClient()
 
-  const [{ data: { user } }, profiles, { data: txns }, { data: shows }] = await Promise.all([
+  const [{ data: { user } }, profiles, { data: txns }, { data: shows }, { data: budgets }] = await Promise.all([
     getCachedUser(),
     getCachedAllProfiles(),
     // Sorted by when it was actually recorded, not the (user-editable, can
@@ -17,6 +17,7 @@ export default async function FinanceHistoryPage() {
     // what you just did if any entry has a different logical date.
     supabase.from('finance_transactions').select('*').order('created_at', { ascending: false }),
     supabase.from('shows').select('*'),
+    supabase.from('budgets').select('*').order('created_at', { ascending: false }),
   ])
 
   const members = profiles.map(p => ({
@@ -73,6 +74,7 @@ export default async function FinanceHistoryPage() {
         transactions={historyTxns}
         members={members}
         shows={shows ?? []}
+        budgets={budgets ?? []}
         showTitleById={showTitleById}
         runningBalances={runningBalances}
       />

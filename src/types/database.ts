@@ -393,6 +393,7 @@ export type Database = {
           description: string
           category: string | null
           show_id: string | null
+          budget_id: string | null
           date: string
           recorded_by: string
           created_at: string
@@ -404,6 +405,7 @@ export type Database = {
           description: string
           category?: string | null
           show_id?: string | null
+          budget_id?: string | null
           date?: string
           recorded_by: string
           created_at?: string
@@ -415,6 +417,7 @@ export type Database = {
           description?: string
           category?: string | null
           show_id?: string | null
+          budget_id?: string | null
           date?: string
           recorded_by?: string
           created_at?: string
@@ -457,6 +460,72 @@ export type Database = {
           created_at?: string
           paid_at?: string | null
           paid_transaction_id?: string | null
+        }
+        Relationships: []
+      }
+      budgets: {
+        Row: {
+          id: string
+          name: string
+          allocated_amount: number
+          recurrence: 'none' | 'monthly'
+          start_date: string
+          end_date: string | null
+          status: 'active' | 'closed'
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          allocated_amount: number
+          recurrence?: 'none' | 'monthly'
+          start_date?: string
+          end_date?: string | null
+          status?: 'active' | 'closed'
+          created_by: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          allocated_amount?: number
+          recurrence?: 'none' | 'monthly'
+          start_date?: string
+          end_date?: string | null
+          status?: 'active' | 'closed'
+          created_by?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      budget_adjustments: {
+        Row: {
+          id: string
+          budget_id: string
+          kind: 'created' | 'top_up' | 'reduce' | 'closed' | 'reopened'
+          delta: number
+          note: string | null
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          budget_id: string
+          kind: 'created' | 'top_up' | 'reduce' | 'closed' | 'reopened'
+          delta?: number
+          note?: string | null
+          created_by: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          budget_id?: string
+          kind?: 'created' | 'top_up' | 'reduce' | 'closed' | 'reopened'
+          delta?: number
+          note?: string | null
+          created_by?: string
+          created_at?: string
         }
         Relationships: []
       }

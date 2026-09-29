@@ -13,6 +13,7 @@ export type { AppNotification, AppNotificationInsert, AppNotificationUpdate, Pus
 export type { Unavailability, UnavailabilityInsert, UnavailabilityUpdate } from './unavailability'
 export type { CalendarEvent, CalendarEventInsert, CalendarEventUpdate } from './calendar-event'
 export type { SplitRun, SplitRunShow, SplitRunPayment, SplitRunReport } from './split-run'
+export type { Budget, BudgetAdjustment, BudgetProgress } from './budget'
 export type { Recording, RecordingInsert, RecordingUpdate, RecordingWithSong } from './recording'
 
 export type SongInsert = Omit<Song, 'id' | 'created_at' | 'updated_at' | 'created_by'>

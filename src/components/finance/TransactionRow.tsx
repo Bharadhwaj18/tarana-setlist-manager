@@ -8,12 +8,14 @@ import { deleteTransaction } from '@/actions/finance'
 import { useToast } from '@/components/ui/Toaster'
 import type { FinanceTransaction } from '@/types/finance'
 import type { Show } from '@/types/shows'
+import type { Budget } from '@/types/budget'
 
 interface Member { id: string; name: string }
 interface Props {
   transaction: FinanceTransaction
   members: Member[]
   shows: Show[]
+  budgets?: Budget[]
   /** Already resolved to a display string — never pass a function here, it can't cross the server/client boundary. */
   payerName: string
   badge?: { label: string; kind: 'show' | 'category' }
@@ -39,7 +41,7 @@ function fmtSigned(n: number) {
   return `${n < 0 ? '−' : ''}₹${Math.abs(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
 }
 
-export function TransactionRow({ transaction: t, members, shows, payerName, badge, afterFundTotal, afterMemberBalance }: Props) {
+export function TransactionRow({ transaction: t, members, shows, budgets, payerName, badge, afterFundTotal, afterMemberBalance }: Props) {
   const [editOpen, setEditOpen] = useState(false)
   const [isDeleting, startDeleteTransition] = useTransition()
   const toast = useToast()
@@ -120,6 +122,7 @@ export function TransactionRow({ transaction: t, members, shows, payerName, badg
         <AddTransactionModal
           members={members}
           shows={shows}
+          budgets={budgets}
           transaction={t}
           open={editOpen}
           onOpenChange={setEditOpen}

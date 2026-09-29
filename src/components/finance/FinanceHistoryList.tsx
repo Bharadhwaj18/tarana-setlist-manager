@@ -8,12 +8,14 @@ import { deleteTransaction } from '@/actions/finance'
 import { useToast } from '@/components/ui/Toaster'
 import type { FinanceTransaction } from '@/types/finance'
 import type { Show } from '@/types/shows'
+import type { Budget } from '@/types/budget'
 
 interface Member { id: string; name: string }
 interface Props {
   transactions: FinanceTransaction[]
   members: Member[]
   shows: Show[]
+  budgets?: Budget[]
   showTitleById: Record<string, string>
   runningBalances?: Record<string, { total: number; memberBalance: number | null }>
 }
@@ -32,13 +34,14 @@ interface RowProps {
   transaction: FinanceTransaction
   members: Member[]
   shows: Show[]
+  budgets?: Budget[]
   payerName: string
   badge?: { label: string; kind: 'show' | 'category' }
   afterFundTotal?: number
   afterMemberBalance?: number
 }
 
-function TransactionTableRow({ transaction: t, members, shows, payerName, badge, afterFundTotal, afterMemberBalance }: RowProps) {
+function TransactionTableRow({ transaction: t, members, shows, budgets, payerName, badge, afterFundTotal, afterMemberBalance }: RowProps) {
   const [editOpen, setEditOpen] = useState(false)
   const [isDeleting, startDeleteTransition] = useTransition()
   const toast = useToast()
@@ -123,6 +126,7 @@ function TransactionTableRow({ transaction: t, members, shows, payerName, badge,
           <AddTransactionModal
             members={members}
             shows={shows}
+            budgets={budgets}
             transaction={t}
             open={editOpen}
             onOpenChange={setEditOpen}
@@ -133,7 +137,7 @@ function TransactionTableRow({ transaction: t, members, shows, payerName, badge,
   )
 }
 
-export function FinanceHistoryList({ transactions, members, shows, showTitleById, runningBalances }: Props) {
+export function FinanceHistoryList({ transactions, members, shows, budgets, showTitleById, runningBalances }: Props) {
   const [memberFilter, setMemberFilter] = useState<string>('all')
   const [typeFilter, setTypeFilter] = useState<'all' | 'misc' | 'show'>('all')
   const [query, setQuery] = useState('')
@@ -235,6 +239,7 @@ export function FinanceHistoryList({ transactions, members, shows, showTitleById
                     transaction={t}
                     members={members}
                     shows={shows}
+                    budgets={budgets}
                     payerName={nameOf(t.member_id)}
                     badge={badge}
                     afterFundTotal={rb?.total}
