@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
 
-export function LoginForm() {
+export function LoginForm({ next = '/setlists' }: { next?: string }) {
   const router = useRouter()
   const [serverError, setServerError] = useState('')
   const supabase = createClient()
@@ -26,7 +26,7 @@ export function LoginForm() {
       setServerError(error.message)
       return
     }
-    router.push('/setlists')
+    router.push(next)
     router.refresh()
   }
 

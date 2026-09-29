@@ -1,14 +1,27 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { LoginForm } from '@/components/auth/LoginForm'
 import { MagicLinkForm } from '@/components/auth/MagicLinkForm'
 import { cn } from '@/lib/utils'
+import { safeNextPath } from '@/lib/safe-redirect'
 
 type Tab = 'password' | 'magic'
 
 export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginPageInner />
+    </Suspense>
+  )
+}
+
+function LoginPageInner() {
   const [tab, setTab] = useState<Tab>('password')
+  const nextParam = useSearchParams().get('next')
+  const next = safeNextPath(nextParam)
+  const fromInvite = next.startsWith('/invite/')
 
   return (
     <div>
@@ -32,10 +45,16 @@ export default function LoginPage() {
         ))}
       </div>
 
-      {tab === 'password' ? <LoginForm /> : <MagicLinkForm />}
+      {fromInvite && (
+        <p className="mb-4 rounded-lg bg-brand-100 px-3 py-2 text-sm text-gray-700">
+          Sign in or enter your email to join the workspace you were invited to.
+        </p>
+      )}
+
+      {tab === 'password' ? <LoginForm next={next} /> : <MagicLinkForm next={next} />}
 
       <p className="mt-6 text-center text-xs text-gray-400">
-        New to Tarana? Ask a bandmate to invite you.
+        New here? Ask for an invite link.
       </p>
     </div>
   )

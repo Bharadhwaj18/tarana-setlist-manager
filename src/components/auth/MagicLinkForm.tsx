@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
 import { Mail } from 'lucide-react'
 
-export function MagicLinkForm() {
+export function MagicLinkForm({ next = '/setlists' }: { next?: string }) {
   const [sent, setSent] = useState(false)
   const [serverError, setServerError] = useState('')
   const supabase = createClient()
@@ -23,7 +23,7 @@ export function MagicLinkForm() {
     setServerError('')
     const { error } = await supabase.auth.signInWithOtp({
       email: data.email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}` },
     })
     if (error) {
       setServerError(error.message)

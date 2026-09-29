@@ -622,6 +622,48 @@ export type Database = {
         }
         Relationships: []
       }
+      workspace_invites: {
+        Row: {
+          id: string
+          workspace_id: string
+          token: string
+          role: string
+          permissions: Json
+          created_by: string
+          expires_at: string
+          max_uses: number | null
+          use_count: number
+          revoked_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          token?: string
+          role?: string
+          permissions?: Json
+          created_by?: string
+          expires_at?: string
+          max_uses?: number | null
+          use_count?: number
+          revoked_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          token?: string
+          role?: string
+          permissions?: Json
+          created_by?: string
+          expires_at?: string
+          max_uses?: number | null
+          use_count?: number
+          revoked_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       plan_features: {
         Row: {
           plan: string
@@ -853,7 +895,16 @@ export type Database = {
       }
     }
     Views: { [_ in never]: never }
-    Functions: { [_ in never]: never }
+    Functions: {
+      create_workspace: { Args: { p_name: string; p_type?: string }; Returns: string }
+      rename_workspace: { Args: { p_ws: string; p_name: string }; Returns: undefined }
+      revoke_workspace_invite: { Args: { p_invite: string }; Returns: undefined }
+      accept_workspace_invite: { Args: { p_token: string }; Returns: string }
+      invite_preview: {
+        Args: { p_token: string }
+        Returns: { workspace_name: string; workspace_type: string; state: string }[]
+      }
+    }
     Enums: { [_ in never]: never }
     CompositeTypes: { [_ in never]: never }
   }

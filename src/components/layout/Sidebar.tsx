@@ -107,7 +107,7 @@ export function Sidebar({ user, pendingPaymentCount = 0, notifications = [], wor
     </nav>
   )
 
-  const switcher = workspaces.length > 1 ? (
+  const switcher = workspaces.length > 0 ? (
     <WorkspaceSwitcher workspaces={workspaces} currentId={currentWorkspaceId} onSwitched={() => setMobileOpen(false)} />
   ) : null
 

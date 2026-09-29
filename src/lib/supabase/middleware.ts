@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import type { Database } from '@/types/database'
+import { safeNextPath } from '@/lib/safe-redirect'
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -40,16 +41,17 @@ export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/auth')
 
-  if (!effectiveUser && !isAuthRoute) {
+  // Invite pages are reachable signed-out (they show the band and a sign-in prompt) and signed-in (accept).
+  const isPublicRoute = isAuthRoute || pathname.startsWith('/invite/')
+
+  if (!effectiveUser && !isPublicRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
   if (effectiveUser && isAuthRoute) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/setlists'
-    return NextResponse.redirect(url)
+    return NextResponse.redirect(new URL(safeNextPath(request.nextUrl.searchParams.get('next')), request.url))
   }
 
   return supabaseResponse

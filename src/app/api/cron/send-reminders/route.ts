@@ -51,19 +51,22 @@ export async function GET(request: NextRequest) {
 
   // Show reminders — a fixed 3-days-out + day-of pair rather than a
   // per-task lead time, since a show has no single assignee to scope a
-  // custom reminder to; every band member gets pinged instead.
+  // custom reminder to; every member of the show's workspace gets pinged instead.
   const { data: upcomingShows } = await supabase
     .from('shows')
-    .select('id, title, show_date, venue')
+    .select('id, title, show_date, venue, workspace_id')
     .in('show_date', [today, addDaysISO(today, 3)])
 
   if (upcomingShows?.length) {
-    const { data: profiles } = await supabase.from('profiles').select('id')
     for (const show of upcomingShows) {
+      const { data: members } = show.workspace_id
+        ? await supabase.from('workspace_members').select('user_id').eq('workspace_id', show.workspace_id)
+        : { data: [] }
+      const profiles = (members ?? []).map(m => ({ id: m.user_id }))
       const dueLabel = show.show_date === today ? 'today' : 'in 3 days'
       const title = `"${show.title}" is ${dueLabel}`
       const body = show.venue
-      for (const profile of profiles ?? []) {
+      for (const profile of profiles) {
         const { error } = await supabase.from('notifications').insert({
           recipient_id: profile.id,
           sender_id: null,

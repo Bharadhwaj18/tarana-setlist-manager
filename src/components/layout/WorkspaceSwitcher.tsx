@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, ChevronsUpDown, User as UserIcon, Users } from 'lucide-react'
+import Link from 'next/link'
+import { Check, ChevronsUpDown, Plus, Settings, User as UserIcon, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { switchWorkspace } from '@/actions/workspace'
 
@@ -27,8 +28,6 @@ export function WorkspaceSwitcher({ workspaces, currentId, onSwitched }: Props) 
   const [open, setOpen] = useState(false)
   const [pending, startTransition] = useTransition()
   const current = workspaces.find(w => w.id === currentId) ?? workspaces[0]
-
-  if (workspaces.length < 2) return null
 
   const pick = (id: string) => {
     setOpen(false)
@@ -75,6 +74,16 @@ export function WorkspaceSwitcher({ workspaces, currentId, onSwitched }: Props) 
                 </button>
               </li>
             ))}
+            <li className="mt-1 border-t border-brand-100 pt-1">
+              <Link href="/workspace" onClick={() => { setOpen(false); onSwitched?.() }} className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-brand-100">
+                <Settings className="h-4 w-4 shrink-0 text-gray-500" />
+                <span className="flex-1 truncate">{current.type === 'personal' ? 'About this space' : 'Members & invites'}</span>
+              </Link>
+              <Link href="/workspace/new" onClick={() => { setOpen(false); onSwitched?.() }} className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-brand-100">
+                <Plus className="h-4 w-4 shrink-0 text-gray-500" />
+                <span className="flex-1 truncate">Create a workspace</span>
+              </Link>
+            </li>
           </ul>
         </>
       )}
