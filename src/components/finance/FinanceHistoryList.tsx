@@ -4,7 +4,6 @@ import { useMemo, useState, useTransition } from 'react'
 import { Search, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AddTransactionModal } from './AddTransactionModal'
-import { TransactionRow } from './TransactionRow'
 import { deleteTransaction } from '@/actions/finance'
 import { useToast } from '@/components/ui/Toaster'
 import type { FinanceTransaction } from '@/types/finance'
@@ -82,7 +81,7 @@ function TransactionTableRow({ transaction: t, members, shows, payerName, badge,
           {isCredit ? '+' : '−'}{fmt(t.amount)}
         </span>
       </td>
-      <td className="whitespace-nowrap py-2.5 pr-3 text-right">
+      <td className="hidden whitespace-nowrap py-2.5 pr-3 text-right sm:table-cell">
         {afterMemberBalance !== undefined
           ? <span className={cn('text-xs font-medium tabular-nums', afterMemberBalance < 0 ? 'text-red-500' : 'text-gray-500')}>{fmtSigned(afterMemberBalance)}</span>
           : <span className="text-xs text-gray-300">—</span>}
@@ -194,74 +193,44 @@ export function FinanceHistoryList({ transactions, members, shows, showTitleById
           No transactions match these filters.
         </div>
       ) : (
-        <>
-          {/* Six columns of a real table just don't fit a phone width, even
-              with overflow-x-auto — a stacked card per transaction (same
-              component the Finance page's own Recent Transactions uses)
-              instead, below the md breakpoint. */}
-          <div className="space-y-1 md:hidden">
-            {filtered.map(t => {
-              const showTitle = t.show_id ? showTitleById[t.show_id] : null
-              const badge = showTitle
-                ? { label: showTitle, kind: 'show' as const }
-                : t.category
-                  ? { label: t.category, kind: 'category' as const }
-                  : undefined
-              const rb = runningBalances?.[t.id]
-              return (
-                <TransactionRow
-                  key={t.id}
-                  transaction={t}
-                  members={members}
-                  shows={shows}
-                  payerName={nameOf(t.member_id)}
-                  badge={badge}
-                  afterFundTotal={rb?.total}
-                  afterMemberBalance={rb?.memberBalance ?? undefined}
-                />
-              )
-            })}
-          </div>
-
-          <div className="hidden overflow-x-auto rounded-xl border border-gray-200 md:block">
-            <table className="w-full min-w-[640px] text-left">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50">
-                  <th className="py-2.5 pl-4 pr-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Date</th>
-                  <th className="py-2.5 pr-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Description</th>
-                  <th className="py-2.5 pr-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Member</th>
-                  <th className="py-2.5 pr-3 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400">Amount</th>
-                  <th className="py-2.5 pr-3 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400">Mem. Bal.</th>
-                  <th className="py-2.5 pr-3 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400">Fund Total</th>
-                  <th className="py-2.5 pl-2 pr-3"><span className="sr-only">Actions</span></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filtered.map(t => {
-                  const showTitle = t.show_id ? showTitleById[t.show_id] : null
-                  const badge = showTitle
-                    ? { label: showTitle, kind: 'show' as const }
-                    : t.category
-                      ? { label: t.category, kind: 'category' as const }
-                      : undefined
-                  const rb = runningBalances?.[t.id]
-                  return (
-                    <TransactionTableRow
-                      key={t.id}
-                      transaction={t}
-                      members={members}
-                      shows={shows}
-                      payerName={nameOf(t.member_id)}
-                      badge={badge}
-                      afterFundTotal={rb?.total}
-                      afterMemberBalance={rb?.memberBalance ?? undefined}
-                    />
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </>
+        <div className="overflow-x-auto rounded-xl border border-gray-200">
+          <table className="w-full min-w-[520px] text-left">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50">
+                <th className="py-2.5 pl-4 pr-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Date</th>
+                <th className="py-2.5 pr-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Description</th>
+                <th className="py-2.5 pr-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Member</th>
+                <th className="py-2.5 pr-3 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400">Amount</th>
+                <th className="hidden py-2.5 pr-3 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400 sm:table-cell">Mem. Bal.</th>
+                <th className="py-2.5 pr-3 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400">Fund Total</th>
+                <th className="py-2.5 pl-2 pr-3"><span className="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filtered.map(t => {
+                const showTitle = t.show_id ? showTitleById[t.show_id] : null
+                const badge = showTitle
+                  ? { label: showTitle, kind: 'show' as const }
+                  : t.category
+                    ? { label: t.category, kind: 'category' as const }
+                    : undefined
+                const rb = runningBalances?.[t.id]
+                return (
+                  <TransactionTableRow
+                    key={t.id}
+                    transaction={t}
+                    members={members}
+                    shows={shows}
+                    payerName={nameOf(t.member_id)}
+                    badge={badge}
+                    afterFundTotal={rb?.total}
+                    afterMemberBalance={rb?.memberBalance ?? undefined}
+                  />
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   )

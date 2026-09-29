@@ -87,25 +87,20 @@ export default async function FinancePage() {
         <div className="space-y-3">
           {members.map(m => (
             <div key={m.id}>
-              <div className="flex items-center gap-3">
-                <span className="w-20 shrink-0 truncate text-sm font-medium text-gray-700">{m.name}</span>
-                <div className="flex-1">
-                  <div className="h-2 overflow-hidden rounded-full bg-gray-100">
-                    <div
-                      className={cn('h-full rounded-full', m.balance >= 0 ? 'bg-brand-400' : 'bg-red-400')}
-                      style={{ width: `${Math.round((Math.abs(m.balance) / maxBal) * 100)}%` }}
-                    />
-                  </div>
-                </div>
-                <span className={cn('w-24 text-right text-sm font-bold tabular-nums', m.balance < 0 ? 'text-red-600' : 'text-gray-800')}>
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <span className="truncate text-sm font-medium text-gray-700">{m.name}</span>
+                <span className={cn('shrink-0 text-sm font-bold tabular-nums', m.balance < 0 ? 'text-red-600' : 'text-gray-800')}>
                   {m.balance < 0 ? '−' : ''}{fmt(m.balance)}
                 </span>
               </div>
-              {/* A negative balance means real money is owed back to them —
-                  no separate pending-reimbursement table, this is just a
-                  live flag on whether their current balance is below ₹0. */}
+              <div className="h-2 overflow-hidden rounded-full bg-gray-100">
+                <div
+                  className={cn('h-full rounded-full', m.balance >= 0 ? 'bg-brand-400' : 'bg-red-400')}
+                  style={{ width: `${Math.round((Math.abs(m.balance) / maxBal) * 100)}%` }}
+                />
+              </div>
               {m.balance < 0 && (
-                <p className="ml-20 mt-0.5 text-[10px] font-medium text-red-500">Reimbursement pending</p>
+                <p className="mt-0.5 text-[10px] font-medium text-red-500">Reimbursement pending</p>
               )}
             </div>
           ))}
