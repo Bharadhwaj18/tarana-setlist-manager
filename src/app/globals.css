@@ -29,7 +29,7 @@ body {
    deliberate here — it needs to beat the text-sm/text-xs utility classes
    already on those same elements. */
 @media (max-width: 767px) {
-  input, select, textarea {
+  input:not(.compact-field), select:not(.compact-field), textarea:not(.compact-field) {
     font-size: 16px !important;
   }
 }

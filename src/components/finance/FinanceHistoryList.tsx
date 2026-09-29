@@ -26,7 +26,7 @@ function fmtSigned(n: number) {
   return `${n < 0 ? '−' : ''}₹${Math.abs(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
 }
 
-const inputCls = 'rounded-md border border-brand-200 bg-white px-2.5 py-1.5 text-xs focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400'
+const inputCls = 'compact-field rounded-md border border-brand-200 bg-white px-2 py-1.5 text-[11px] focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400'
 
 interface RowProps {
   transaction: FinanceTransaction
@@ -66,10 +66,10 @@ function TransactionTableRow({ transaction: t, members, shows, payerName, badge,
       <td className="hidden whitespace-nowrap py-2.5 pl-4 pr-3 text-xs text-gray-500 sm:table-cell">
         {dateStr}
       </td>
-      <td className="py-2.5 pl-3 pr-2 sm:pl-0">
-        <p className="truncate text-sm font-medium text-gray-800">{t.description}</p>
+      <td className="w-full max-w-0 py-2.5 pl-3 pr-2 sm:w-auto sm:max-w-[220px] sm:pl-0">
+        <p className="line-clamp-2 break-words text-[13px] font-medium leading-tight text-gray-800 sm:truncate sm:text-sm">{t.description}</p>
         {/* Mobile subline: date + member + badge */}
-        <p className="mt-0.5 flex flex-wrap items-center gap-x-1 text-[11px] text-gray-400 sm:hidden">
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-1 text-[10px] leading-snug text-gray-400 sm:hidden">
           <span>{dateStr}</span>
           <span>&middot;</span>
           <span>{payerName}</span>
@@ -95,7 +95,7 @@ function TransactionTableRow({ transaction: t, members, shows, payerName, badge,
       {/* Member: own column on sm+; hidden on mobile, in subline above */}
       <td className="hidden whitespace-nowrap py-2.5 pr-3 text-xs text-gray-600 sm:table-cell">{payerName}</td>
       <td className="whitespace-nowrap py-2.5 pr-2 text-right">
-        <span className={cn('text-sm font-bold tabular-nums', isCredit ? 'text-green-600' : 'text-red-500')}>
+        <span className={cn('text-xs font-bold tabular-nums sm:text-sm', isCredit ? 'text-green-600' : 'text-red-500')}>
           {isCredit ? '+' : '-'}{fmt(t.amount)}
         </span>
       </td>
