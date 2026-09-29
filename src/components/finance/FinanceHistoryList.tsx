@@ -13,6 +13,7 @@ interface Props {
   members: Member[]
   shows: Show[]
   showTitleById: Record<string, string>
+  runningBalances?: Record<string, { total: number; memberBalance: number | null }>
 }
 
 function fmt(n: number) {
@@ -21,7 +22,7 @@ function fmt(n: number) {
 
 const inputCls = 'rounded-md border border-brand-200 bg-white px-2.5 py-1.5 text-xs focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400'
 
-export function FinanceHistoryList({ transactions, members, shows, showTitleById }: Props) {
+export function FinanceHistoryList({ transactions, members, shows, showTitleById, runningBalances }: Props) {
   const [memberFilter, setMemberFilter] = useState<string>('all')
   const [typeFilter, setTypeFilter] = useState<'all' | 'misc' | 'show'>('all')
   const [query, setQuery] = useState('')
@@ -93,6 +94,7 @@ export function FinanceHistoryList({ transactions, members, shows, showTitleById
               : t.category
                 ? { label: t.category, kind: 'category' as const }
                 : undefined
+            const rb = runningBalances?.[t.id]
             return (
               <TransactionRow
                 key={t.id}
@@ -101,6 +103,8 @@ export function FinanceHistoryList({ transactions, members, shows, showTitleById
                 shows={shows}
                 payerName={nameOf(t.member_id)}
                 badge={badge}
+                afterFundTotal={rb?.total}
+                afterMemberBalance={rb?.memberBalance ?? undefined}
               />
             )
           })}

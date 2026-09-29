@@ -17,6 +17,10 @@ interface Props {
   /** Already resolved to a display string — never pass a function here, it can't cross the server/client boundary. */
   payerName: string
   badge?: { label: string; kind: 'show' | 'category' }
+  /** Total band fund balance after this transaction — shown in history for easy tracking. */
+  afterFundTotal?: number
+  /** Paying member's band fund balance after this transaction — null if unattributed. */
+  afterMemberBalance?: number
 }
 
 function fmt(n: number) {
@@ -31,7 +35,11 @@ function fmt(n: number) {
  * actually deletes anything, since it's no longer hover-gated as an
  * accidental safety net.
  */
-export function TransactionRow({ transaction: t, members, shows, payerName, badge }: Props) {
+function fmtSigned(n: number) {
+  return `${n < 0 ? '−' : ''}₹${Math.abs(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+}
+
+export function TransactionRow({ transaction: t, members, shows, payerName, badge, afterFundTotal, afterMemberBalance }: Props) {
   const [editOpen, setEditOpen] = useState(false)
   const [isDeleting, startDeleteTransition] = useTransition()
   const toast = useToast()
@@ -79,6 +87,14 @@ export function TransactionRow({ transaction: t, members, shows, payerName, badg
             </span>
           )}
         </p>
+        {afterFundTotal !== undefined && (
+          <p className="mt-0.5 text-xs text-gray-400">
+            Fund total: <span className={cn('font-medium', afterFundTotal < 0 ? 'text-red-500' : 'text-gray-600')}>{fmtSigned(afterFundTotal)}</span>
+            {afterMemberBalance !== undefined && (
+              <> · {payerName}: <span className={cn('font-medium', afterMemberBalance < 0 ? 'text-red-500' : 'text-gray-600')}>{fmtSigned(afterMemberBalance)}</span></>
+            )}
+          </p>
+        )}
       </div>
       <span className={cn('shrink-0 text-sm font-bold tabular-nums', isCredit ? 'text-green-600' : 'text-red-500')}>
         {isCredit ? '+' : '−'}{fmt(t.amount)}

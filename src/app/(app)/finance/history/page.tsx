@@ -34,6 +34,28 @@ export default async function FinanceHistoryPage() {
   // no category at all.
   const historyTxns = (txns ?? []).filter(t => t.category !== 'split')
 
+  // Running "after this transaction" band fund snapshot for every transaction
+  // (including splits, which don't appear in history but do affect balances).
+  // Processed oldest→newest so each entry reflects real state at that moment.
+  // category:'reimbursement' is excluded from band fund balances (same rule
+  // as the Finance page's Member Balances panel).
+  const allChron = [...(txns ?? [])].sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  )
+  let runningTotal = 0
+  const runningMember: Record<string, number> = {}
+  const runningBalances: Record<string, { total: number; memberBalance: number | null }> = {}
+  for (const t of allChron) {
+    if (t.category !== 'reimbursement' && t.member_id) {
+      runningTotal += t.amount
+      runningMember[t.member_id] = (runningMember[t.member_id] ?? 0) + t.amount
+    }
+    runningBalances[t.id] = {
+      total: runningTotal,
+      memberBalance: t.member_id ? (runningMember[t.member_id] ?? 0) : null,
+    }
+  }
+
   // A show that hasn't happened yet has nothing to split — same rule
   // /finance/split itself enforces (404s if every unsplit show is still
   // upcoming). Without this, the floating Split button could show up here
@@ -59,6 +81,7 @@ export default async function FinanceHistoryPage() {
         members={members}
         shows={shows ?? []}
         showTitleById={showTitleById}
+        runningBalances={runningBalances}
       />
 
       <FinanceFloatingNav hasUnsplitShows={hasUnsplitShows} />
