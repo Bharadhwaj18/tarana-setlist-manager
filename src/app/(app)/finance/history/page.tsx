@@ -26,16 +26,9 @@ export default async function FinanceHistoryPage() {
 
   const showTitleById = Object.fromEntries((shows ?? []).map(s => [s.id, s.title]))
 
-  // category:'split' already has its own dedicated Split History page —
-  // showing it here too is just duplication. Filtered in JS rather than a
-  // query-level .neq('category', 'split'): that operator excludes rows
-  // where category IS NULL too (Postgres's <> is NULL, not true, for a
-  // NULL operand), which would have silently hidden every transaction with
-  // no category at all.
-  const historyTxns = (txns ?? []).filter(t => t.category !== 'split')
+  const historyTxns = txns ?? []
 
-  // Running "after this transaction" band fund snapshot for every transaction
-  // (including splits, which don't appear in history but do affect balances).
+  // Running "after this transaction" band fund snapshot for every transaction.
   // Processed oldest→newest so each entry reflects real state at that moment.
   // category:'reimbursement' is excluded from band fund balances (same rule
   // as the Finance page's Member Balances panel).
@@ -74,7 +67,7 @@ export default async function FinanceHistoryPage() {
           Split History →
         </Link>
       </div>
-      <p className="mb-6 text-sm text-gray-500">Every transaction — Misc, show income and expenses. Splits are in Split History.</p>
+      <p className="mb-6 text-sm text-gray-500">Every transaction — Misc, show income, expenses, and splits.</p>
 
       <FinanceHistoryList
         transactions={historyTxns}
