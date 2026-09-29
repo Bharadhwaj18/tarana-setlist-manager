@@ -11,6 +11,7 @@ import { buildSplitReportPdf, type SplitReportLine, type SplitReportRow, type Sp
 import { AddTransactionModal } from '@/components/finance/AddTransactionModal'
 import type { FinanceTransaction } from '@/types/finance'
 import type { Show } from '@/types/shows'
+import type { SplitRunReport } from '@/types/split-run'
 
 interface Member { id: string; name: string }
 interface Props {
@@ -319,25 +320,11 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
   // forever, so it always uses the real display name instead.
   const realNameOf = (id: string) => realNames.find(m => m.id === id)?.name ?? 'Unknown'
 
-  const handleSplit = () => {
-    if (!canConfirm) return
-    const shows_: ShowSplitInput[] = selectedShows.map(s => ({ showId: s.id, showTitle: s.title }))
-    const showTitles = selectedShows.map(s => s.title).join(', ')
-    const activePayments = mode === 'auto' ? payments : manualPayments
-    const splitPayments: SplitPayment[] = activePayments
-      .filter(p => p.amount > 0)
-      .map(p => ({ from: p.from, to: p.to, amount: round2(p.amount), description: descriptionFor(p, realNameOf, showTitles) }))
-    startTransition(async () => {
-      const result = await splitShows(shows_, splitPayments)
-      if (result && 'error' in result && result.error) toast(result.error, 'error')
-    })
-  }
-
   const [isDownloading, setIsDownloading] = useState(false)
 
-  const handleDownloadReport = () => {
-    setIsDownloading(true)
-    try {
+  // Everything the Split Report PDF is built from — also what gets frozen
+  // into Split History when the split is confirmed.
+  const buildReport = (): SplitRunReport => {
       // Reflect whichever mode is active — the manual assignments if
       // that's what was actually decided, or the algorithm's routing.
       const activePayments = mode === 'auto' ? payments : manualPayments
@@ -393,7 +380,33 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
         return { name: m.name, balance: round2((memberBalances[m.id] ?? 0) - paidOut) }
       })
 
-      buildSplitReportPdf(selectedShows.map(s => s.title), bandPct, showDetails, rows, totalNet, totalBandFund, allBalances)
+      const meta: SplitRunReport['meta'] = {
+        mode,
+        balancesBefore: realNames.map(m => ({ name: m.name, balance: round2(memberBalances[m.id] ?? 0) })),
+        involvedByShow: perShow.map(p => ({ showTitle: p.show.title, names: p.involved.map(realNameOf) })),
+      }
+      return { showTitles: selectedShows.map(s => s.title), bandPct, shows: showDetails, rows, totalNet, totalBandFund, allBalances, meta }
+  }
+
+  const handleSplit = () => {
+    if (!canConfirm) return
+    const shows_: ShowSplitInput[] = selectedShows.map(s => ({ showId: s.id, showTitle: s.title }))
+    const showTitles = selectedShows.map(s => s.title).join(', ')
+    const activePayments = mode === 'auto' ? payments : manualPayments
+    const splitPayments: SplitPayment[] = activePayments
+      .filter(p => p.amount > 0)
+      .map(p => ({ from: p.from, to: p.to, amount: round2(p.amount), description: descriptionFor(p, realNameOf, showTitles) }))
+    startTransition(async () => {
+      const result = await splitShows(shows_, splitPayments, buildReport())
+      if (result && 'error' in result && result.error) toast(result.error, 'error')
+    })
+  }
+
+  const handleDownloadReport = () => {
+    setIsDownloading(true)
+    try {
+      const r = buildReport()
+      buildSplitReportPdf(r.showTitles, r.bandPct, r.shows, r.rows, r.totalNet, r.totalBandFund, r.allBalances)
       toast('Report downloaded', 'success')
     } finally {
       setIsDownloading(false)

@@ -5,6 +5,8 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { todayISO } from '@/lib/shows'
 import { sendNotification, sendNotificationToAll } from '@/actions/notifications'
+import type { Json } from '@/types/database'
+import type { SplitRunReport, SplitRunPayment, SplitRunShow } from '@/types/split-run'
 
 async function requireTreasurer(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<string | null> {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle()
@@ -172,7 +174,7 @@ export interface SplitPayment {
  * show is still marked split immediately either way; Band Fund balances
  * just reflect only what's actually been paid so far.
  */
-export async function splitShows(shows: ShowSplitInput[], payments: SplitPayment[]): Promise<{ error?: string }> {
+export async function splitShows(shows: ShowSplitInput[], payments: SplitPayment[], report: SplitRunReport): Promise<{ error?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
@@ -204,6 +206,7 @@ export async function splitShows(shows: ShowSplitInput[], payments: SplitPayment
     if (txErr) return { error: txErr.message }
   }
 
+  let pendingIds: string[] = []
   if (crossPayments.length > 0) {
     const pending = crossPayments.map(p => ({
       from_member: p.from,
@@ -213,8 +216,9 @@ export async function splitShows(shows: ShowSplitInput[], payments: SplitPayment
       category: 'split',
       show_id: showId,
     }))
-    const { error: pendingErr } = await supabase.from('pending_payments').insert(pending)
+    const { data: insertedPending, error: pendingErr } = await supabase.from('pending_payments').insert(pending).select('id')
     if (pendingErr) return { error: pendingErr.message }
+    pendingIds = (insertedPending ?? []).map(r => r.id)
 
     for (const p of crossPayments) {
       if (p.from === user.id) continue // don't ping yourself about your own debt
@@ -234,6 +238,34 @@ export async function splitShows(shows: ShowSplitInput[], payments: SplitPayment
     .in('id', shows.map(s => s.showId))
 
   if (showErr) return { error: showErr.message }
+
+  // Freeze this run — the full report plus who pays whom — so Split History
+  // is a record of the split itself, not a re-derivation from live data.
+  const ids = [...new Set(payments.flatMap(p => [p.from, p.to]))]
+  const { data: people } = await supabase.from('profiles').select('id, display_name').in('id', ids)
+  const nameOf = (id: string) => people?.find(p => p.id === id)?.display_name ?? 'Member'
+  let crossIndex = 0
+  const runPayments: SplitRunPayment[] = real.map(p =>
+    p.from === p.to
+      ? { from: p.from, to: p.to, fromName: nameOf(p.from), toName: nameOf(p.to), amount: p.amount, kind: 'self' as const }
+      : { from: p.from, to: p.to, fromName: nameOf(p.from), toName: nameOf(p.to), amount: p.amount, kind: 'transfer' as const, pendingId: pendingIds[crossIndex++] }
+  )
+  const { data: showRows } = await supabase.from('shows').select('id, title, show_date').in('id', shows.map(s => s.showId))
+  const runShows: SplitRunShow[] = report.shows.map((rs, i) => {
+    const row = showRows?.find(r => r.id === shows[i]?.showId)
+    return { id: shows[i]?.showId ?? '', title: rs.showTitle, date: row?.show_date ?? null, net: rs.net }
+  })
+  const { error: runErr } = await supabase.from('split_runs').insert({
+    created_at: now,
+    created_by: user.id,
+    band_pct: report.bandPct,
+    total_net: report.totalNet,
+    total_band_fund: report.totalBandFund,
+    shows: runShows as unknown as Json,
+    payments: runPayments as unknown as Json,
+    report: report as unknown as Json,
+  })
+  if (runErr) return { error: runErr.message }
 
   revalidatePath('/finance')
   revalidatePath('/finance/split')

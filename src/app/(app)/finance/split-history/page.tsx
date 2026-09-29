@@ -1,37 +1,20 @@
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
-import { getCachedAllProfiles, getCachedPendingPayments } from '@/lib/data'
+import { getCachedPendingPayments } from '@/lib/data'
 import { todayISO, isUpcoming } from '@/lib/shows'
 import { SplitHistoryList } from '@/components/finance/SplitHistoryList'
 import { FinanceFloatingNav } from '@/components/finance/FinanceFloatingNav'
-import type { FinanceTransaction } from '@/types/finance'
-import type { PendingPayment } from '@/types'
+import type { SplitRun } from '@/types'
 
 export default async function SplitHistoryPage() {
   const supabase = await createClient()
 
-  const [profiles, { data: shows }, { data: allTxns }, { data: unsplitShows }, pendingPayments] = await Promise.all([
-    getCachedAllProfiles(),
-    supabase.from('shows').select('*').not('split_at', 'is', null).order('split_at', { ascending: false }),
-    supabase.from('finance_transactions').select('*').eq('category', 'split'),
+  const [{ data: runs }, { data: unsplitShows }, pendingPayments] = await Promise.all([
+    supabase.from('split_runs').select('*').order('created_at', { ascending: false }),
     supabase.from('shows').select('id, show_date').is('split_at', null),
     getCachedPendingPayments(),
   ])
-
-  const txnsByShow: Record<string, FinanceTransaction[]> = {}
-  for (const t of allTxns ?? []) {
-    if (!t.show_id) continue
-    if (!txnsByShow[t.show_id]) txnsByShow[t.show_id] = []
-    txnsByShow[t.show_id].push(t)
-  }
-
-  const pendingByShow: Record<string, PendingPayment[]> = {}
-  for (const p of pendingPayments) {
-    if (!p.show_id) continue
-    if (!pendingByShow[p.show_id]) pendingByShow[p.show_id] = []
-    pendingByShow[p.show_id].push(p)
-  }
 
   return (
     <div className="max-w-2xl">
@@ -39,14 +22,14 @@ export default async function SplitHistoryPage() {
         <ChevronLeft className="h-4 w-4" /> Finance
       </Link>
       <h1 className="mb-1 text-2xl font-bold text-gray-900">Split History</h1>
-      <p className="mb-6 text-sm text-gray-500">Every show that&apos;s been split, with exactly who paid what.</p>
+      <p className="mb-6 text-sm text-gray-500">Every time shows have been split, with who paid whom.</p>
 
-      {!shows?.length ? (
+      {!runs?.length ? (
         <div className="rounded-xl border-2 border-dashed border-gray-200 py-16 text-center text-sm text-gray-400">
-          No shows have been split yet.
+          No splits yet.
         </div>
       ) : (
-        <SplitHistoryList shows={shows} txnsByShow={txnsByShow} pendingByShow={pendingByShow} profiles={profiles} />
+        <SplitHistoryList runs={runs as unknown as SplitRun[]} unpaidPendingIds={pendingPayments.map(p => p.id)} />
       )}
 
       {/* A show that hasn't happened yet has nothing to split — same rule

@@ -460,6 +460,45 @@ export type Database = {
         }
         Relationships: []
       }
+      split_runs: {
+        Row: {
+          id: string
+          created_at: string
+          created_by: string | null
+          band_pct: number | null
+          total_net: number
+          total_band_fund: number | null
+          shows: Json
+          payments: Json
+          report: Json | null
+          reconstructed: boolean
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          created_by?: string | null
+          band_pct?: number | null
+          total_net?: number
+          total_band_fund?: number | null
+          shows?: Json
+          payments?: Json
+          report?: Json | null
+          reconstructed?: boolean
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          created_by?: string | null
+          band_pct?: number | null
+          total_net?: number
+          total_band_fund?: number | null
+          shows?: Json
+          payments?: Json
+          report?: Json | null
+          reconstructed?: boolean
+        }
+        Relationships: []
+      }
       push_subscriptions: {
         Row: {
           id: string
