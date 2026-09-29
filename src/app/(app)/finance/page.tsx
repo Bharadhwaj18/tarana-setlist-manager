@@ -6,6 +6,7 @@ import { AddTransactionModal } from '@/components/finance/AddTransactionModal'
 import { TransactionRow } from '@/components/finance/TransactionRow'
 import { ExportModal } from '@/components/finance/ExportModal'
 import { FinanceFloatingNav } from '@/components/finance/FinanceFloatingNav'
+import { ReimburseButton } from '@/components/finance/ReimburseButton'
 import { PendingPaymentsBanner } from '@/components/finance/PendingPaymentsBanner'
 import { cn } from '@/lib/utils'
 
@@ -99,9 +100,20 @@ export default async function FinancePage() {
                   style={{ width: `${Math.round((Math.abs(m.balance) / maxBal) * 100)}%` }}
                 />
               </div>
-              {m.balance < 0 && (
-                <p className="mt-0.5 text-[10px] font-medium text-red-500">Reimbursement pending</p>
-              )}
+              {m.balance < 0 && (() => {
+                const incoming = pendingPayments.filter(p => p.to_member === m.id && p.category === 'balance_reimbursement')
+                const covered = incoming.reduce((s, p) => s + p.amount, 0)
+                return (
+                  <div className="mt-0.5">
+                    <p className="text-[10px] font-medium text-red-500">
+                      {incoming.length > 0
+                        ? `${fmt(covered)} assigned: ${incoming.map(p => nameOf(p.from_member)).join(', ')}`
+                        : 'Reimbursement pending'}
+                    </p>
+                    {-m.balance - covered > 0.005 && <ReimburseButton memberId={m.id} payers={memberOptions} />}
+                  </div>
+                )
+              })()}
             </div>
           ))}
         </div>

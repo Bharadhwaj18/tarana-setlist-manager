@@ -35,31 +35,49 @@ export function PendingPaymentsBanner({ payments, profiles }: Props) {
 
   if (payments.length === 0) return null
 
-  const handleMarkPaid = (id: string) => {
+  const handleMarkPaid = (ids: string[]) => {
     startTransition(async () => {
-      const result = await markPendingPaymentPaid(id)
-      if (result.error) toast(result.error, 'error')
-      else toast('Marked as paid', 'success')
+      for (const id of ids) {
+        const result = await markPendingPaymentPaid(id)
+        if (result.error) { toast(result.error, 'error'); return }
+      }
+      toast('Marked as paid', 'success')
     })
   }
+
+  // One row per recipient — everything this person owes the same bandmate
+  // is paid in one go, with the breakdown kept visible underneath.
+  const groups = [...new Set(payments.map(p => p.to_member))].map(to => {
+    const items = payments.filter(p => p.to_member === to)
+    return { to, items, total: round2(items.reduce((s, p) => s + p.amount, 0)) }
+  })
 
   const total = round2(payments.reduce((s, p) => s + p.amount, 0))
 
   return (
     <section className="rounded-xl border border-red-200 bg-red-50 p-4">
       <h2 className="mb-3 text-sm font-semibold text-red-800">
-        You owe {fmt(total)} · {payments.length} pending payment{payments.length !== 1 ? 's' : ''}
+        You owe {fmt(total)} · {groups.length} pending payment{groups.length !== 1 ? 's' : ''}
       </h2>
       <div className="space-y-2">
-        {payments.map(p => (
-          <div key={p.id} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2.5 shadow-sm">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-gray-800">{nameOf(p.to_member)}</p>
-              <p className="truncate text-xs text-gray-400">{p.description}</p>
+        {groups.map(g => (
+          <div key={g.to} className="rounded-lg bg-white px-3 py-2.5 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <p className="min-w-0 truncate text-sm font-medium text-gray-800">{nameOf(g.to)}</p>
+              <div className="flex shrink-0 items-center gap-3">
+                <span className="text-sm font-bold text-gray-800">{fmt(g.total)}</span>
+                <Button size="sm" loading={isPending} onClick={() => handleMarkPaid(g.items.map(p => p.id))}>Mark paid</Button>
+              </div>
             </div>
-            <div className="flex shrink-0 items-center gap-3">
-              <span className="text-sm font-bold text-gray-800">{fmt(p.amount)}</span>
-              <Button size="sm" loading={isPending} onClick={() => handleMarkPaid(p.id)}>Mark paid</Button>
+            <div className="mt-1 space-y-0.5">
+              {g.items.map(p => (
+                <div key={p.id} className="flex items-baseline justify-between gap-3 text-xs text-gray-400">
+                  <span className="min-w-0 truncate">
+                    {p.category === 'balance_reimbursement' ? 'Balance reimbursement' : p.description}
+                  </span>
+                  <span className="shrink-0 tabular-nums">{fmt(p.amount)}</span>
+                </div>
+              ))}
             </div>
           </div>
         ))}
