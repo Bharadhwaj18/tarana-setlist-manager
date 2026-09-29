@@ -52,7 +52,12 @@ function descriptionFor(payment: Payment, nameOf: (id: string) => string, showTi
 }
 
 export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalances, memberFundBalances }: Props) {
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(shows.length === 1 ? [shows[0].id] : []))
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => {
+    if (shows.length !== 1) return new Set()
+    const txns = txnsByShow[shows[0].id] ?? []
+    const net = txns.reduce((s, t) => s + t.amount, 0)
+    return net > 0 ? new Set([shows[0].id]) : new Set()
+  })
   const [bandPct, setBandPct] = useState(20)
   const [involvedByShow, setInvolvedByShow] = useState<Record<string, Set<string>>>(
     Object.fromEntries(shows.map(s => [s.id, new Set(members.map(m => m.id))]))
@@ -287,6 +292,7 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
   })
 
   const toggleShow = (id: string) => {
+    if (netForShow(id) <= 0) return
     setSelectedIds(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id); else next.add(id)
@@ -407,21 +413,26 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
             const involved = involvedByShow[s.id] ?? new Set()
             const showData = perShow.find(p => p.show.id === s.id)
 
+            const splittable = net > 0
             return (
               <div key={s.id} className={cn('rounded-lg border transition-colors', selected ? 'border-brand-400 bg-brand-50' : 'border-brand-200')}>
-                <button type="button" onClick={() => toggleShow(s.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left">
+                <button type="button" onClick={() => toggleShow(s.id)} disabled={!splittable}
+                  className={cn('flex w-full items-center gap-3 px-4 py-3 text-left', !splittable && 'cursor-not-allowed opacity-60')}>
                   <span className={cn('flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors',
-                    selected ? 'border-brand-400 bg-brand-400' : 'border-gray-300')}>
-                    {selected && <Check className="h-3 w-3 text-white" />}
+                    !splittable ? 'border-gray-200 bg-gray-100' : selected ? 'border-brand-400 bg-brand-400' : 'border-gray-300')}>
+                    {selected && splittable && <Check className="h-3 w-3 text-white" />}
                   </span>
                   <div className="flex-1">
-                    <p className="font-medium text-gray-900">{s.title}</p>
+                    <p className={cn('font-medium', splittable ? 'text-gray-900' : 'text-gray-400')}>{s.title}</p>
                     {s.show_date && <p className="text-xs text-gray-400">
                       {new Date(s.show_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'long' })}
                       {s.venue ? ` · ${s.venue}` : ''}
                     </p>}
+                    {!splittable && <p className="text-xs text-red-400">Awaiting credit — can&apos;t split yet</p>}
                   </div>
-                  <p className="text-sm font-bold text-gray-700">{fmt(net)}</p>
+                  <p className={cn('text-sm font-bold tabular-nums', net < 0 ? 'text-red-500' : 'text-gray-700')}>
+                    {net < 0 ? '−' : ''}{fmt(net)}
+                  </p>
                 </button>
 
                 {selected && (
