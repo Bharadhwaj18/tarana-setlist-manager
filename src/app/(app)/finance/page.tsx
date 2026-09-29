@@ -124,15 +124,20 @@ export default async function FinancePage() {
             </Link>
           </div>
           <div className="space-y-1.5">
-            {unsplitShows.map(s => (
-              <div key={s.id} className="flex items-center justify-between text-sm">
-                <span className="font-medium text-amber-900">{s.title}</span>
-                <div className="flex items-center gap-3">
-                  {s.show_date && <span className="text-amber-600">{new Date(s.show_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>}
-                  <span className="font-bold text-amber-800">{fmt(netForShow(s.id))}</span>
+            {unsplitShows.map(s => {
+              const net = netForShow(s.id)
+              return (
+                <div key={s.id} className="flex items-center justify-between text-sm">
+                  <span className="font-medium text-amber-900">{s.title}</span>
+                  <div className="flex items-center gap-3">
+                    {s.show_date && <span className="text-amber-600">{new Date(s.show_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>}
+                    <span className={cn('font-bold tabular-nums', net < 0 ? 'text-red-600' : 'text-amber-800')}>
+                      {net < 0 ? '−' : ''}{fmt(net)}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </section>
       )}
