@@ -86,18 +86,17 @@ export function TransactionRow({ transaction: t, members, shows, payerName, badg
               {badge.label}
             </span>
           )}
+          {afterMemberBalance !== undefined && (
+            <span className={cn('font-medium tabular-nums', afterMemberBalance < 0 ? 'text-red-500' : 'text-gray-500')}>
+              {fmtSigned(afterMemberBalance)}
+            </span>
+          )}
         </p>
       </div>
       {afterFundTotal !== undefined && (
         <div className="shrink-0 text-right">
           <p className="text-[10px] text-gray-400">Fund total</p>
           <p className={cn('text-xs font-semibold tabular-nums', afterFundTotal < 0 ? 'text-red-500' : 'text-gray-700')}>{fmtSigned(afterFundTotal)}</p>
-        </div>
-      )}
-      {afterMemberBalance !== undefined && (
-        <div className="shrink-0 text-right">
-          <p className="text-[10px] text-gray-400">{payerName}</p>
-          <p className={cn('text-xs font-semibold tabular-nums', afterMemberBalance < 0 ? 'text-red-500' : 'text-gray-700')}>{fmtSigned(afterMemberBalance)}</p>
         </div>
       )}
       <span className={cn('shrink-0 text-sm font-bold tabular-nums', isCredit ? 'text-green-600' : 'text-red-500')}>
