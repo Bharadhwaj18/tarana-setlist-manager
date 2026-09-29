@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import { requireWorkspaceId } from '@/lib/workspace'
 import { getCachedAllProfiles, getCachedUser } from '@/lib/data'
 import { todayISO, isUpcoming } from '@/lib/shows'
 import { FinanceHistoryList } from '@/components/finance/FinanceHistoryList'
@@ -8,6 +9,7 @@ import { FinanceFloatingNav } from '@/components/finance/FinanceFloatingNav'
 
 export default async function FinanceHistoryPage() {
   const supabase = await createClient()
+  const ws = await requireWorkspaceId()
 
   const [{ data: { user } }, profiles, { data: txns }, { data: shows }, { data: budgets }] = await Promise.all([
     getCachedUser(),
@@ -15,9 +17,9 @@ export default async function FinanceHistoryPage() {
     // Sorted by when it was actually recorded, not the (user-editable, can
     // be backdated) `date` field — otherwise "latest at top" doesn't match
     // what you just did if any entry has a different logical date.
-    supabase.from('finance_transactions').select('*').order('created_at', { ascending: false }),
-    supabase.from('shows').select('*'),
-    supabase.from('budgets').select('*').order('created_at', { ascending: false }),
+    supabase.from('finance_transactions').select('*').eq('workspace_id', ws).order('created_at', { ascending: false }),
+    supabase.from('shows').select('*').eq('workspace_id', ws),
+    supabase.from('budgets').select('*').eq('workspace_id', ws).order('created_at', { ascending: false }),
   ])
 
   const members = profiles.map(p => ({

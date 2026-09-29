@@ -32,6 +32,7 @@ export type Database = {
       }
       songs: {
         Row: {
+          workspace_id: string | null
           id: string
           created_by: string
           updated_by: string | null
@@ -46,6 +47,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          workspace_id?: string | null
           id?: string
           created_by: string
           updated_by?: string | null
@@ -60,6 +62,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          workspace_id?: string | null
           id?: string
           created_by?: string
           updated_by?: string | null
@@ -77,6 +80,7 @@ export type Database = {
       }
       setlists: {
         Row: {
+          workspace_id: string | null
           id: string
           created_by: string
           updated_by: string | null
@@ -89,6 +93,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          workspace_id?: string | null
           id?: string
           created_by: string
           updated_by?: string | null
@@ -101,6 +106,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          workspace_id?: string | null
           id?: string
           created_by?: string
           updated_by?: string | null
@@ -166,6 +172,7 @@ export type Database = {
       }
       shows: {
         Row: {
+          workspace_id: string | null
           id: string
           title: string
           show_date: string | null
@@ -193,6 +200,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          workspace_id?: string | null
           id?: string
           title: string
           show_date?: string | null
@@ -220,6 +228,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          workspace_id?: string | null
           id?: string
           title?: string
           show_date?: string | null
@@ -258,6 +267,7 @@ export type Database = {
       }
       event_management: {
         Row: {
+          workspace_id: string | null
           id: string
           name: string
           contact_name: string | null
@@ -271,6 +281,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          workspace_id?: string | null
           id?: string
           name: string
           contact_name?: string | null
@@ -284,6 +295,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          workspace_id?: string | null
           id?: string
           name?: string
           contact_name?: string | null
@@ -300,6 +312,7 @@ export type Database = {
       }
       notes: {
         Row: {
+          workspace_id: string | null
           id: string
           title: string
           content: string | null
@@ -318,6 +331,7 @@ export type Database = {
           labels: string[] | null
         }
         Insert: {
+          workspace_id?: string | null
           id?: string
           title: string
           content?: string | null
@@ -336,6 +350,7 @@ export type Database = {
           labels?: string[] | null
         }
         Update: {
+          workspace_id?: string | null
           id?: string
           title?: string
           content?: string | null
@@ -387,6 +402,7 @@ export type Database = {
       }
       finance_transactions: {
         Row: {
+          workspace_id: string | null
           id: string
           member_id: string | null
           amount: number
@@ -399,6 +415,7 @@ export type Database = {
           created_at: string
         }
         Insert: {
+          workspace_id?: string | null
           id?: string
           member_id?: string | null
           amount: number
@@ -411,6 +428,7 @@ export type Database = {
           created_at?: string
         }
         Update: {
+          workspace_id?: string | null
           id?: string
           member_id?: string | null
           amount?: number
@@ -426,6 +444,7 @@ export type Database = {
       }
       pending_payments: {
         Row: {
+          workspace_id: string | null
           id: string
           from_member: string
           to_member: string
@@ -438,6 +457,7 @@ export type Database = {
           paid_transaction_id: string | null
         }
         Insert: {
+          workspace_id?: string | null
           id?: string
           from_member: string
           to_member: string
@@ -450,6 +470,7 @@ export type Database = {
           paid_transaction_id?: string | null
         }
         Update: {
+          workspace_id?: string | null
           id?: string
           from_member?: string
           to_member?: string
@@ -465,6 +486,7 @@ export type Database = {
       }
       budgets: {
         Row: {
+          workspace_id: string | null
           id: string
           name: string
           allocated_amount: number
@@ -476,6 +498,7 @@ export type Database = {
           created_at: string
         }
         Insert: {
+          workspace_id?: string | null
           id?: string
           name: string
           allocated_amount: number
@@ -487,6 +510,7 @@ export type Database = {
           created_at?: string
         }
         Update: {
+          workspace_id?: string | null
           id?: string
           name?: string
           allocated_amount?: number
@@ -529,8 +553,96 @@ export type Database = {
         }
         Relationships: []
       }
+      workspaces: {
+        Row: {
+          id: string
+          name: string
+          type: string
+          owner_id: string
+          plan: string
+          status: string
+          trial_ends_at: string | null
+          past_due_since: string | null
+          read_only_until: string | null
+          blocked_at: string | null
+          settings: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          type?: string
+          owner_id: string
+          plan?: string
+          status?: string
+          trial_ends_at?: string | null
+          past_due_since?: string | null
+          read_only_until?: string | null
+          blocked_at?: string | null
+          settings?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          type?: string
+          owner_id?: string
+          plan?: string
+          status?: string
+          trial_ends_at?: string | null
+          past_due_since?: string | null
+          read_only_until?: string | null
+          blocked_at?: string | null
+          settings?: Json
+          created_at?: string
+        }
+        Relationships: []
+      }
+      workspace_members: {
+        Row: {
+          workspace_id: string
+          user_id: string
+          role: string
+          permissions: Json
+          created_at: string
+        }
+        Insert: {
+          workspace_id: string
+          user_id: string
+          role?: string
+          permissions?: Json
+          created_at?: string
+        }
+        Update: {
+          workspace_id?: string
+          user_id?: string
+          role?: string
+          permissions?: Json
+          created_at?: string
+        }
+        Relationships: []
+      }
+      plan_features: {
+        Row: {
+          plan: string
+          feature: string
+          value: Json
+        }
+        Insert: {
+          plan: string
+          feature: string
+          value?: Json
+        }
+        Update: {
+          plan?: string
+          feature?: string
+          value?: Json
+        }
+        Relationships: []
+      }
       split_runs: {
         Row: {
+          workspace_id: string | null
           id: string
           created_at: string
           created_by: string | null
@@ -543,6 +655,7 @@ export type Database = {
           reconstructed: boolean
         }
         Insert: {
+          workspace_id?: string | null
           id?: string
           created_at?: string
           created_by?: string | null
@@ -555,6 +668,7 @@ export type Database = {
           reconstructed?: boolean
         }
         Update: {
+          workspace_id?: string | null
           id?: string
           created_at?: string
           created_by?: string | null
@@ -597,6 +711,7 @@ export type Database = {
       }
       calendar_events: {
         Row: {
+          workspace_id: string | null
           id: string
           title: string
           start_date: string
@@ -606,6 +721,7 @@ export type Database = {
           created_at: string
         }
         Insert: {
+          workspace_id?: string | null
           id?: string
           title: string
           start_date: string
@@ -615,6 +731,7 @@ export type Database = {
           created_at?: string
         }
         Update: {
+          workspace_id?: string | null
           id?: string
           title?: string
           start_date?: string
@@ -627,6 +744,7 @@ export type Database = {
       }
       unavailability: {
         Row: {
+          workspace_id: string | null
           id: string
           member_id: string
           start_date: string
@@ -635,6 +753,7 @@ export type Database = {
           created_at: string
         }
         Insert: {
+          workspace_id?: string | null
           id?: string
           member_id: string
           start_date: string
@@ -643,6 +762,7 @@ export type Database = {
           created_at?: string
         }
         Update: {
+          workspace_id?: string | null
           id?: string
           member_id?: string
           start_date?: string
@@ -690,6 +810,7 @@ export type Database = {
       }
       recordings: {
         Row: {
+          workspace_id: string | null
           id: string
           title: string
           file_path: string
@@ -700,6 +821,7 @@ export type Database = {
           created_at: string
         }
         Insert: {
+          workspace_id?: string | null
           id?: string
           title: string
           file_path: string
@@ -710,6 +832,7 @@ export type Database = {
           created_at?: string
         }
         Update: {
+          workspace_id?: string | null
           id?: string
           title?: string
           file_path?: string

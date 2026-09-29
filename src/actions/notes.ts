@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { requireWorkspaceId } from '@/lib/workspace'
 import { sendNotification } from '@/actions/notifications'
 import { addDaysISO, addMonthsISO, formatDateDMY } from '@/lib/dates'
 import type { Recurrence } from '@/types/notes'
@@ -89,6 +90,7 @@ export async function createNote(data: NoteFormData): Promise<{ error?: string; 
     title: data.title.trim(),
     content: data.content.trim() || null,
     created_by: user.id,
+    workspace_id: await requireWorkspaceId(),
     assigned_to: data.assignedTo,
     due_date: data.dueDate,
     remind_days_before: data.remindDaysBefore,
@@ -225,6 +227,7 @@ export async function toggleNoteComplete(id: string, completed: boolean): Promis
         title: note.title,
         content: note.content,
         created_by: note.created_by,
+        workspace_id: note.workspace_id,
         assigned_to: note.assigned_to,
         due_date: nextDueDate(note.due_date, note.recurrence as Recurrence),
         remind_days_before: note.remind_days_before,

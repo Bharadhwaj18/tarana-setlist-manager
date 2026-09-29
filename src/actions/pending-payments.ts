@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { todayISO } from '@/lib/shows'
 import { sendNotification } from '@/actions/notifications'
+import { hasWorkspacePermission, requireWorkspaceId } from '@/lib/workspace'
 
 const BALANCE_REIMBURSEMENT = 'balance_reimbursement'
 
@@ -18,10 +19,12 @@ export async function requestBalanceReimbursement(memberId: string, payerId: str
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
   if (memberId === payerId) return { error: 'The payer must be someone else.' }
+  const workspaceId = await requireWorkspaceId()
 
   const { data: txns, error: txErr } = await supabase
     .from('finance_transactions')
     .select('amount, category')
+    .eq('workspace_id', workspaceId)
     .eq('member_id', memberId)
   if (txErr) return { error: txErr.message }
   const balance = (txns ?? []).filter(t => t.category !== 'reimbursement').reduce((s, t) => s + t.amount, 0)
@@ -29,6 +32,7 @@ export async function requestBalanceReimbursement(memberId: string, payerId: str
   const { data: open, error: openErr } = await supabase
     .from('pending_payments')
     .select('*')
+    .eq('workspace_id', workspaceId)
     .eq('to_member', memberId)
     .eq('category', BALANCE_REIMBURSEMENT)
     .is('paid_at', null)
@@ -54,6 +58,7 @@ export async function requestBalanceReimbursement(memberId: string, payerId: str
       description: `Balance reimbursement to ${recipient?.display_name ?? 'member'}`,
       category: BALANCE_REIMBURSEMENT,
       show_id: null,
+      workspace_id: workspaceId,
     })
     if (error) return { error: error.message }
   }
@@ -94,8 +99,8 @@ export async function markPendingPaymentPaid(id: string): Promise<{ error?: stri
   if (pending.paid_at) return { error: 'Already marked paid.' }
 
   if (pending.from_member !== user.id) {
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
-    if (profile?.role !== 'treasurer') return { error: 'Only the payer (or a treasurer) can mark this paid.' }
+    const wsId = pending.workspace_id ?? (await requireWorkspaceId())
+    if (!(await hasWorkspacePermission(user.id, wsId, 'treasurer'))) return { error: 'Only the payer (or a treasurer) can mark this paid.' }
   }
 
   const { data: txn, error: txErr } = await supabase
@@ -108,6 +113,7 @@ export async function markPendingPaymentPaid(id: string): Promise<{ error?: stri
       show_id: pending.show_id,
       date: todayISO(),
       recorded_by: user.id,
+      workspace_id: pending.workspace_id,
     })
     .select('id')
     .single()
@@ -124,6 +130,7 @@ export async function markPendingPaymentPaid(id: string): Promise<{ error?: stri
       show_id: null,
       date: todayISO(),
       recorded_by: user.id,
+      workspace_id: pending.workspace_id,
     })
     if (creditErr) return { error: creditErr.message }
   }

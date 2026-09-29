@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { requireWorkspaceId } from '@/lib/workspace'
 import { sendNotification, sendNotificationToAll } from '@/actions/notifications'
 import { formatDateDMY } from '@/lib/dates'
 import type { UnavailabilityFormData } from '@/lib/validators'
@@ -16,6 +17,7 @@ export async function addUnavailability(data: UnavailabilityFormData): Promise<{
     start_date: data.start_date,
     end_date: data.end_date,
     reason: data.reason?.trim() || null,
+    workspace_id: await requireWorkspaceId(),
   }).select('id').single()
   if (error) return { error: error.message }
 

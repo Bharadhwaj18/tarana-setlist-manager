@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import { requireWorkspaceId } from '@/lib/workspace'
 import { getCachedPendingPayments } from '@/lib/data'
 import { todayISO, isUpcoming } from '@/lib/shows'
 import { SplitHistoryList } from '@/components/finance/SplitHistoryList'
@@ -9,10 +10,11 @@ import type { SplitRun } from '@/types'
 
 export default async function SplitHistoryPage() {
   const supabase = await createClient()
+  const ws = await requireWorkspaceId()
 
   const [{ data: runs }, { data: unsplitShows }, pendingPayments] = await Promise.all([
-    supabase.from('split_runs').select('*').order('created_at', { ascending: false }),
-    supabase.from('shows').select('id, show_date').is('split_at', null),
+    supabase.from('split_runs').select('*').eq('workspace_id', ws).order('created_at', { ascending: false }),
+    supabase.from('shows').select('id, show_date').eq('workspace_id', ws).is('split_at', null),
     getCachedPendingPayments(),
   ])
 

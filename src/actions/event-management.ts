@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { requireWorkspaceId } from '@/lib/workspace'
 import type { EventManagementFormData } from '@/lib/validators'
 
 export async function createEventManagement(data: EventManagementFormData): Promise<{ error?: string; id?: string }> {
@@ -12,7 +13,7 @@ export async function createEventManagement(data: EventManagementFormData): Prom
 
   const { data: company, error } = await supabase
     .from('event_management')
-    .insert({ ...data, created_by: user.id })
+    .insert({ ...data, created_by: user.id, workspace_id: await requireWorkspaceId(), })
     .select('id')
     .single()
 

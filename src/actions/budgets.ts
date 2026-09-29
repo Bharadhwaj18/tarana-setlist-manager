@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { todayISO } from '@/lib/shows'
+import { isCurrentTreasurer, requireWorkspaceId } from '@/lib/workspace'
 
 type Supabase = Awaited<ReturnType<typeof createClient>>
 
@@ -10,8 +11,7 @@ async function requireTreasurer(): Promise<{ supabase: Supabase; userId: string 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
-  if (profile?.role !== 'treasurer') return { error: 'Only a treasurer can manage budgets.' }
+  if (!(await isCurrentTreasurer())) return { error: 'Only a treasurer can manage budgets.' }
   return { supabase, userId: user.id }
 }
 
@@ -49,6 +49,7 @@ export async function createBudget(data: BudgetInput): Promise<{ error?: string;
       start_date: data.start_date || todayISO(),
       end_date: data.end_date || null,
       created_by: auth.userId,
+      workspace_id: await requireWorkspaceId(),
     })
     .select('id')
     .single()

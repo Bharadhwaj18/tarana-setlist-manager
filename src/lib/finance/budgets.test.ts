@@ -5,11 +5,11 @@ import type { FinanceTransaction } from '@/types/finance'
 
 const budget = (o: Partial<Budget> = {}): Budget => ({
   id: 'b1', name: 'Gear', allocated_amount: 1000, recurrence: 'none', start_date: '2026-09-01',
-  end_date: null, status: 'active', created_by: 'u', created_at: '', ...o,
+  end_date: null, status: 'active', created_by: 'u', created_at: '', workspace_id: null, ...o,
 })
 const txn = (o: Partial<FinanceTransaction>): FinanceTransaction => ({
   id: Math.random().toString(), member_id: 'u', amount: -100, description: '', category: 'misc',
-  show_id: null, budget_id: 'b1', date: '2026-09-10', recorded_by: 'u', created_at: '', ...o,
+  show_id: null, budget_id: 'b1', date: '2026-09-10', recorded_by: 'u', created_at: '', workspace_id: null, ...o,
 })
 
 describe('computeBudgetProgress', () => {

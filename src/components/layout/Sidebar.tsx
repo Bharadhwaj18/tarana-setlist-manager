@@ -9,6 +9,7 @@ import { ACTIVE_SETLIST_COOKIE } from '@/lib/setlist-context'
 import { useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { NotificationBell } from './NotificationBell'
+import { WorkspaceSwitcher, type WorkspaceOption } from './WorkspaceSwitcher'
 import type { NotificationItem } from '@/types/notifications'
 
 function LogoImage() {
@@ -38,6 +39,9 @@ interface SidebarProps {
   pendingPaymentCount?: number
   /** This user's notifications, sender names already resolved server-side. */
   notifications?: NotificationItem[]
+  /** Workspaces this user belongs to, and which one is selected. */
+  workspaces?: WorkspaceOption[]
+  currentWorkspaceId?: string
 }
 
 const navItems = [
@@ -52,7 +56,7 @@ const navItems = [
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
-export function Sidebar({ user, pendingPaymentCount = 0, notifications = [] }: SidebarProps) {
+export function Sidebar({ user, pendingPaymentCount = 0, notifications = [], workspaces = [], currentWorkspaceId = '' }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -103,6 +107,10 @@ export function Sidebar({ user, pendingPaymentCount = 0, notifications = [] }: S
     </nav>
   )
 
+  const switcher = workspaces.length > 1 ? (
+    <WorkspaceSwitcher workspaces={workspaces} currentId={currentWorkspaceId} onSwitched={() => setMobileOpen(false)} />
+  ) : null
+
   const footer = (
     <div className="border-t border-brand-200 p-4">
       <div className="mb-3 flex items-center gap-3">
@@ -136,6 +144,7 @@ export function Sidebar({ user, pendingPaymentCount = 0, notifications = [] }: S
           {logo}
           <NotificationBell notifications={notifications} />
         </div>
+        {switcher}
         <div className="flex flex-1 flex-col overflow-y-auto px-3">
           {nav}
         </div>
@@ -166,6 +175,7 @@ export function Sidebar({ user, pendingPaymentCount = 0, notifications = [] }: S
           <div className="flex items-center border-b border-brand-200 px-4 py-4">
             {logo}
           </div>
+          {switcher}
           <div className="flex flex-1 flex-col overflow-y-auto px-3">
             {nav}
           </div>

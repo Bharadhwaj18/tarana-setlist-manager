@@ -10,6 +10,7 @@ import { ReimburseButton } from '@/components/finance/ReimburseButton'
 import { PendingPaymentsBanner } from '@/components/finance/PendingPaymentsBanner'
 import { BudgetsSection } from '@/components/finance/BudgetsSection'
 import { computeBudgetProgress, unallocatedFund } from '@/lib/finance/budgets'
+import { isCurrentTreasurer, requireWorkspaceId } from '@/lib/workspace'
 import { cn } from '@/lib/utils'
 
 function fmt(n: number) {
@@ -18,14 +19,15 @@ function fmt(n: number) {
 
 export default async function FinancePage() {
   const supabase = await createClient()
+  const ws = await requireWorkspaceId()
 
   const [{ data: { user } }, profiles, { data: txns }, { data: shows }, pendingPayments, { data: budgets }] = await Promise.all([
     getCachedUser(),
     getCachedAllProfiles(),
-    supabase.from('finance_transactions').select('*').order('created_at', { ascending: false }),
-    supabase.from('shows').select('*').order('show_date', { ascending: false }),
+    supabase.from('finance_transactions').select('*').eq('workspace_id', ws).order('created_at', { ascending: false }),
+    supabase.from('shows').select('*').eq('workspace_id', ws).order('show_date', { ascending: false }),
     getCachedPendingPayments(),
-    supabase.from('budgets').select('*').order('created_at', { ascending: true }),
+    supabase.from('budgets').select('*').eq('workspace_id', ws).order('created_at', { ascending: true }),
   ])
 
   // Balance per member. There's no separate Band Fund bucket — whatever a
@@ -65,8 +67,7 @@ export default async function FinancePage() {
 
   const budgetProgress = (budgets ?? []).map(b => computeBudgetProgress(b, txns ?? [], today))
   const unallocated = unallocatedFund(memberTotal, budgetProgress)
-  const { data: roleRow } = user ? await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle() : { data: null }
-  const isTreasurer = roleRow?.role === 'treasurer'
+  const isTreasurer = await isCurrentTreasurer()
   const memberNames = Object.fromEntries(profiles.map(p => [p.id, p.display_name ?? 'Member']))
 
   const memberOptions = profiles.map(p => ({ id: p.id, name: p.id === user?.id ? 'You' : (p.display_name ?? 'Member') }))

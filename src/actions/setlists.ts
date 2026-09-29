@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { requireWorkspaceId } from '@/lib/workspace'
 import { sendNotificationToAll } from '@/actions/notifications'
 import { formatDateDMY } from '@/lib/dates'
 import type { SetlistFormData } from '@/lib/validators'
@@ -15,7 +16,7 @@ export async function createSetlist(data: SetlistFormData) {
 
   const { data: setlist, error } = await supabase
     .from('setlists')
-    .insert({ ...data, created_by: user.id })
+    .insert({ ...data, created_by: user.id, workspace_id: await requireWorkspaceId(), })
     .select()
     .single()
 
@@ -125,7 +126,7 @@ export async function bulkImportSongs(
   if (!user) throw new Error('Not authenticated')
 
   // Fetch all existing songs to match by title (case-insensitive)
-  const { data: existingSongs } = await supabase.from('songs').select('id, title')
+  const { data: existingSongs } = await supabase.from('songs').select('id, title').eq('workspace_id', await requireWorkspaceId())
   const songMap = new Map(
     (existingSongs ?? []).map(s => [s.title.toLowerCase().trim(), s.id])
   )
@@ -154,6 +155,7 @@ export async function bulkImportSongs(
           title: parsed.title,
           song_key: parsed.song_key ?? null,
           created_by: user.id,
+          workspace_id: await requireWorkspaceId(),
         })
         .select('id')
         .single()
@@ -200,7 +202,7 @@ export async function quickCreateSongAndAdd(
 
   const { data: newSong, error: createError } = await supabase
     .from('songs')
-    .insert({ title: trimmed, created_by: user.id })
+    .insert({ title: trimmed, created_by: user.id, workspace_id: await requireWorkspaceId(), })
     .select('id, title, artist, song_key')
     .single()
 
@@ -262,7 +264,7 @@ export async function syncSetlistFromText(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
-  const { data: existingSongsRaw } = await supabase.from('songs').select('id, title, song_key')
+  const { data: existingSongsRaw } = await supabase.from('songs').select('id, title, song_key').eq('workspace_id', await requireWorkspaceId())
   const existingSongs = existingSongsRaw ?? []
   const byTitle = new Map(existingSongs.map(s => [s.title.toLowerCase().trim(), s]))
   const byId = new Map(existingSongs.map(s => [s.id, s]))
@@ -289,7 +291,7 @@ export async function syncSetlistFromText(
     if (!songId) {
       const { data: newSong, error } = await supabase
         .from('songs')
-        .insert({ title: parsed.title, song_key: parsed.song_key ?? null, created_by: user.id })
+        .insert({ title: parsed.title, song_key: parsed.song_key ?? null, created_by: user.id, workspace_id: await requireWorkspaceId(), })
         .select('id')
         .single()
       if (error || !newSong) continue

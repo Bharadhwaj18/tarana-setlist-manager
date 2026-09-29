@@ -4,13 +4,14 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { todayISO } from '@/lib/shows'
+import { getCachedAllProfiles } from '@/lib/data'
+import { isCurrentTreasurer, requireWorkspaceId } from '@/lib/workspace'
 import { sendNotification, sendNotificationToAll } from '@/actions/notifications'
 import type { Json } from '@/types/database'
 import type { SplitRunReport, SplitRunPayment, SplitRunShow } from '@/types/split-run'
 
-async function requireTreasurer(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<string | null> {
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle()
-  if (profile?.role !== 'treasurer') return 'Only a treasurer can do this.'
+async function requireTreasurer(): Promise<string | null> {
+  if (!(await isCurrentTreasurer())) return 'Only a treasurer can do this.'
   return null
 }
 
@@ -68,6 +69,7 @@ export async function addTransaction(data: TransactionInput): Promise<{ error?: 
 
   const { error } = await supabase.from('finance_transactions').insert({
     ...data,
+    workspace_id: await requireWorkspaceId(),
     date: data.date ?? todayISO(),
     recorded_by: user.id,
   })
@@ -137,7 +139,7 @@ export async function addShow(data: {
 
   const { data: inserted, error } = await supabase
     .from('shows')
-    .insert({ ...data, created_by: user.id })
+    .insert({ ...data, created_by: user.id, workspace_id: await requireWorkspaceId(), })
     .select('id')
     .single()
   if (error) return { error: error.message }
@@ -185,9 +187,10 @@ export async function splitShows(shows: ShowSplitInput[], payments: SplitPayment
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
-  const permissionError = await requireTreasurer(supabase, user.id)
+  const permissionError = await requireTreasurer()
   if (permissionError) return { error: permissionError }
 
+  const workspaceId = await requireWorkspaceId()
   const now = new Date().toISOString()
   const today = todayISO()
   // Only tie transactions to a specific show when there's exactly one in
@@ -207,6 +210,7 @@ export async function splitShows(shows: ShowSplitInput[], payments: SplitPayment
       show_id: showId,
       date: today,
       recorded_by: user.id,
+      workspace_id: workspaceId,
     }))
     const { error: txErr } = await supabase.from('finance_transactions').insert(transactions)
     if (txErr) return { error: txErr.message }
@@ -221,6 +225,7 @@ export async function splitShows(shows: ShowSplitInput[], payments: SplitPayment
       description: p.description,
       category: 'split',
       show_id: showId,
+      workspace_id: workspaceId,
     }))
     const { data: insertedPending, error: pendingErr } = await supabase.from('pending_payments').insert(pending).select('id')
     if (pendingErr) return { error: pendingErr.message }
@@ -264,6 +269,7 @@ export async function splitShows(shows: ShowSplitInput[], payments: SplitPayment
   const { error: runErr } = await supabase.from('split_runs').insert({
     created_at: now,
     created_by: user.id,
+    workspace_id: workspaceId,
     band_pct: report.bandPct,
     total_net: report.totalNet,
     total_band_fund: report.totalBandFund,
@@ -290,6 +296,7 @@ export async function exportTransactions(filters: {
   let query = supabase
     .from('finance_transactions')
     .select('*')
+    .eq('workspace_id', await requireWorkspaceId())
     .order('date', { ascending: false })
 
   if (filters.dateFrom) query = query.gte('date', filters.dateFrom)
@@ -300,7 +307,7 @@ export async function exportTransactions(filters: {
   const { data: txns, error } = await query
   if (error) return { error: error.message }
 
-  const profiles = await supabase.from('profiles').select('id, display_name')
+  const profiles = { data: await getCachedAllProfiles() }
   const nameMap = new Map((profiles.data ?? []).map(p => [p.id, p.display_name ?? 'Member']))
 
   const rows = (txns ?? []).map(t => ({

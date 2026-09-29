@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { requireWorkspaceId } from '@/lib/workspace'
 
 const BUCKET = 'recordings'
 
@@ -42,6 +43,7 @@ export async function createRecording(input: CreateRecordingInput): Promise<{ er
     mime_type: input.mimeType,
     song_id: input.songId ?? null,
     created_by: user.id,
+    workspace_id: await requireWorkspaceId(),
   }).select('id').single()
   if (error) return { error: error.message }
 

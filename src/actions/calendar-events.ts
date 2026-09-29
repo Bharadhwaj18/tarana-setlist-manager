@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { requireWorkspaceId } from '@/lib/workspace'
 import type { CalendarEventFormData } from '@/lib/validators'
 
 export async function addCalendarEvent(data: CalendarEventFormData): Promise<{ error?: string; id?: string }> {
@@ -15,6 +16,7 @@ export async function addCalendarEvent(data: CalendarEventFormData): Promise<{ e
     end_date: data.end_date,
     notes: data.notes?.trim() || null,
     created_by: user.id,
+    workspace_id: await requireWorkspaceId(),
   }).select('id').single()
   if (error) return { error: error.message }
 

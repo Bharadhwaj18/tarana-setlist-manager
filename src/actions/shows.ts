@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { requireWorkspaceId } from '@/lib/workspace'
 import { sendNotificationToAll } from '@/actions/notifications'
 import { formatDateDMY } from '@/lib/dates'
 import type { ShowFormData } from '@/lib/validators'
@@ -19,7 +20,7 @@ export async function createShow(data: ShowFormData): Promise<{ error?: string; 
 
   const { data: show, error } = await supabase
     .from('shows')
-    .insert({ ...data, created_by: user.id })
+    .insert({ ...data, created_by: user.id, workspace_id: await requireWorkspaceId(), })
     .select('id')
     .single()
 

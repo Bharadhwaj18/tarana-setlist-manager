@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { requireWorkspaceId } from '@/lib/workspace'
 import type { SongFormData } from '@/lib/validators'
 
 export async function createSong(data: SongFormData) {
@@ -16,6 +17,7 @@ export async function createSong(data: SongFormData) {
       ...data,
       bpm: data.bpm ?? null,
       created_by: user.id,
+      workspace_id: await requireWorkspaceId(),
     })
     .select()
     .single()

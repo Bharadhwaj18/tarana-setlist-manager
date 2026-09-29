@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import { requireWorkspaceId } from '@/lib/workspace'
 import { getCachedAllProfiles, getCachedUser } from '@/lib/data'
 import { todayISO, isUpcoming } from '@/lib/shows'
 import { SplitWizard } from '@/components/finance/SplitWizard'
@@ -9,12 +10,13 @@ import type { FinanceTransaction } from '@/types/finance'
 
 export default async function SplitPage() {
   const supabase = await createClient()
+  const ws = await requireWorkspaceId()
 
   const [{ data: { user } }, profiles, { data: unsplitShows }, { data: allTxns }] = await Promise.all([
     getCachedUser(),
     getCachedAllProfiles(),
-    supabase.from('shows').select('*').is('split_at', null).order('show_date', { ascending: false }),
-    supabase.from('finance_transactions').select('*'),
+    supabase.from('shows').select('*').eq('workspace_id', ws).is('split_at', null).order('show_date', { ascending: false }),
+    supabase.from('finance_transactions').select('*').eq('workspace_id', ws),
   ])
 
   // A show that hasn't happened yet has nothing to split — same rule as the

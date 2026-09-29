@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { sendPushToProfile } from '@/lib/push'
+import { getWorkspaceContext } from '@/lib/workspace'
 
 export interface PushSubscriptionData {
   endpoint: string
@@ -91,8 +92,16 @@ export async function sendNotificationToAll({ title, body, link, type }: SendNot
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
-  const { data: profiles, error: profilesError } = await supabase.from('profiles').select('id').neq('id', user.id)
+  // Only the current workspace's other members — never the whole user base.
+  const ctx = await getWorkspaceContext()
+  if (!ctx) return {}
+  const { data: members, error: profilesError } = await supabase
+    .from('workspace_members')
+    .select('user_id')
+    .eq('workspace_id', ctx.current.workspace.id)
+    .neq('user_id', user.id)
   if (profilesError) return { error: profilesError.message }
+  const profiles = (members ?? []).map(m => ({ id: m.user_id }))
   if (!profiles?.length) return {}
 
   const { error } = await supabase.from('notifications').insert(

@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedUser, getCachedPendingPayments, getCachedNotifications, getCachedAllProfiles } from '@/lib/data'
 import { resolveNotificationItems } from '@/lib/notifications'
+import { getWorkspaceContext } from '@/lib/workspace'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { OfflineUserSync } from '@/components/OfflineUserSync'
 import { IdentifyUser } from '@/components/analytics/IdentifyUser'
@@ -44,12 +45,15 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     getCachedAllProfiles(),
   ])
   const notificationItems = resolveNotificationItems(notifications, profiles, effectiveUser.id)
+  const workspaceCtx = await getWorkspaceContext()
 
   return (
     <div className="flex h-screen">
       <OfflineUserSync email={effectiveUser.email ?? ''} displayName={profile?.display_name ?? ''} />
       <IdentifyUser userId={effectiveUser.id} email={effectiveUser.email} name={profile?.display_name} />
-      <Sidebar user={effectiveUser} pendingPaymentCount={pendingCount} notifications={notificationItems} />
+      <Sidebar user={effectiveUser} pendingPaymentCount={pendingCount} notifications={notificationItems}
+        workspaces={workspaceCtx?.memberships.map(m => ({ id: m.workspace.id, name: m.workspace.name, type: m.workspace.type }))}
+        currentWorkspaceId={workspaceCtx?.current.workspace.id} />
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-5xl px-4 pb-8 pt-20 sm:px-6 lg:px-8 lg:pt-8">
           {children}
