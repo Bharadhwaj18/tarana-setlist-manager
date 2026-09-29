@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from 'react'
 import { Search, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AddTransactionModal } from './AddTransactionModal'
+import { TransactionRow } from './TransactionRow'
 import { deleteTransaction } from '@/actions/finance'
 import { useToast } from '@/components/ui/Toaster'
 import type { FinanceTransaction } from '@/types/finance'
@@ -138,7 +139,14 @@ export function FinanceHistoryList({ transactions, members, shows, showTitleById
     })
   }, [transactions, memberFilter, typeFilter, query, showTitleById])
 
-  const total = filtered.reduce((s, t) => s + t.amount, 0)
+  // Same rule the page's running Fund Total column uses (excludes
+  // category:'reimbursement' and unattributed rows) — so with no filters
+  // active, this reconciles exactly with the last row's running Fund
+  // Total instead of drifting from it via a plain sum of everything shown.
+  const bandFundRows = filtered.filter(t => t.category !== 'reimbursement' && t.member_id)
+  const total = bandFundRows.reduce((s, t) => s + t.amount, 0)
+  const totalCredit = bandFundRows.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0)
+  const totalDebit = bandFundRows.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0)
 
   return (
     <div className="space-y-4">
@@ -166,11 +174,19 @@ export function FinanceHistoryList({ transactions, members, shows, showTitleById
         </select>
       </div>
 
-      <div className="flex items-center justify-between rounded-lg bg-brand-50 px-4 py-2 text-sm">
-        <span className="text-gray-500">{filtered.length} transaction{filtered.length !== 1 ? 's' : ''}</span>
-        <span className={cn('font-bold tabular-nums', total >= 0 ? 'text-green-600' : 'text-red-500')}>
-          {total >= 0 ? '+' : '−'}{fmt(total)}
-        </span>
+      <div className="rounded-lg bg-brand-50 px-4 py-2.5 text-sm">
+        <div className="flex items-center justify-between">
+          <span className="text-gray-500">{filtered.length} transaction{filtered.length !== 1 ? 's' : ''}</span>
+          <span className={cn('font-bold tabular-nums', total >= 0 ? 'text-green-600' : 'text-red-500')}>
+            {total >= 0 ? '+' : '−'}{fmt(total)}
+          </span>
+        </div>
+        {(totalCredit > 0 || totalDebit < 0) && (
+          <div className="mt-1 flex items-center justify-end gap-3 text-xs">
+            <span className="text-green-600 tabular-nums">+{fmt(totalCredit)} credit</span>
+            <span className="text-red-500 tabular-nums">−{fmt(totalDebit)} debit</span>
+          </div>
+        )}
       </div>
 
       {filtered.length === 0 ? (
@@ -178,44 +194,74 @@ export function FinanceHistoryList({ transactions, members, shows, showTitleById
           No transactions match these filters.
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-200">
-          <table className="w-full min-w-[640px] text-left">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="py-2.5 pl-4 pr-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Date</th>
-                <th className="py-2.5 pr-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Description</th>
-                <th className="py-2.5 pr-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Member</th>
-                <th className="py-2.5 pr-3 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400">Amount</th>
-                <th className="py-2.5 pr-3 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400">Mem. Bal.</th>
-                <th className="py-2.5 pr-3 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400">Fund Total</th>
-                <th className="py-2.5 pl-2 pr-3"><span className="sr-only">Actions</span></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filtered.map(t => {
-                const showTitle = t.show_id ? showTitleById[t.show_id] : null
-                const badge = showTitle
-                  ? { label: showTitle, kind: 'show' as const }
-                  : t.category
-                    ? { label: t.category, kind: 'category' as const }
-                    : undefined
-                const rb = runningBalances?.[t.id]
-                return (
-                  <TransactionTableRow
-                    key={t.id}
-                    transaction={t}
-                    members={members}
-                    shows={shows}
-                    payerName={nameOf(t.member_id)}
-                    badge={badge}
-                    afterFundTotal={rb?.total}
-                    afterMemberBalance={rb?.memberBalance ?? undefined}
-                  />
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {/* Six columns of a real table just don't fit a phone width, even
+              with overflow-x-auto — a stacked card per transaction (same
+              component the Finance page's own Recent Transactions uses)
+              instead, below the md breakpoint. */}
+          <div className="space-y-1 md:hidden">
+            {filtered.map(t => {
+              const showTitle = t.show_id ? showTitleById[t.show_id] : null
+              const badge = showTitle
+                ? { label: showTitle, kind: 'show' as const }
+                : t.category
+                  ? { label: t.category, kind: 'category' as const }
+                  : undefined
+              const rb = runningBalances?.[t.id]
+              return (
+                <TransactionRow
+                  key={t.id}
+                  transaction={t}
+                  members={members}
+                  shows={shows}
+                  payerName={nameOf(t.member_id)}
+                  badge={badge}
+                  afterFundTotal={rb?.total}
+                  afterMemberBalance={rb?.memberBalance ?? undefined}
+                />
+              )
+            })}
+          </div>
+
+          <div className="hidden overflow-x-auto rounded-xl border border-gray-200 md:block">
+            <table className="w-full min-w-[640px] text-left">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50">
+                  <th className="py-2.5 pl-4 pr-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Date</th>
+                  <th className="py-2.5 pr-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Description</th>
+                  <th className="py-2.5 pr-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Member</th>
+                  <th className="py-2.5 pr-3 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400">Amount</th>
+                  <th className="py-2.5 pr-3 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400">Mem. Bal.</th>
+                  <th className="py-2.5 pr-3 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400">Fund Total</th>
+                  <th className="py-2.5 pl-2 pr-3"><span className="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filtered.map(t => {
+                  const showTitle = t.show_id ? showTitleById[t.show_id] : null
+                  const badge = showTitle
+                    ? { label: showTitle, kind: 'show' as const }
+                    : t.category
+                      ? { label: t.category, kind: 'category' as const }
+                      : undefined
+                  const rb = runningBalances?.[t.id]
+                  return (
+                    <TransactionTableRow
+                      key={t.id}
+                      transaction={t}
+                      members={members}
+                      shows={shows}
+                      payerName={nameOf(t.member_id)}
+                      badge={badge}
+                      afterFundTotal={rb?.total}
+                      afterMemberBalance={rb?.memberBalance ?? undefined}
+                    />
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   )
