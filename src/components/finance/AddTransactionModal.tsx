@@ -38,7 +38,10 @@ function fieldsFrom(transaction: FinanceTransaction | undefined, unsplitShows: S
     return {
       tag: (lockedShow ? 'show' : null) as 'misc' | 'show' | null,
       category: CREDIT_CATEGORIES[0] as string,
-      showId: lockedShow?.id ?? unsplitShows[0]?.id ?? NEW_SHOW,
+      // No pre-selection when the user opens the form freely — they must
+      // explicitly pick a show. A pre-filled first unsplit show was the root
+      // cause of credits landing on the wrong show silently.
+      showId: lockedShow?.id ?? '',
       memberId: AUTO,
       amount: '',
       dir: 'credit' as 'credit' | 'debit',
@@ -107,7 +110,7 @@ export function AddTransactionModal({ members, shows, transaction, lockedShow, o
 
   const canSubmit = tag !== null
     && !!category
-    && (tag === 'misc' || showId !== NEW_SHOW || newShowTitle.trim() !== '')
+    && (tag === 'misc' || (showId !== '' && (showId !== NEW_SHOW || newShowTitle.trim() !== '')))
     && !!amount
     && (!isReimbursement || (memberId !== AUTO && memberId !== ''))
 
@@ -197,6 +200,7 @@ export function AddTransactionModal({ members, shows, transaction, lockedShow, o
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Which show *</label>
               <select value={showId} onChange={e => set('showId', e.target.value)} className={inputCls}>
+                <option value="" disabled>Select a show…</option>
                 {availableShows.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
                 <option value={NEW_SHOW}>+ New show…</option>
               </select>
