@@ -1,9 +1,11 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { Search } from 'lucide-react'
+import { useMemo, useState, useTransition } from 'react'
+import { Search, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { TransactionRow } from './TransactionRow'
+import { AddTransactionModal } from './AddTransactionModal'
+import { deleteTransaction } from '@/actions/finance'
+import { useToast } from '@/components/ui/Toaster'
 import type { FinanceTransaction } from '@/types/finance'
 import type { Show } from '@/types/shows'
 
@@ -20,7 +22,98 @@ function fmt(n: number) {
   return `₹${Math.abs(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
 }
 
+function fmtSigned(n: number) {
+  return `${n < 0 ? '−' : ''}₹${Math.abs(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+}
+
 const inputCls = 'rounded-md border border-brand-200 bg-white px-2.5 py-1.5 text-xs focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400'
+
+interface RowProps {
+  transaction: FinanceTransaction
+  members: Member[]
+  shows: Show[]
+  payerName: string
+  badge?: { label: string; kind: 'show' | 'category' }
+  afterFundTotal?: number
+  afterMemberBalance?: number
+}
+
+function TransactionTableRow({ transaction: t, members, shows, payerName, badge, afterFundTotal, afterMemberBalance }: RowProps) {
+  const [editOpen, setEditOpen] = useState(false)
+  const [isDeleting, startDeleteTransition] = useTransition()
+  const toast = useToast()
+  const isCredit = t.amount >= 0
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!window.confirm('Delete this transaction? This can’t be undone.')) return
+    startDeleteTransition(async () => {
+      const result = await deleteTransaction(t.id)
+      if (result.error) toast(result.error, 'error')
+    })
+  }
+
+  return (
+    <tr
+      className={cn(
+        'cursor-pointer transition-colors hover:bg-gray-50',
+        isDeleting && 'opacity-40 pointer-events-none'
+      )}
+      onClick={() => setEditOpen(true)}
+    >
+      <td className="whitespace-nowrap py-2.5 pl-4 pr-3 text-xs text-gray-500">
+        {new Date(t.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}
+      </td>
+      <td className="py-2.5 pr-3 max-w-[180px]">
+        <p className="truncate text-sm font-medium text-gray-800">{t.description}</p>
+        {badge && (
+          <span className={cn(
+            'mt-0.5 inline-block rounded px-1.5 py-0.5 text-[10px] font-medium leading-tight',
+            badge.kind === 'show' ? 'bg-brand-100 text-brand-700' : 'bg-gray-100 text-gray-500'
+          )}>
+            {badge.label}
+          </span>
+        )}
+      </td>
+      <td className="whitespace-nowrap py-2.5 pr-3 text-xs text-gray-600">{payerName}</td>
+      <td className="whitespace-nowrap py-2.5 pr-3 text-right">
+        <span className={cn('text-sm font-bold tabular-nums', isCredit ? 'text-green-600' : 'text-red-500')}>
+          {isCredit ? '+' : '−'}{fmt(t.amount)}
+        </span>
+      </td>
+      <td className="whitespace-nowrap py-2.5 pr-3 text-right">
+        {afterMemberBalance !== undefined
+          ? <span className={cn('text-xs font-medium tabular-nums', afterMemberBalance < 0 ? 'text-red-500' : 'text-gray-500')}>{fmtSigned(afterMemberBalance)}</span>
+          : <span className="text-xs text-gray-300">—</span>}
+      </td>
+      <td className="whitespace-nowrap py-2.5 pr-3 text-right">
+        {afterFundTotal !== undefined
+          ? <span className={cn('text-xs font-semibold tabular-nums', afterFundTotal < 0 ? 'text-red-500' : 'text-gray-700')}>{fmtSigned(afterFundTotal)}</span>
+          : <span className="text-xs text-gray-300">—</span>}
+      </td>
+      <td className="py-2.5 pl-2 pr-3" onClick={e => e.stopPropagation()}>
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={isDeleting}
+          aria-label="Delete transaction"
+          className="rounded-md p-1.5 text-gray-300 transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+        <div onClick={e => e.stopPropagation()}>
+          <AddTransactionModal
+            members={members}
+            shows={shows}
+            transaction={t}
+            open={editOpen}
+            onOpenChange={setEditOpen}
+          />
+        </div>
+      </td>
+    </tr>
+  )
+}
 
 export function FinanceHistoryList({ transactions, members, shows, showTitleById, runningBalances }: Props) {
   const [memberFilter, setMemberFilter] = useState<string>('all')
@@ -80,34 +173,48 @@ export function FinanceHistoryList({ transactions, members, shows, showTitleById
         </span>
       </div>
 
-      {/* List */}
       {filtered.length === 0 ? (
         <div className="rounded-xl border-2 border-dashed border-gray-200 py-16 text-center text-sm text-gray-400">
           No transactions match these filters.
         </div>
       ) : (
-        <div className="space-y-1">
-          {filtered.map(t => {
-            const showTitle = t.show_id ? showTitleById[t.show_id] : null
-            const badge = showTitle
-              ? { label: showTitle, kind: 'show' as const }
-              : t.category
-                ? { label: t.category, kind: 'category' as const }
-                : undefined
-            const rb = runningBalances?.[t.id]
-            return (
-              <TransactionRow
-                key={t.id}
-                transaction={t}
-                members={members}
-                shows={shows}
-                payerName={nameOf(t.member_id)}
-                badge={badge}
-                afterFundTotal={rb?.total}
-                afterMemberBalance={rb?.memberBalance ?? undefined}
-              />
-            )
-          })}
+        <div className="overflow-x-auto rounded-xl border border-gray-200">
+          <table className="w-full min-w-[640px] text-left">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50">
+                <th className="py-2.5 pl-4 pr-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Date</th>
+                <th className="py-2.5 pr-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Description</th>
+                <th className="py-2.5 pr-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Member</th>
+                <th className="py-2.5 pr-3 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400">Amount</th>
+                <th className="py-2.5 pr-3 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400">Mem. Bal.</th>
+                <th className="py-2.5 pr-3 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400">Fund Total</th>
+                <th className="py-2.5 pl-2 pr-3"><span className="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filtered.map(t => {
+                const showTitle = t.show_id ? showTitleById[t.show_id] : null
+                const badge = showTitle
+                  ? { label: showTitle, kind: 'show' as const }
+                  : t.category
+                    ? { label: t.category, kind: 'category' as const }
+                    : undefined
+                const rb = runningBalances?.[t.id]
+                return (
+                  <TransactionTableRow
+                    key={t.id}
+                    transaction={t}
+                    members={members}
+                    shows={shows}
+                    payerName={nameOf(t.member_id)}
+                    badge={badge}
+                    afterFundTotal={rb?.total}
+                    afterMemberBalance={rb?.memberBalance ?? undefined}
+                  />
+                )
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
