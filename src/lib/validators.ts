@@ -10,7 +10,7 @@ export const magicLinkSchema = z.object({
 })
 
 export const songSchema = z.object({
-  title: z.string().min(1, 'Title is required'),
+  title: z.string().trim().min(1, 'Title is required').max(200, 'Title is too long'),
   artist: z.string().optional(),
   song_key: z.string().optional(),
   bpm: z.number().int().min(20, 'BPM too slow').max(280, 'BPM too fast').optional(),
@@ -20,7 +20,7 @@ export const songSchema = z.object({
 })
 
 export const setlistSchema = z.object({
-  title: z.string().min(1, 'Title is required'),
+  title: z.string().trim().min(1, 'Title is required').max(200, 'Title is too long'),
   show_date: z.string().optional(),
   venue: z.string().optional(),
   notes: z.string().optional(),
@@ -28,7 +28,7 @@ export const setlistSchema = z.object({
 })
 
 export const showSchema = z.object({
-  title: z.string().min(1, 'Title is required'),
+  title: z.string().trim().min(1, 'Title is required').max(200, 'Title is too long'),
   show_date: z.string().nullable().optional(),
   venue: z.string().nullable().optional(),
   fee: z.number().min(0).nullable().optional(),
@@ -39,7 +39,7 @@ export const showSchema = z.object({
   tds_amount: z.number().min(0).nullable().optional(),
   tds_filed: z.boolean().optional(),
   tds_certificate_received: z.boolean().optional(),
-  booking_status: z.string().nullable().optional(),
+  booking_status: z.enum(['Inquiry', 'Quotation Shared', 'Confirmed', 'Advance Received', 'Completed']).nullable().optional(),
   poc_name: z.string().nullable().optional(),
   poc_phone: z.string().nullable().optional(),
   poc_email: z.string().nullable().optional(),
@@ -68,7 +68,7 @@ export const unavailabilitySchema = z.object({
 })
 
 export const calendarEventSchema = z.object({
-  title: z.string().min(1, 'Title is required'),
+  title: z.string().trim().min(1, 'Title is required').max(200, 'Title is too long'),
   start_date: z.string().min(1, 'Start date is required'),
   end_date: z.string().min(1, 'End date is required'),
   notes: z.string().nullable().optional(),
@@ -83,3 +83,17 @@ export type ShowFormData = z.infer<typeof showSchema>
 export type EventManagementFormData = z.infer<typeof eventManagementSchema>
 export type UnavailabilityFormData = z.infer<typeof unavailabilitySchema>
 export type CalendarEventFormData = z.infer<typeof calendarEventSchema>
+
+export const transactionInputSchema = z.object({
+  member_id: z.string().uuid().nullable(),
+  amount: z.number().finite().refine(n => n !== 0, 'Amount cannot be zero').refine(n => Math.abs(n) <= 100_000_000, 'Amount is too large'),
+  description: z.string().trim().min(1, 'Description is required').max(500),
+  category: z.string().max(60).nullable().optional(),
+  show_id: z.string().uuid().nullable().optional(),
+  budget_id: z.string().uuid().nullable().optional(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date').optional(),
+})
+
+export function validationMessage(error: z.ZodError): string {
+  return error.issues[0]?.message ?? 'Invalid input.'
+}

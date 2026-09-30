@@ -6,13 +6,16 @@ import { createClient } from '@/lib/supabase/server'
 import { requireWorkspaceId } from '@/lib/workspace'
 import { sendNotificationToAll } from '@/actions/notifications'
 import { formatDateDMY } from '@/lib/dates'
-import type { SetlistFormData } from '@/lib/validators'
+import { setlistSchema, validationMessage, type SetlistFormData } from '@/lib/validators'
 import type { ParsedSong } from '@/lib/setlist-parser'
 
 export async function createSetlist(data: SetlistFormData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
+  const parsed = setlistSchema.safeParse(data)
+  if (!parsed.success) throw new Error(validationMessage(parsed.error))
+  data = parsed.data
 
   const { data: setlist, error } = await supabase
     .from('setlists')
@@ -60,6 +63,9 @@ export async function updateSetlist(id: string, data: SetlistFormData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
+  const parsed = setlistSchema.safeParse(data)
+  if (!parsed.success) throw new Error(validationMessage(parsed.error))
+  data = parsed.data
 
   const { error } = await supabase.from('setlists').update({ ...data, updated_by: user.id }).eq('id', id)
   if (error) throw new Error(error.message)

@@ -6,7 +6,6 @@ import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { exportTransactions } from '@/actions/finance'
 import { useToast } from '@/components/ui/Toaster'
-import { buildTransactionStatementPdf } from '@/lib/pdf/financeReports'
 import { todayISO } from '@/lib/shows'
 import { addDaysISO } from '@/lib/dates'
 
@@ -78,6 +77,7 @@ export function ExportModal({ members }: { members: Member[] }) {
         toast('CSV downloaded', 'success')
         setOpen(false)
       } else {
+        const { buildTransactionStatementPdf } = await import('@/lib/pdf/financeReports')
         buildTransactionStatementPdf(rows, preset, memberLabel(memberId))
         toast('PDF downloaded', 'success')
         setOpen(false)

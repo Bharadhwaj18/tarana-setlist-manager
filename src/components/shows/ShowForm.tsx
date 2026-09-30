@@ -114,7 +114,7 @@ export function ShowForm({ show, eventManagementCompanies = [], onSubmit, initia
         tds_amount: fields.tds_applicable && tdsAmount > 0 ? Math.round(tdsAmount * 100) / 100 : null,
         tds_filed: fields.tds_filed,
         tds_certificate_received: fields.tds_certificate_received,
-        booking_status: fields.booking_status || null,
+        booking_status: (fields.booking_status || null) as ShowFormData['booking_status'],
         event_management_id: fields.event_management_id === DIRECT_BOOKING ? null : fields.event_management_id,
         poc_name: fields.poc_name.trim() || null,
         poc_phone: fields.poc_phone.trim() || null,

@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { Search, ChevronDown, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { buildSplitReportPdf } from '@/lib/pdf/financeReports'
 import type { SplitRun } from '@/types'
 
 interface Props {
@@ -40,9 +39,10 @@ export function SplitHistoryList({ runs, unpaidPendingIds }: Props) {
       return next
     })
 
-  const downloadReport = (run: SplitRun) => {
+  const downloadReport = async (run: SplitRun) => {
     const r = run.report
     if (!r) return
+    const { buildSplitReportPdf } = await import('@/lib/pdf/financeReports')
     buildSplitReportPdf(r.showTitles, r.bandPct, r.shows, r.rows, r.totalNet, r.totalBandFund, r.allBalances)
   }
 

@@ -4,12 +4,15 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { requireWorkspaceId } from '@/lib/workspace'
-import type { EventManagementFormData } from '@/lib/validators'
+import { eventManagementSchema, validationMessage, type EventManagementFormData } from '@/lib/validators'
 
 export async function createEventManagement(data: EventManagementFormData): Promise<{ error?: string; id?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
+  const parsed = eventManagementSchema.safeParse(data)
+  if (!parsed.success) return { error: validationMessage(parsed.error) }
+  data = parsed.data
 
   const { data: company, error } = await supabase
     .from('event_management')
@@ -27,6 +30,9 @@ export async function updateEventManagement(id: string, data: EventManagementFor
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
+  const parsed = eventManagementSchema.safeParse(data)
+  if (!parsed.success) return { error: validationMessage(parsed.error) }
+  data = parsed.data
 
   const { error } = await supabase.from('event_management').update({ ...data, updated_by: user.id }).eq('id', id)
   if (error) return { error: error.message }

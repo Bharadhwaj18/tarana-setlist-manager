@@ -3,12 +3,15 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireWorkspaceId } from '@/lib/workspace'
-import type { CalendarEventFormData } from '@/lib/validators'
+import { calendarEventSchema, validationMessage, type CalendarEventFormData } from '@/lib/validators'
 
 export async function addCalendarEvent(data: CalendarEventFormData): Promise<{ error?: string; id?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
+  const parsed = calendarEventSchema.safeParse(data)
+  if (!parsed.success) return { error: validationMessage(parsed.error) }
+  data = parsed.data
 
   const { data: row, error } = await supabase.from('calendar_events').insert({
     title: data.title.trim(),

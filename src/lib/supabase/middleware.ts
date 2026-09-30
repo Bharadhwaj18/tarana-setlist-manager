@@ -27,13 +27,14 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // getUser() verifies the token with Supabase's servers.
-  // When offline, it fails and returns null. In that case, fall back to
-  // getSession() which reads the JWT from the cookie locally — no network needed.
-  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  // getClaims() verifies the JWT signature locally (cached JWKS) and refreshes an expired
+  // session, so the common request needs no round-trip to Supabase's auth server.
+  // Projects still on a symmetric secret fall back to a server check inside the library.
+  // When offline it errors; then read the JWT from the cookie via getSession().
+  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims()
 
-  let effectiveUser = user
-  if (!user && userError) {
+  let effectiveUser: { id: string } | null = claimsData?.claims?.sub ? { id: claimsData.claims.sub } : null
+  if (!effectiveUser && claimsError) {
     const { data: { session } } = await supabase.auth.getSession()
     effectiveUser = session?.user ?? null
   }

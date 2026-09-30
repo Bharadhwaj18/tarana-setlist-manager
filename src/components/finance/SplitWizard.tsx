@@ -7,7 +7,7 @@ import { computeEntitlements, computeBalanceTopUp, computeShowSettlement, poolSh
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toaster'
 import { cn } from '@/lib/utils'
-import { buildSplitReportPdf, type SplitReportLine, type SplitReportRow, type SplitReportShow } from '@/lib/pdf/financeReports'
+import type { SplitReportLine, SplitReportRow, SplitReportShow } from '@/lib/pdf/financeReports'
 import { AddTransactionModal } from '@/components/finance/AddTransactionModal'
 import type { FinanceTransaction } from '@/types/finance'
 import type { Show } from '@/types/shows'
@@ -402,10 +402,11 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
     })
   }
 
-  const handleDownloadReport = () => {
+  const handleDownloadReport = async () => {
     setIsDownloading(true)
     try {
       const r = buildReport()
+      const { buildSplitReportPdf } = await import('@/lib/pdf/financeReports')
       buildSplitReportPdf(r.showTitles, r.bandPct, r.shows, r.rows, r.totalNet, r.totalBandFund, r.allBalances)
       toast('Report downloaded', 'success')
     } finally {

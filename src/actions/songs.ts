@@ -4,12 +4,15 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { requireWorkspaceId } from '@/lib/workspace'
-import type { SongFormData } from '@/lib/validators'
+import { songSchema, validationMessage, type SongFormData } from '@/lib/validators'
 
 export async function createSong(data: SongFormData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
+  const parsed = songSchema.safeParse(data)
+  if (!parsed.success) throw new Error(validationMessage(parsed.error))
+  data = parsed.data
 
   const { data: song, error } = await supabase
     .from('songs')
@@ -32,6 +35,9 @@ export async function updateSong(id: string, data: SongFormData, redirectTo?: st
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
+  const parsed = songSchema.safeParse(data)
+  if (!parsed.success) throw new Error(validationMessage(parsed.error))
+  data = parsed.data
 
   const { error } = await supabase
     .from('songs')
