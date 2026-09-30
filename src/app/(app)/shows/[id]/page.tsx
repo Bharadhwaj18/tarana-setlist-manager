@@ -189,7 +189,7 @@ export default async function ShowDetailPage({ params }: Props) {
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">Fee &amp; Payment</h2>
           <dl className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <dt className="text-gray-500">{show.tds_applicable ? 'Amount received' : 'Agreed fee'}</dt>
+              <dt className="text-gray-500">{show.tds_applicable ? 'Amount received' : 'Quoted fee'}</dt>
               <dd className="font-medium text-gray-800">{show.fee != null ? fmt(show.fee) : '—'}</dd>
             </div>
             <div className="flex justify-between">

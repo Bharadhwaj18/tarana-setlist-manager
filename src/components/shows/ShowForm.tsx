@@ -76,6 +76,22 @@ export function ShowForm({ show, eventManagementCompanies = [], onSubmit, initia
 
   const canSubmit = fields.title.trim() !== ''
 
+  // Money only matters once a quote is out. Older shows with no status but a fee still show it.
+  const showFinance = fields.booking_status
+    ? fields.booking_status !== 'Inquiry'
+    : show?.fee != null
+
+  const pickCompany = (id: string) => {
+    const c = eventManagementCompanies.find(x => x.id === id)
+    setFields(prev => ({
+      ...prev,
+      event_management_id: id,
+      poc_name: c?.contact_name ?? prev.poc_name,
+      poc_phone: c?.contact_phone ?? prev.poc_phone,
+      poc_email: c?.contact_email ?? prev.poc_email,
+    }))
+  }
+
   const feeNum = parseFloat(fields.fee) || 0
   const tdsPercentageNum = parseFloat(fields.tds_percentage) || 0
   const { tdsAmount, grossFee } = computeTds(feeNum, tdsPercentageNum)
@@ -170,7 +186,7 @@ export function ShowForm({ show, eventManagementCompanies = [], onSubmit, initia
               id="event_management_id"
               className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm transition-colors focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
               value={fields.event_management_id}
-              onChange={e => set('event_management_id', e.target.value)}
+              onChange={e => pickCompany(e.target.value)}
             >
               <option value={DIRECT_BOOKING}>Direct booking</option>
               {eventManagementCompanies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -196,12 +212,13 @@ export function ShowForm({ show, eventManagementCompanies = [], onSubmit, initia
         </div>
       </div>
 
+      {showFinance && (<>
       {/* Fee & payment */}
       <div className="space-y-3 rounded-lg border border-brand-200 bg-brand-50 p-4">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500">Fee &amp; Payment</h3>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="fee">{fields.tds_applicable ? 'Amount received (₹)' : 'Agreed fee (₹)'}</Label>
+            <Label htmlFor="fee">{fields.tds_applicable ? 'Amount received (₹)' : 'Quoted fee (₹)'}</Label>
             <Input id="fee" type="number" min="0" step="any" placeholder="0" className="mt-1" value={fields.fee}
               onChange={e => set('fee', e.target.value)} />
             {fields.tds_applicable && (
@@ -266,6 +283,7 @@ export function ShowForm({ show, eventManagementCompanies = [], onSubmit, initia
           </>
         )}
       </div>
+      </>)}
 
       {/* Media */}
       <div>
