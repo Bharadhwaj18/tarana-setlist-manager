@@ -25,15 +25,10 @@ export const getCachedSetlists = cache(() =>
   )
 )
 
-// RLS returns rows from every workspace the user belongs to, so keep only this workspace's setlists.
 export const getCachedSetlistSongCounts = cache(async () => {
   const supabase = await createClient()
-  const [{ data }, setlists] = await Promise.all([
-    supabase.from('setlist_songs').select('setlist_id'),
-    getCachedSetlists(),
-  ])
-  const ids = new Set(setlists.map(l => l.id))
-  return (data ?? []).filter(r => ids.has(r.setlist_id))
+  const { data } = await supabase.from('setlist_songs').select('setlist_id')
+  return data ?? []
 })
 
 export const getCachedSong = cache(async (id: string) => {
@@ -116,12 +111,8 @@ export const getCachedNotes = cache(() =>
 // JS" convention as getCachedShowTransactions.
 export const getCachedChecklistItems = cache(async () => {
   const supabase = await createClient()
-  const [{ data }, notes] = await Promise.all([
-    supabase.from('note_checklist_items').select('*').order('position'),
-    getCachedNotes(),
-  ])
-  const ids = new Set(notes.map(n => n.id))
-  return (data ?? []).filter(i => ids.has(i.note_id))
+  const { data } = await supabase.from('note_checklist_items').select('*').order('position')
+  return data ?? []
 })
 
 // Every unpaid split payment still waiting on someone to actually hand the
@@ -142,7 +133,6 @@ export const getCachedNotifications = cache(async (recipientId: string) => {
     .select('*')
     .eq('recipient_id', recipientId)
     .order('created_at', { ascending: false })
-    .limit(100)
   return data ?? []
 })
 

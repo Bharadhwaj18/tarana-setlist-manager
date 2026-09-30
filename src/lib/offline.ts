@@ -23,20 +23,6 @@ export interface OfflineUser {
   displayName: string
 }
 
-/** Wipes everything saved for offline use — called on sign-out so a shared device keeps no one's setlists. */
-export async function clearOfflineData(): Promise<void> {
-  try {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem(LS_SETLISTS)
-      localStorage.removeItem(LS_SONGS)
-      localStorage.removeItem(LS_USER)
-    }
-    if (typeof caches !== 'undefined') await caches.delete('tarana-offline-v1')
-  } catch {
-    // Storage can be blocked (private mode); signing out should still go through.
-  }
-}
-
 // ── User session ────────────────────────────────────────────────
 
 export function saveUserOffline(user: OfflineUser) {

@@ -24,22 +24,28 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   if (!effectiveUser) redirect('/login')
 
-  // Everything below only needs the user id, so fetch it all at once.
-  const [profileRes, pendingPayments, notifications, profiles, workspaceCtx] = await Promise.all([
-    supabase.from('profiles').select('display_name').eq('id', effectiveUser.id).maybeSingle(),
-    getCachedPendingPayments(),
-    getCachedNotifications(effectiveUser.id),
-    getCachedAllProfiles(),
-    getWorkspaceContext(),
-  ])
-  const { data: profile, error: profileError } = profileRes
+  // Check display name — but skip the setup redirect when offline
+  // (if the profile query errors, the user has already done setup before)
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('display_name')
+    .eq('id', effectiveUser.id)
+    .maybeSingle()
 
-  // Skip the setup redirect when offline (if the profile query errors, setup was done before).
   if (!profileError && !profile?.display_name?.trim()) redirect('/setup')
 
-  // Split payments this person still owes — the Sidebar's Finance badge.
+  // How many split payments this person still owes a bandmate — the
+  // Sidebar's Finance badge, visible from anywhere in the app until each
+  // one's marked paid.
+  const pendingPayments = await getCachedPendingPayments()
   const pendingCount = pendingPayments.filter(p => p.from_member === effectiveUser.id).length
+
+  const [notifications, profiles] = await Promise.all([
+    getCachedNotifications(effectiveUser.id),
+    getCachedAllProfiles(),
+  ])
   const notificationItems = resolveNotificationItems(notifications, profiles, effectiveUser.id)
+  const workspaceCtx = await getWorkspaceContext()
 
   return (
     <div className="flex h-screen">

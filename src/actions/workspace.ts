@@ -32,11 +32,6 @@ export async function switchWorkspace(workspaceId: string): Promise<{ error?: st
 }
 
 export async function createWorkspace(name: string): Promise<{ error?: string; id?: string }> {
-  name = name.trim()
-  if (name.length < 1 || name.length > 80) return { error: 'Workspace name must be 1–80 characters.' }
-  const ctx = await getWorkspaceContext()
-  if (!ctx) return { error: 'Not authenticated' }
-  if (ctx.memberships.length >= 25) return { error: 'You have reached the workspace limit.' }
   const supabase = await createClient()
   const { data, error } = await supabase.rpc('create_workspace', { p_name: name, p_type: 'band' })
   if (error) return { error: error.message }
@@ -45,8 +40,6 @@ export async function createWorkspace(name: string): Promise<{ error?: string; i
 }
 
 export async function renameWorkspace(name: string): Promise<{ error?: string }> {
-  name = name.trim()
-  if (name.length < 1 || name.length > 80) return { error: 'Workspace name must be 1–80 characters.' }
   const auth = await requireAdminContext()
   if ('error' in auth) return { error: auth.error }
   const supabase = await createClient()
@@ -72,15 +65,6 @@ export async function createInvite(input: CreateInviteInput): Promise<{ error?: 
     return { error: 'Max uses must be at least 1.' }
   }
   const supabase = await createClient()
-
-  // Simple abuse guard, no external store needed: cap invites minted per workspace per hour.
-  const { count: recent } = await supabase
-    .from('workspace_invites')
-    .select('id', { count: 'exact', head: true })
-    .eq('workspace_id', auth.workspaceId)
-    .gte('created_at', new Date(Date.now() - 3_600_000).toISOString())
-  if ((recent ?? 0) >= 20) return { error: 'Too many invite links created recently. Try again in an hour.' }
-
   const { data, error } = await supabase
     .from('workspace_invites')
     .insert({

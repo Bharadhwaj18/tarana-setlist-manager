@@ -944,20 +944,6 @@ export type Database = {
     }
     Views: { [_ in never]: never }
     Functions: {
-      run_split: {
-        Args: {
-          p_workspace_id: string
-          p_show_ids: string[]
-          p_payments: Json
-          p_run_shows: Json
-          p_report: Json
-          p_band_pct: number
-          p_total_net: number
-          p_total_band_fund: number
-          p_today: string
-        }
-        Returns: string
-      }
       calendar_external: {
         Args: { p_ws: string }
         Returns: {

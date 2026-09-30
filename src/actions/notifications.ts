@@ -54,23 +54,6 @@ export async function sendNotification({ recipientId, title, body, link, type }:
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
-  // This is an exported server action, so callable with any recipient id:
-  // only allow people in the caller's current workspace, and in-app links.
-  const ctx = await getWorkspaceContext()
-  if (!ctx) return { error: 'No workspace available.' }
-  if (recipientId !== user.id) {
-    const { data: recipient } = await supabase
-      .from('workspace_members')
-      .select('user_id')
-      .eq('workspace_id', ctx.current.workspace.id)
-      .eq('user_id', recipientId)
-      .maybeSingle()
-    if (!recipient) return { error: 'Recipient is not in this workspace.' }
-  }
-  if (link && !link.startsWith('/')) link = null
-  title = title.slice(0, 200)
-  if (body) body = body.slice(0, 1000)
-
   const { error } = await supabase.from('notifications').insert({
     recipient_id: recipientId,
     sender_id: user.id,

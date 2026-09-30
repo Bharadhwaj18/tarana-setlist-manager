@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { Music2, ListMusic, Wallet, LogOut, Menu, X, CalendarDays, CalendarRange, StickyNote, Building2, Settings, Mic } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { clearOfflineData } from '@/lib/offline'
 import { cn } from '@/lib/utils'
 import { ACTIVE_SETLIST_COOKIE } from '@/lib/setlist-context'
 import { useState } from 'react'
@@ -65,7 +64,6 @@ export function Sidebar({ user, pendingPaymentCount = 0, notifications = [], wor
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
-    await clearOfflineData()
     router.push('/login')
   }
 
