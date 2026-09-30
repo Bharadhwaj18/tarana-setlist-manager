@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getCachedShow, getCachedAllProfiles, getCachedUser, getCachedEventManagementCompany } from '@/lib/data'
 import { Button } from '@/components/ui/Button'
 import { DeleteShowButton } from '@/components/shows/DeleteShowButton'
+import { ShowDocuments } from '@/components/shows/ShowDocuments'
 import { AddTransactionModal } from '@/components/finance/AddTransactionModal'
 import { computeTds } from '@/lib/finance/tds'
 import { cn } from '@/lib/utils'
@@ -21,12 +22,13 @@ export default async function ShowDetailPage({ params }: Props) {
   const { id } = await params
   const supabase = await createClient()
 
-  const [show, { data: { user } }, profiles, { data: txns }, { data: setlist }] = await Promise.all([
+  const [show, { data: { user } }, profiles, { data: txns }, { data: setlist }, { data: documents }] = await Promise.all([
     getCachedShow(id),
     getCachedUser(),
     getCachedAllProfiles(),
     supabase.from('finance_transactions').select('*').eq('show_id', id).order('created_at', { ascending: false }),
     supabase.from('setlists').select('id, title').eq('show_id', id).maybeSingle(),
+    supabase.from('show_documents').select('*').eq('show_id', id).order('created_at', { ascending: false }),
   ])
 
   if (!show) notFound()
@@ -41,6 +43,7 @@ export default async function ShowDetailPage({ params }: Props) {
 
   const net = (txns ?? []).reduce((s, t) => s + t.amount, 0)
   const isSplit = !!show.split_at
+  const showHasQuote = show.booking_status ? show.booking_status !== 'Inquiry' : show.fee != null
 
   // TDS to claim is derived from what was actually credited for this show
   // (the real finance transactions), not the separately-typed "Amount
@@ -181,6 +184,11 @@ export default async function ShowDetailPage({ params }: Props) {
             )}
           </dl>
         </section>
+      )}
+
+      {/* Quotation / invoice files — once a quote is out (or any file already exists) */}
+      {user && (showHasQuote || (documents ?? []).length > 0) && (
+        <ShowDocuments showId={show.id} userId={user.id} documents={documents ?? []} />
       )}
 
       {/* Fee & payment / TDS */}

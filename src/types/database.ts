@@ -859,6 +859,45 @@ export type Database = {
         }
         Relationships: []
       }
+      show_documents: {
+        Row: {
+          id: string
+          workspace_id: string
+          show_id: string
+          kind: string
+          file_name: string
+          file_path: string
+          mime_type: string
+          size_bytes: number
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id?: string
+          show_id: string
+          kind?: string
+          file_name: string
+          file_path: string
+          mime_type: string
+          size_bytes: number
+          created_by: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          show_id?: string
+          kind?: string
+          file_name?: string
+          file_path?: string
+          mime_type?: string
+          size_bytes?: number
+          created_by?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       recordings: {
         Row: {
           workspace_id: string | null

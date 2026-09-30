@@ -22,3 +22,4 @@ export type SetlistInsert = Omit<Setlist, 'id' | 'created_at' | 'updated_at' | '
 export type SetlistUpdate = Partial<SetlistInsert>
 
 export type SetlistSongWithSong = SetlistSong & { song: Song; section?: string | null }
+export type { ShowDocument, DocumentKind } from './show-document'

@@ -79,8 +79,13 @@ export async function deleteShow(id: string): Promise<{ error?: string }> {
   const { data: { user } } = await supabase.auth.getUser()
   const { data: show } = await supabase.from('shows').select('title, show_date').eq('id', id).maybeSingle()
 
+  const { data: docs } = await supabase.from('show_documents').select('file_path').eq('show_id', id)
+
   const { error } = await supabase.from('shows').delete().eq('id', id)
   if (error) return { error: error.message }
+
+  // Rows cascade away with the show; best-effort clean up their files too.
+  if (docs?.length) await supabase.storage.from('show-documents').remove(docs.map(d => d.file_path))
 
   if (show && user) {
     await sendNotificationToAll({
