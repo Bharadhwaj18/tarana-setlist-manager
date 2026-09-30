@@ -156,3 +156,37 @@ export const getCachedRecordings = cache(() =>
     supabase.from('recordings').select('*, song:songs(id, title)').eq('workspace_id', ws).order('created_at', { ascending: false })
   )
 )
+
+// Busy blocks / details from the user's OTHER workspaces, already redacted in
+// the database by each item's visibility (see calendar_external).
+export const getCachedExternalCalendar = cache(async () => {
+  const ctx = await getWorkspaceContext()
+  if (!ctx) return []
+  const supabase = await createClient()
+  const { data } = await supabase.rpc('calendar_external', { p_ws: ctx.current.workspace.id })
+  return data ?? []
+})
+
+// Every calendar source across ALL of the user's workspaces, for the read-only
+// consolidated view. RLS already limits each table to workspaces they belong to.
+export const getCachedAllCalendars = cache(async () => {
+  const ctx = await getWorkspaceContext()
+  if (!ctx) return null
+  const ids = ctx.memberships.map(m => m.workspace.id)
+  const supabase = await createClient()
+  const [shows, notes, unavailability, events, profiles] = await Promise.all([
+    supabase.from('shows').select('*').in('workspace_id', ids),
+    supabase.from('notes').select('*').in('workspace_id', ids).not('due_date', 'is', null),
+    supabase.from('unavailability').select('*').in('workspace_id', ids),
+    supabase.from('calendar_events').select('*').in('workspace_id', ids),
+    supabase.from('profiles').select('id, display_name'),
+  ])
+  return {
+    shows: shows.data ?? [],
+    tasks: notes.data ?? [],
+    unavailability: unavailability.data ?? [],
+    events: events.data ?? [],
+    profiles: profiles.data ?? [],
+    workspaces: ctx.memberships.map(m => ({ id: m.workspace.id, name: m.workspace.type === 'personal' ? 'Personal' : m.workspace.name })),
+  }
+})

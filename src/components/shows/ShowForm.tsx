@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
 import { Textarea } from '@/components/ui/Textarea'
 import { cn } from '@/lib/utils'
+import { VisibilitySelect } from '@/components/calendar/VisibilitySelect'
+import { asVisibility, type Visibility } from '@/lib/visibility'
 import { computeTds } from '@/lib/finance/tds'
 import type { ShowFormData } from '@/lib/validators'
 import type { Show, EventManagement } from '@/types'
@@ -45,6 +47,7 @@ function fieldsFrom(show: Show | undefined, initialDate: string | undefined) {
     format: show?.format ?? '',
     media_url: show?.media_url ?? '',
     notes: show?.notes ?? '',
+    visibility: asVisibility(show?.visibility) as Visibility,
   }
 }
 
@@ -103,6 +106,7 @@ export function ShowForm({ show, eventManagementCompanies = [], onSubmit, initia
         format: fields.format || null,
         media_url: fields.media_url.trim() || null,
         notes: fields.notes.trim() || null,
+        visibility: fields.visibility,
       }
       const result = await onSubmit(data)
       if (result && 'error' in result && result.error) setError(result.error)
@@ -276,6 +280,8 @@ export function ShowForm({ show, eventManagementCompanies = [], onSubmit, initia
         <Textarea id="notes" rows={3} placeholder="Anything else about this show..." className="mt-1" value={fields.notes}
           onChange={e => set('notes', e.target.value)} />
       </div>
+
+      <VisibilitySelect id="visibility" value={fields.visibility} onChange={v => set('visibility', v)} />
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 

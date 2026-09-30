@@ -179,7 +179,7 @@ export function WorkspaceManager({ workspaceName, isAdmin, isOwner, members, inv
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-mono text-xs text-gray-700">…/invite/{i.token.slice(0, 8)}…</p>
                     <p className="text-xs text-gray-500">
-                      {i.role === 'admin' ? 'Admin' : 'Member'} · expires {new Date(i.expiresAt).toLocaleDateString()} · {i.useCount}{i.maxUses ? `/${i.maxUses}` : ''} joined
+                      {i.role === 'admin' ? 'Admin' : 'Member'} · expires {new Date(i.expiresAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' })} · {i.useCount}{i.maxUses ? `/${i.maxUses}` : ''} joined
                     </p>
                   </div>
                   <button type="button" onClick={() => copy(i.token)} className="rounded-md p-1.5 text-gray-500 hover:bg-brand-100" aria-label="Copy invite link">

@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { addMonths, subMonths, format } from 'date-fns'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { buildMonthGrid, groupItemsByDate } from '@/lib/calendar'
+import { buildMonthGrid, groupItemsByDate, externalLabel, type ExternalItem } from '@/lib/calendar'
 import { parseISODate } from '@/lib/dates'
 import { cn } from '@/lib/utils'
 import { DayDetailPanel } from './DayDetailPanel'
@@ -16,6 +16,11 @@ interface Props {
   tasks: Note[]
   unavailability: Unavailability[]
   events: CalendarEvent[]
+  /** Redacted items from the viewer's other workspaces. */
+  external?: ExternalItem[]
+  /** Consolidated view: no adding or deleting, items tagged with their workspace. */
+  readOnly?: boolean
+  workspaceNameById?: Record<string, string>
   members: Member[]
   /** profile id -> display name, resolved server-side. */
   nameById: Record<string, string>
@@ -24,12 +29,13 @@ interface Props {
 
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-export function CalendarMonthView({ shows, tasks, unavailability, events, members, nameById, today }: Props) {
+export function CalendarMonthView({ shows, tasks, unavailability, events, external = [], readOnly = false, workspaceNameById = {}, members, nameById, today }: Props) {
+  const tag = (workspaceId: string | null, text: string) => (readOnly && workspaceId && workspaceNameById[workspaceId] ? `${workspaceNameById[workspaceId]} · ${text}` : text)
   const [currentMonth, setCurrentMonth] = useState(() => parseISODate(today))
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
   const weeks = useMemo(() => buildMonthGrid(currentMonth), [currentMonth])
-  const byDate = useMemo(() => groupItemsByDate(shows, tasks, unavailability, events), [shows, tasks, unavailability, events])
+  const byDate = useMemo(() => groupItemsByDate(shows, tasks, unavailability, events, external), [shows, tasks, unavailability, events, external])
 
   return (
     <div>
@@ -95,10 +101,10 @@ export function CalendarMonthView({ shows, tasks, unavailability, events, member
                 {items && (
                   <div className="flex w-full min-h-0 flex-1 flex-col gap-0.5 overflow-hidden">
                     {items.shows.slice(0, 2).map(s => (
-                      <span key={s.id} className="truncate rounded bg-brand-100 px-1 py-0.5 text-[9px] font-medium text-brand-700 sm:text-[11px]">{s.title}</span>
+                      <span key={s.id} className="truncate rounded bg-brand-100 px-1 py-0.5 text-[9px] font-medium text-brand-700 sm:text-[11px]">{tag(s.workspace_id, s.title)}</span>
                     ))}
                     {items.tasks.slice(0, 2).map(t => (
-                      <span key={t.id} className={cn('truncate rounded bg-violet-100 px-1 py-0.5 text-[9px] font-medium text-violet-700 sm:text-[11px]', t.completed_at && 'line-through opacity-60')}>{t.title}</span>
+                      <span key={t.id} className={cn('truncate rounded bg-violet-100 px-1 py-0.5 text-[9px] font-medium text-violet-700 sm:text-[11px]', t.completed_at && 'line-through opacity-60')}>{tag(t.workspace_id, t.title)}</span>
                     ))}
                     {items.unavailability.length > 0 && (
                       <span className="truncate rounded bg-gray-100 px-1 py-0.5 text-[9px] font-medium text-gray-500 sm:text-[11px]">
@@ -106,9 +112,12 @@ export function CalendarMonthView({ shows, tasks, unavailability, events, member
                       </span>
                     )}
                     {items.events.slice(0, 2).map(e => (
-                      <span key={e.id} className="truncate rounded bg-amber-100 px-1 py-0.5 text-[9px] font-medium text-amber-700 sm:text-[11px]">{e.title}</span>
+                      <span key={e.id} className="truncate rounded bg-amber-100 px-1 py-0.5 text-[9px] font-medium text-amber-700 sm:text-[11px]">{tag(e.workspace_id, e.title)}</span>
                     ))}
-                    {(items.shows.length + items.tasks.length + items.events.length) > 4 && (
+                    {items.external.slice(0, 2).map(x => (
+                      <span key={x.key} className="truncate rounded border border-dashed border-gray-300 px-1 py-0.5 text-[9px] font-medium text-gray-500 sm:text-[11px]">{externalLabel(x, nameById)}</span>
+                    ))}
+                    {(items.shows.length + items.tasks.length + items.events.length + items.external.length) > 4 && (
                       <span className="text-[9px] text-gray-400 sm:text-[11px]">+more</span>
                     )}
                   </div>
@@ -122,7 +131,9 @@ export function CalendarMonthView({ shows, tasks, unavailability, events, member
       {selectedDate && (
         <DayDetailPanel
           date={selectedDate}
-          items={byDate[selectedDate] ?? { shows: [], tasks: [], unavailability: [], events: [] }}
+          items={byDate[selectedDate] ?? { shows: [], tasks: [], unavailability: [], events: [], external: [] }}
+          readOnly={readOnly}
+          workspaceNameById={workspaceNameById}
           members={members}
           nameById={nameById}
           open={!!selectedDate}

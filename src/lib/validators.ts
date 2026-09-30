@@ -47,6 +47,7 @@ export const showSchema = z.object({
   format: z.string().nullable().optional(),
   media_url: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
+  visibility: z.enum(['hidden', 'busy', 'details']).optional(),
 })
 
 export const eventManagementSchema = z.object({
@@ -63,6 +64,7 @@ export const unavailabilitySchema = z.object({
   start_date: z.string().min(1, 'Start date is required'),
   end_date: z.string().min(1, 'End date is required'),
   reason: z.string().nullable().optional(),
+  visibility: z.enum(['hidden', 'busy', 'details']).optional(),
 })
 
 export const calendarEventSchema = z.object({
@@ -70,6 +72,7 @@ export const calendarEventSchema = z.object({
   start_date: z.string().min(1, 'Start date is required'),
   end_date: z.string().min(1, 'End date is required'),
   notes: z.string().nullable().optional(),
+  visibility: z.enum(['hidden', 'busy', 'details']).optional(),
 })
 
 export type LoginFormData = z.infer<typeof loginSchema>

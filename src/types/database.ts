@@ -173,6 +173,7 @@ export type Database = {
       shows: {
         Row: {
           workspace_id: string | null
+          visibility: string
           id: string
           title: string
           show_date: string | null
@@ -201,6 +202,7 @@ export type Database = {
         }
         Insert: {
           workspace_id?: string | null
+          visibility?: string
           id?: string
           title: string
           show_date?: string | null
@@ -229,6 +231,7 @@ export type Database = {
         }
         Update: {
           workspace_id?: string | null
+          visibility?: string
           id?: string
           title?: string
           show_date?: string | null
@@ -754,6 +757,7 @@ export type Database = {
       calendar_events: {
         Row: {
           workspace_id: string | null
+          visibility: string
           id: string
           title: string
           start_date: string
@@ -764,6 +768,7 @@ export type Database = {
         }
         Insert: {
           workspace_id?: string | null
+          visibility?: string
           id?: string
           title: string
           start_date: string
@@ -774,6 +779,7 @@ export type Database = {
         }
         Update: {
           workspace_id?: string | null
+          visibility?: string
           id?: string
           title?: string
           start_date?: string
@@ -787,6 +793,7 @@ export type Database = {
       unavailability: {
         Row: {
           workspace_id: string | null
+          visibility: string
           id: string
           member_id: string
           start_date: string
@@ -796,6 +803,7 @@ export type Database = {
         }
         Insert: {
           workspace_id?: string | null
+          visibility?: string
           id?: string
           member_id: string
           start_date: string
@@ -805,6 +813,7 @@ export type Database = {
         }
         Update: {
           workspace_id?: string | null
+          visibility?: string
           id?: string
           member_id?: string
           start_date?: string
@@ -896,6 +905,20 @@ export type Database = {
     }
     Views: { [_ in never]: never }
     Functions: {
+      calendar_external: {
+        Args: { p_ws: string }
+        Returns: {
+          kind: 'show' | 'event' | 'unavailable'
+          item_id: string
+          member_id: string
+          source_name: string | null
+          start_date: string
+          end_date: string
+          visibility: string
+          title: string | null
+          detail: string | null
+        }[]
+      }
       create_workspace: { Args: { p_name: string; p_type?: string }; Returns: string }
       rename_workspace: { Args: { p_ws: string; p_name: string }; Returns: undefined }
       revoke_workspace_invite: { Args: { p_invite: string }; Returns: undefined }

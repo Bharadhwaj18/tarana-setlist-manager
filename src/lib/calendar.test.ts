@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildMonthGrid, groupItemsByDate } from './calendar'
+import { buildMonthGrid, groupItemsByDate, groupExternal, type ExternalItem } from './calendar'
 import type { Show, Note, Unavailability, CalendarEvent } from '@/types'
 
 describe('buildMonthGrid', () => {
@@ -58,5 +58,25 @@ describe('groupItemsByDate', () => {
     expect(byDate['2026-09-22'].events).toEqual([singleDay])
     expect(byDate['2026-09-24'].events).toEqual([multiDay])
     expect(byDate['2026-09-25'].events).toEqual([multiDay])
+  })
+})
+
+describe('external busy feed', () => {
+  const row = (over: Partial<ExternalItem>): ExternalItem => ({
+    kind: 'show', item_id: 's1', member_id: 'a', source_name: null,
+    start_date: '2026-10-03', end_date: '2026-10-03', visibility: 'busy', title: null, detail: null, ...over,
+  })
+
+  it('folds the same item seen through several shared members into one entry', () => {
+    const groups = groupExternal([row({ member_id: 'a' }), row({ member_id: 'b' }), row({ item_id: 's2', member_id: 'a' })])
+    expect(groups).toHaveLength(2)
+    expect(groups[0].memberIds).toEqual(['a', 'b'])
+  })
+
+  it('expands a multi-day external item across each day and keeps redacted fields null', () => {
+    const byDate = groupItemsByDate([], [], [], [], [row({ kind: 'unavailable', item_id: 'u1', start_date: '2026-10-05', end_date: '2026-10-06' })])
+    expect(byDate['2026-10-05'].external).toHaveLength(1)
+    expect(byDate['2026-10-06'].external[0].title).toBeNull()
+    expect(byDate['2026-10-07']).toBeUndefined()
   })
 })

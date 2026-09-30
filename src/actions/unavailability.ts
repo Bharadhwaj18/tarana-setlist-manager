@@ -17,6 +17,7 @@ export async function addUnavailability(data: UnavailabilityFormData): Promise<{
     start_date: data.start_date,
     end_date: data.end_date,
     reason: data.reason?.trim() || null,
+    visibility: data.visibility,
     workspace_id: await requireWorkspaceId(),
   }).select('id').single()
   if (error) return { error: error.message }
@@ -65,6 +66,7 @@ export async function updateUnavailability(id: string, data: UnavailabilityFormD
     start_date: data.start_date,
     end_date: data.end_date,
     reason: data.reason?.trim() || null,
+    visibility: data.visibility,
   }).eq('id', id)
   if (error) return { error: error.message }
 

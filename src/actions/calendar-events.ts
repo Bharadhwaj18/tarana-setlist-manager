@@ -15,6 +15,7 @@ export async function addCalendarEvent(data: CalendarEventFormData): Promise<{ e
     start_date: data.start_date,
     end_date: data.end_date,
     notes: data.notes?.trim() || null,
+    visibility: data.visibility,
     created_by: user.id,
     workspace_id: await requireWorkspaceId(),
   }).select('id').single()
@@ -31,6 +32,7 @@ export async function updateCalendarEvent(id: string, data: CalendarEventFormDat
     start_date: data.start_date,
     end_date: data.end_date,
     notes: data.notes?.trim() || null,
+    visibility: data.visibility,
   }).eq('id', id)
   if (error) return { error: error.message }
 
