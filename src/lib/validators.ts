@@ -83,3 +83,37 @@ export type ShowFormData = z.infer<typeof showSchema>
 export type EventManagementFormData = z.infer<typeof eventManagementSchema>
 export type UnavailabilityFormData = z.infer<typeof unavailabilitySchema>
 export type CalendarEventFormData = z.infer<typeof calendarEventSchema>
+
+const uuid = z.string().uuid()
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a valid date').nullable()
+
+export const boardNameSchema = z.string().trim().min(1, 'Name is required').max(80, 'Keep the name under 80 characters')
+
+export const taskInputSchema = z.object({
+  title: z.string().trim().min(1, 'Title is required').max(300, 'Keep the title under 300 characters'),
+  description: z.string().max(10000).nullable(),
+  bucketId: uuid,
+  progress: z.enum(['not_started', 'in_progress', 'completed']),
+  priority: z.enum(['urgent', 'important', 'medium', 'low']),
+  startDate: isoDate,
+  dueDate: isoDate,
+  remindDaysBefore: z.number().int().min(0).max(365).nullable(),
+  recurrence: z.enum(['daily', 'weekly', 'monthly']).nullable(),
+  assigneeIds: z.array(uuid).max(50),
+  labelIds: z.array(uuid).max(50),
+  checklist: z.array(z.object({
+    id: uuid.optional(),
+    text: z.string().trim().min(1).max(300),
+    done: z.boolean(),
+  })).max(200),
+}).refine(v => !v.startDate || !v.dueDate || v.startDate <= v.dueDate, {
+  message: 'Start date can’t be after the due date',
+  path: ['startDate'],
+})
+
+export const labelInputSchema = z.object({
+  name: z.string().trim().min(1, 'Name is required').max(40, 'Keep the label under 40 characters'),
+  color: z.enum(['red', 'orange', 'yellow', 'green', 'teal', 'blue', 'purple', 'pink', 'gray']),
+})
+
+export type TaskInput = z.infer<typeof taskInputSchema>

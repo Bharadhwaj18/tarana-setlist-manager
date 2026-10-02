@@ -2,14 +2,14 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Plus, Trash2, CalendarDays, StickyNote, UserX, Tag, Layers } from 'lucide-react'
+import { Plus, Trash2, CalendarDays, ListChecks, UserX, Tag, Layers } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
 import { VisibilitySelect } from './VisibilitySelect'
 import { DEFAULT_VISIBILITY, type Visibility } from '@/lib/visibility'
-import { NoteModal } from '@/components/notes/NoteModal'
+import { QuickTaskModal } from '@/components/tasks/QuickTaskModal'
 import { addUnavailability, deleteUnavailability } from '@/actions/unavailability'
 import { addCalendarEvent, deleteCalendarEvent } from '@/actions/calendar-events'
 import { useToast } from '@/components/ui/Toaster'
@@ -32,6 +32,7 @@ interface Props {
   date: string
   items: DayItems
   members: Member[]
+  boards?: { id: string; name: string }[]
   nameById: Record<string, string>
   readOnly?: boolean
   workspaceNameById?: Record<string, string>
@@ -39,7 +40,7 @@ interface Props {
   onOpenChange: (open: boolean) => void
 }
 
-export function DayDetailPanel({ date, items, members, nameById, readOnly = false, workspaceNameById = {}, open, onOpenChange }: Props) {
+export function DayDetailPanel({ date, items, members, boards = [], nameById, readOnly = false, workspaceNameById = {}, open, onOpenChange }: Props) {
   const wsLabel = (workspaceId: string | null) => (readOnly && workspaceId ? workspaceNameById[workspaceId] : undefined)
   const [unavailVisibility, setUnavailVisibility] = useState<Visibility>(DEFAULT_VISIBILITY)
   const [eventVisibility, setEventVisibility] = useState<Visibility>(DEFAULT_VISIBILITY)
@@ -126,10 +127,10 @@ export function DayDetailPanel({ date, items, members, nameById, readOnly = fals
           <div className="space-y-1.5">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500">Tasks</h3>
             {items.tasks.map(t => (
-              <ItemRow key={t.id} readOnly={readOnly} href="/notes" className={cn('bg-violet-50 hover:bg-violet-100', t.completed_at && 'opacity-60')}>
-                <StickyNote className="h-3.5 w-3.5 shrink-0 text-violet-500" />
+              <ItemRow key={t.id} readOnly={readOnly} href={`/tasks/${t.board_id}?task=${t.id}`} className={cn('bg-violet-50 hover:bg-violet-100', t.completed_at && 'opacity-60')}>
+                <ListChecks className="h-3.5 w-3.5 shrink-0 text-violet-500" />
                 <span className={cn('min-w-0 flex-1 truncate', t.completed_at && 'line-through')}>{t.title}</span>
-                {t.assigned_to && <span className="shrink-0 text-xs text-gray-400">{nameById[t.assigned_to] ?? 'Someone'}</span>}
+                {t.assignee_ids.length > 0 && <span className="shrink-0 truncate text-xs text-gray-400">{t.assignee_ids.map(id => nameById[id] ?? 'Someone').join(', ')}</span>}
                 <WorkspaceTag name={wsLabel(t.workspace_id)} />
               </ItemRow>
             ))}
@@ -250,7 +251,7 @@ export function DayDetailPanel({ date, items, members, nameById, readOnly = fals
         )}
       </div>
 
-      {!readOnly && <NoteModal members={members} open={taskModalOpen} onOpenChange={setTaskModalOpen} defaultDueDate={date} />}
+      {!readOnly && <QuickTaskModal boards={boards} members={members} open={taskModalOpen} onOpenChange={setTaskModalOpen} dueDate={date} />}
     </Modal>
   )
 }

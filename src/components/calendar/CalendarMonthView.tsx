@@ -7,13 +7,16 @@ import { buildMonthGrid, groupItemsByDate, externalLabel, type ExternalItem } fr
 import { parseISODate } from '@/lib/dates'
 import { cn } from '@/lib/utils'
 import { DayDetailPanel } from './DayDetailPanel'
-import type { Show, Note, Unavailability, CalendarEvent } from '@/types'
+import type { Show, Unavailability, CalendarEvent } from '@/types'
+import type { CalendarTask } from '@/types/tasks'
 
 interface Member { id: string; name: string }
 
 interface Props {
   shows: Show[]
-  tasks: Note[]
+  tasks: CalendarTask[]
+  /** Boards a new task can be added to from a day (current-workspace view only). */
+  boards?: { id: string; name: string }[]
   unavailability: Unavailability[]
   events: CalendarEvent[]
   /** Redacted items from the viewer's other workspaces. */
@@ -29,7 +32,7 @@ interface Props {
 
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-export function CalendarMonthView({ shows, tasks, unavailability, events, external = [], readOnly = false, workspaceNameById = {}, members, nameById, today }: Props) {
+export function CalendarMonthView({ shows, tasks, unavailability, events, boards = [], external = [], readOnly = false, workspaceNameById = {}, members, nameById, today }: Props) {
   const tag = (workspaceId: string | null, text: string) => (readOnly && workspaceId && workspaceNameById[workspaceId] ? `${workspaceNameById[workspaceId]} · ${text}` : text)
   const [currentMonth, setCurrentMonth] = useState(() => parseISODate(today))
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
@@ -135,6 +138,7 @@ export function CalendarMonthView({ shows, tasks, unavailability, events, extern
           readOnly={readOnly}
           workspaceNameById={workspaceNameById}
           members={members}
+          boards={boards}
           nameById={nameById}
           open={!!selectedDate}
           onOpenChange={open => { if (!open) setSelectedDate(null) }}

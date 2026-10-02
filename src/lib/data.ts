@@ -1,6 +1,7 @@
 import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { getWorkspaceContext } from '@/lib/workspace'
+import type { TaskData } from '@/types/tasks'
 
 export { getCachedUser } from '@/lib/auth-cache'
 
@@ -115,6 +116,27 @@ export const getCachedChecklistItems = cache(async () => {
   return data ?? []
 })
 
+// Everything the Tasks pages show for the current workspace, fetched in one parallel batch
+// and handled client-side (a workspace's task count is small). Labels live on the board row;
+// assignees, label ids and the checklist live on the task row.
+export const getCachedTaskData = cache(async (): Promise<TaskData> => {
+  const empty: TaskData = { boards: [], buckets: [], tasks: [] }
+  const ctx = await getWorkspaceContext()
+  if (!ctx) return empty
+  const ws = ctx.current.workspace.id
+  const supabase = await createClient()
+  const [boards, buckets, tasks] = await Promise.all([
+    supabase.from('task_boards').select('*').eq('workspace_id', ws).is('archived_at', null).order('created_at'),
+    supabase.from('task_buckets').select('*').eq('workspace_id', ws).order('position'),
+    supabase.from('tasks').select('*').eq('workspace_id', ws).order('position'),
+  ])
+  return {
+    boards: boards.data ?? [],
+    buckets: buckets.data ?? [],
+    tasks: tasks.data ?? [],
+  }
+})
+
 // Every unpaid split payment still waiting on someone to actually hand the
 // money over — the reminder banner (Finance page) and the Sidebar's badge
 // both read this, plus Split History shows them alongside paid ones.
@@ -174,16 +196,16 @@ export const getCachedAllCalendars = cache(async () => {
   if (!ctx) return null
   const ids = ctx.memberships.map(m => m.workspace.id)
   const supabase = await createClient()
-  const [shows, notes, unavailability, events, profiles] = await Promise.all([
+  const [shows, tasks, unavailability, events, profiles] = await Promise.all([
     supabase.from('shows').select('*').in('workspace_id', ids),
-    supabase.from('notes').select('*').in('workspace_id', ids).not('due_date', 'is', null),
+    supabase.from('tasks').select('*').in('workspace_id', ids).not('due_date', 'is', null),
     supabase.from('unavailability').select('*').in('workspace_id', ids),
     supabase.from('calendar_events').select('*').in('workspace_id', ids),
     supabase.from('profiles').select('id, display_name'),
   ])
   return {
     shows: shows.data ?? [],
-    tasks: notes.data ?? [],
+    tasks: tasks.data ?? [],
     unavailability: unavailability.data ?? [],
     events: events.data ?? [],
     profiles: profiles.data ?? [],

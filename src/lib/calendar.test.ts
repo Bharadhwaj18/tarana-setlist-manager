@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { buildMonthGrid, groupItemsByDate, groupExternal, type ExternalItem } from './calendar'
-import type { Show, Note, Unavailability, CalendarEvent } from '@/types'
+import type { Show, Unavailability, CalendarEvent } from '@/types'
+import type { CalendarTask } from '@/types/tasks'
 
 describe('buildMonthGrid', () => {
   it('covers all 29 days of a leap-year February without dropping any', () => {
@@ -32,8 +33,8 @@ describe('buildMonthGrid', () => {
 describe('groupItemsByDate', () => {
   const show = { show_date: '2026-09-20' } as unknown as Show
   const undatedShow = { show_date: null } as unknown as Show
-  const task = { due_date: '2026-09-20' } as unknown as Note
-  const undatedTask = { due_date: null } as unknown as Note
+  const task = { due_date: '2026-09-20' } as unknown as CalendarTask
+  const undatedTask = { due_date: null } as unknown as CalendarTask
   const unavailability = { start_date: '2026-09-18', end_date: '2026-09-20' } as unknown as Unavailability
 
   it('buckets shows and tasks by their own date, skipping undated ones', () => {

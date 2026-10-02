@@ -22,30 +22,32 @@ export async function GET(request: NextRequest) {
   const today = todayISO()
 
   const { data: dueTasks } = await supabase
-    .from('notes')
-    .select('id, title, assigned_to, created_by, due_date, remind_days_before')
+    .from('tasks')
+    .select('id, board_id, title, created_by, due_date, remind_days_before, assignee_ids')
     .not('due_date', 'is', null)
     .not('remind_days_before', 'is', null)
-    .is('completed_at', null)
-    .is('archived_at', null)
+    .neq('progress', 'completed')
 
   const toRemind = (dueTasks ?? []).filter(t => addDaysISO(t.due_date!, -t.remind_days_before!) === today)
 
   let sent = 0
   for (const task of toRemind) {
-    const recipientId = task.assigned_to ?? task.created_by
+    const recipientIds = task.assignee_ids.length ? task.assignee_ids : [task.created_by]
     const dueLabel = task.due_date === today ? 'today' : `on ${formatDateDMY(task.due_date!)}`
-    const { error } = await supabase.from('notifications').insert({
-      recipient_id: recipientId,
-      sender_id: null,
-      title: `"${task.title}" is due ${dueLabel}`,
-      body: null,
-      link: '/notes',
-      type: 'task_due',
-    })
-    if (!error) {
-      sent++
-      await sendPushToProfile(supabase, recipientId, { title: `"${task.title}" is due ${dueLabel}`, link: '/notes' })
+    const link = `/tasks/${task.board_id}?task=${task.id}`
+    for (const recipientId of recipientIds) {
+      const { error } = await supabase.from('notifications').insert({
+        recipient_id: recipientId,
+        sender_id: null,
+        title: `"${task.title}" is due ${dueLabel}`,
+        body: null,
+        link,
+        type: 'task_due',
+      })
+      if (!error) {
+        sent++
+        await sendPushToProfile(supabase, recipientId, { title: `"${task.title}" is due ${dueLabel}`, link })
+      }
     }
   }
 

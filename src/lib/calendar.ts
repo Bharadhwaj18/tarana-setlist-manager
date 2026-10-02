@@ -1,6 +1,7 @@
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns'
 import { toISODate, parseISODate } from './dates'
-import type { Show, Note, Unavailability, CalendarEvent } from '@/types'
+import type { Show, Unavailability, CalendarEvent } from '@/types'
+import type { CalendarTask } from '@/types/tasks'
 import type { Database } from '@/types/database'
 
 /** One row of the redacted cross-workspace feed (see calendar_external in the DB). */
@@ -65,7 +66,7 @@ export function externalLabel(group: ExternalGroup, nameById: Record<string, str
 
 export interface DayItems {
   shows: Show[]
-  tasks: Note[]
+  tasks: CalendarTask[]
   unavailability: Unavailability[]
   events: CalendarEvent[]
   /** Busy blocks / details from the viewer's other workspaces (current-workspace view only). */
@@ -79,7 +80,7 @@ export interface DayItems {
  * rendering a day cell is an O(1) lookup instead of filtering every list
  * per cell.
  */
-export function groupItemsByDate(shows: Show[], tasks: Note[], unavailability: Unavailability[], events: CalendarEvent[] = [], external: ExternalItem[] = []): Record<string, DayItems> {
+export function groupItemsByDate(shows: Show[], tasks: CalendarTask[], unavailability: Unavailability[], events: CalendarEvent[] = [], external: ExternalItem[] = []): Record<string, DayItems> {
   const byDate: Record<string, DayItems> = {}
   const bucket = (date: string) => (byDate[date] ??= { shows: [], tasks: [], unavailability: [], events: [], external: [] })
 

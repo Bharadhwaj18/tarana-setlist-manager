@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { getCachedShows, getCachedNotes, getCachedUnavailability, getCachedCalendarEvents, getCachedAllProfiles, getCachedUser, getCachedExternalCalendar, getCachedAllCalendars } from '@/lib/data'
+import { getCachedShows, getCachedTaskData, getCachedUnavailability, getCachedCalendarEvents, getCachedAllProfiles, getCachedUser, getCachedExternalCalendar, getCachedAllCalendars } from '@/lib/data'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { todayISO } from '@/lib/shows'
 import { cn } from '@/lib/utils'
@@ -66,16 +66,16 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     )
   }
 
-  const [shows, notes, unavailability, events, profiles, external] = await Promise.all([
+  const [shows, taskData, unavailability, events, profiles, external] = await Promise.all([
     getCachedShows(),
-    getCachedNotes(),
+    getCachedTaskData(),
     getCachedUnavailability(),
     getCachedCalendarEvents(),
     getCachedAllProfiles(),
     getCachedExternalCalendar(),
   ])
 
-  const tasks = notes.filter(n => n.due_date)
+  const tasks = taskData.tasks.filter(t => t.due_date)
   const nameById = nameFor(profiles)
   const members = profiles.map(p => ({ id: p.id, name: nameById[p.id] }))
 
@@ -85,6 +85,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
       <CalendarMonthView
         shows={shows}
         tasks={tasks}
+        boards={taskData.boards.map(b => ({ id: b.id, name: b.name }))}
         unavailability={unavailability}
         events={events}
         external={external}

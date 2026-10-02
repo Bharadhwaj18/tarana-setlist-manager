@@ -6,6 +6,9 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
+export interface TaskBoardLabel { id: string; name: string; color: string }
+export interface TaskChecklistEntry { id: string; text: string; done: boolean }
+
 export type Database = {
   public: {
     Tables: {
@@ -400,6 +403,138 @@ export type Database = {
           position?: number
           created_at?: string
           assigned_to?: string | null
+        }
+        Relationships: []
+      }
+      task_boards: {
+        Row: {
+          workspace_id: string
+          id: string
+          name: string
+          labels: TaskBoardLabel[]
+          archived_at: string | null
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          workspace_id?: string
+          id?: string
+          name: string
+          labels?: TaskBoardLabel[]
+          archived_at?: string | null
+          created_by: string
+          created_at?: string
+        }
+        Update: {
+          workspace_id?: string
+          id?: string
+          name?: string
+          labels?: TaskBoardLabel[]
+          archived_at?: string | null
+          created_by?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      task_buckets: {
+        Row: {
+          workspace_id: string
+          id: string
+          board_id: string
+          name: string
+          position: number
+          created_at: string
+        }
+        Insert: {
+          workspace_id?: string
+          id?: string
+          board_id: string
+          name: string
+          position?: number
+          created_at?: string
+        }
+        Update: {
+          workspace_id?: string
+          id?: string
+          board_id?: string
+          name?: string
+          position?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
+      tasks: {
+        Row: {
+          workspace_id: string
+          id: string
+          board_id: string
+          bucket_id: string
+          title: string
+          description: string | null
+          progress: string
+          priority: string
+          start_date: string | null
+          due_date: string | null
+          completed_at: string | null
+          position: number
+          remind_days_before: number | null
+          recurrence: string | null
+          assignee_ids: string[]
+          label_ids: string[]
+          checklist: TaskChecklistEntry[]
+          source_note_id: string | null
+          created_by: string
+          updated_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          workspace_id?: string
+          id?: string
+          board_id: string
+          bucket_id: string
+          title: string
+          description?: string | null
+          progress?: string
+          priority?: string
+          start_date?: string | null
+          due_date?: string | null
+          completed_at?: string | null
+          position?: number
+          remind_days_before?: number | null
+          recurrence?: string | null
+          assignee_ids?: string[]
+          label_ids?: string[]
+          checklist?: TaskChecklistEntry[]
+          source_note_id?: string | null
+          created_by: string
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          workspace_id?: string
+          id?: string
+          board_id?: string
+          bucket_id?: string
+          title?: string
+          description?: string | null
+          progress?: string
+          priority?: string
+          start_date?: string | null
+          due_date?: string | null
+          completed_at?: string | null
+          position?: number
+          remind_days_before?: number | null
+          recurrence?: string | null
+          assignee_ids?: string[]
+          label_ids?: string[]
+          checklist?: TaskChecklistEntry[]
+          source_note_id?: string | null
+          created_by?: string
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
         }
         Relationships: []
       }
