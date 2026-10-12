@@ -8,6 +8,7 @@ import { formatSong, getCss } from '@/lib/chords/formatter'
 import { saveSetlistOffline, removeSetlistOffline, isSetlistSavedOffline } from '@/lib/offline'
 import { useToast } from '@/components/ui/Toaster'
 import type { Song } from '@/types'
+import { APP_NAME } from '@/lib/brand'
 
 interface SetlistSongEntry {
   song: Song
@@ -83,7 +84,7 @@ function buildOfflineHtml(
 <html lang="en">
 <head>
   <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${escapeHtml(setlistTitle)} — Tarana</title>
+  <title>${escapeHtml(setlistTitle)} — ${APP_NAME}</title>
   <style>
     ${chordCss}
     *,*::before,*::after{box-sizing:border-box}

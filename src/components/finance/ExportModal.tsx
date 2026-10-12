@@ -72,7 +72,7 @@ export function ExportModal({ members }: { members: Member[] }) {
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = `tarana-finance-${todayISO()}.csv`
+        a.download = `finance-${todayISO()}.csv`
         a.click()
         URL.revokeObjectURL(url)
         toast('CSV downloaded', 'success')

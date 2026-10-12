@@ -37,7 +37,7 @@ export function LoginForm({ next = '/setlists' }: { next?: string }) {
         <Input
           id="email"
           type="email"
-          placeholder="you@tarana.band"
+          placeholder="you@example.com"
           className="mt-1"
           error={errors.email?.message}
           {...register('email')}

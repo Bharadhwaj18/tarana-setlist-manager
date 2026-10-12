@@ -5,6 +5,7 @@ import { FileDown } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toaster'
 import type { Setlist, Song } from '@/types'
+import { APP_NAME } from '@/lib/brand'
 
 function escapeHtml(str: string) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -58,7 +59,7 @@ function buildSetlistPrintHtml(setlist: Setlist, songs: Song[]): string {
     </thead>
     <tbody>${rows}</tbody>
   </table>
-  <p class="footer">Tarana Setlist Manager</p>
+  <p class="footer">${APP_NAME}</p>
   <script>window.onload = () => { window.print(); }<\/script>
 </body>
 </html>`

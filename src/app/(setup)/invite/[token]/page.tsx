@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getCachedUser } from '@/lib/auth-cache'
 import { Button } from '@/components/ui/Button'
 import { AcceptInviteButton } from '@/components/workspace/AcceptInviteButton'
+import { APP_NAME } from '@/lib/brand'
 
 const STATE_MESSAGES: Record<string, string> = {
   revoked: 'This invite link was cancelled. Ask whoever invited you for a new one.',
@@ -22,7 +23,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
   return (
     <div className="w-full max-w-sm">
       <div className="mb-8 flex flex-col items-center gap-3 text-center">
-        <Image src="/logo.png" alt="Tarana" width={64} height={64} className="rounded-2xl object-contain shadow-lg" />
+        <Image src="/logo.png" alt={APP_NAME} width={64} height={64} className="rounded-2xl object-contain shadow-lg" />
       </div>
 
       <div className="rounded-xl bg-white p-8 text-center shadow-sm ring-1 ring-gray-200">

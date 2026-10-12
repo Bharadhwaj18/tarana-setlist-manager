@@ -51,7 +51,7 @@ export function MagicLinkForm({ next = '/setlists' }: { next?: string }) {
         <Input
           id="magic-email"
           type="email"
-          placeholder="you@tarana.band"
+          placeholder="you@example.com"
           className="mt-1"
           error={errors.email?.message}
           {...register('email')}

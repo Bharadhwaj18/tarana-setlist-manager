@@ -11,6 +11,7 @@ import type { User } from '@supabase/supabase-js'
 import { NotificationBell } from './NotificationBell'
 import { WorkspaceSwitcher, type WorkspaceOption } from './WorkspaceSwitcher'
 import type { NotificationItem } from '@/types/notifications'
+import { APP_NAME } from '@/lib/brand'
 
 function LogoImage() {
   const [imgError, setImgError] = useState(false)
@@ -25,7 +26,7 @@ function LogoImage() {
     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-900 shadow-sm">
       <img
         src="/logo.png"
-        alt="Tarana"
+        alt={APP_NAME}
         className="h-6 w-6 object-contain"
         onError={() => setImgError(true)}
       />
@@ -133,7 +134,7 @@ export function Sidebar({ user, pendingPaymentCount = 0, notifications = [], wor
   const logo = (
     <Link href="/shows" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5">
       <LogoImage />
-      <span className="font-bold text-gray-900">Tarana</span>
+      <span className="font-bold text-gray-900">{APP_NAME}</span>
     </Link>
   )
 

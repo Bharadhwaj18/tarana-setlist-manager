@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { saveDisplayName } from '@/actions/profile'
 import { Button } from '@/components/ui/Button'
+import { APP_NAME } from '@/lib/brand'
 
 export function SetupForm({ email }: { email: string }) {
   const [name, setName] = useState('')
@@ -31,13 +32,13 @@ export function SetupForm({ email }: { email: string }) {
       <div className="mb-8 flex flex-col items-center gap-3 text-center">
         <Image
           src="/logo.png"
-          alt="Tarana"
+          alt={APP_NAME}
           width={64}
           height={64}
           className="rounded-2xl object-contain shadow-lg"
         />
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Welcome to Tarana!</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Welcome to {APP_NAME}!</h1>
           <p className="mt-1 text-sm text-gray-500">
             Set a display name so your bandmates can see who added or edited songs.
           </p>
