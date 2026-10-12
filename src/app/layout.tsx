@@ -3,13 +3,14 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import { ToastProvider } from '@/components/ui/Toaster'
 import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration'
+import { APP_NAME, APP_TAGLINE } from '@/lib/brand'
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Setlist Manager',
-  description: 'Band setlist and chord chart manager for Tarana',
+  title: APP_NAME,
+  description: APP_TAGLINE,
   manifest: '/manifest.json',
   icons: {
     icon: '/logo.png',

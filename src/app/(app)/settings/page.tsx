@@ -1,6 +1,7 @@
 import { getCachedUser } from '@/lib/data'
 import { PushSubscribeToggle } from '@/components/settings/PushSubscribeToggle'
 import { TestNotificationButton } from '@/components/settings/TestNotificationButton'
+import { DeleteAccountSection } from '@/components/settings/DeleteAccountSection'
 
 export default async function SettingsPage() {
   const { data: { user } } = await getCachedUser()
@@ -18,6 +19,12 @@ export default async function SettingsPage() {
             <TestNotificationButton userId={user.id} />
           </div>
         )}
+      </section>
+
+      <section className="mt-6 rounded-xl border border-red-200 bg-white p-5 shadow-sm">
+        <h2 className="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-400">Account</h2>
+        <p className="mb-4 text-sm text-gray-500">Signed in as {user?.email}.</p>
+        <DeleteAccountSection />
       </section>
     </div>
   )

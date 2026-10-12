@@ -1,0 +1,52 @@
+name: Schema snapshot
+
+# Commits the live database's STRUCTURE (tables, RLS policies, functions,
+# triggers — no rows) to supabase/schema/public.sql on a `schema-snapshot`
+# branch, so the schema lives in git and a staging project can be rebuilt
+# from it. Data never lands here: this repo is public, and the nightly data
+# backup keeps going to the private db-dump repo (backup.yml).
+#
+# Run it from the Actions tab after any change made in the Supabase
+# dashboard, then open a pull request from the branch it pushes. It reuses
+# the SUPABASE_DB_URL secret backup.yml already has.
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        # Same reason as backup.yml: pg_dump must be at least as new as the server.
+        run: |
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          latest=$(apt-cache search '^postgresql-client-[0-9]+$' | grep -oE '[0-9]+' | sort -n | tail -1)
+          sudo apt-get install -y "postgresql-client-$latest"
+
+      - name: Dump the public schema (structure only)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          pg_dump_bin=$(ls -d /usr/lib/postgresql/*/bin/pg_dump | sort -V | tail -1)
+          mkdir -p supabase/schema
+          "$pg_dump_bin" --schema-only --schema=public --no-owner --no-privileges -F p \
+            -f supabase/schema/public.sql "$SUPABASE_DB_URL"
+          # pg_dump stamps a random \restrict key into every dump; strip it so
+          # an unchanged schema produces an unchanged file.
+          sed -i '/^\\\(un\)\?restrict /d' supabase/schema/public.sql
+
+      - name: Push to the schema-snapshot branch
+        run: |
+          git config user.name "schema-snapshot-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git checkout -B schema-snapshot
+          git add supabase/schema/public.sql
+          git commit -m "Schema snapshot $(date -u +%Y-%m-%dT%H:%M:%SZ)" || { echo "Schema unchanged"; exit 0; }
+          git push --force origin schema-snapshot

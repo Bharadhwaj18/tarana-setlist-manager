@@ -1,36 +1,46 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Setlist Manager
 
-## Getting Started
+Setlists, chord charts, gigs, finances and planning for bands. Next.js 16
+(App Router) on Vercel, with Supabase for Postgres, auth and file storage.
+Each band is a workspace; members join through invite links, and row-level
+security in Postgres keeps every band's data to its own members.
 
-First, run the development server:
+## Running it locally
 
 ```bash
+npm ci
+cp .env.example .env.local   # then fill in the values
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Checks (the same ones CI runs on every pull request):
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run lint
+npx tsc --noEmit
+npm test
+npm run build
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Environment variables
 
-## Learn More
+| Variable | Where it's used |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Every Supabase client |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server only: the reminder cron and account deletion |
+| `CRON_SECRET` | Authenticates Vercel Cron's call to `/api/cron/send-reminders` |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web push |
+| `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN`, `NEXT_PUBLIC_POSTHOG_HOST` | Analytics (optional) |
 
-To learn more about Next.js, take a look at the following resources:
+## Database schema
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`supabase/migrations/` holds changes made through migrations. The full
+current structure of the live database is snapshotted to
+`supabase/schema/public.sql` by the **Schema snapshot** workflow
+(Actions tab → Schema snapshot → Run workflow), which pushes a
+`schema-snapshot` branch to open a pull request from. Run it after any change
+made directly in the Supabase dashboard so git stays the source of truth.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Objects outside the `public` schema (the `auth.users` trigger that creates
+profiles, storage bucket policies) aren't in that snapshot yet and still need
+to be copied in by hand.

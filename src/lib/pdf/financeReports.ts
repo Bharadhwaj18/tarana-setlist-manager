@@ -1,6 +1,7 @@
 import autoTable from 'jspdf-autotable'
 import { PdfDoc, TABLE_THEME, COLORS, MARGIN, CONTENT_W } from './pdfDoc'
 import { todayISO, IST_TIME_ZONE } from '@/lib/shows'
+import { APP_NAME } from '@/lib/brand'
 
 // jsPDF's built-in Helvetica only covers the Windows-1252 repertoire — the
 // Rupee sign (₹), the true minus sign (−), and arrows (→/←) all fall
@@ -23,9 +24,9 @@ export function buildTransactionStatementPdf(rows: StatementRow[], rangeLabel: s
   const total = rows.reduce((s, r) => s + r.amount, 0)
 
   const pdf = new PdfDoc({
-    title: 'Tarana Finance Statement',
+    title: 'Finance Statement',
     subtitleLines: [`${rangeLabel} · ${memberLabel}`, `Generated ${today()}`],
-    footerNote: 'Tarana Finance Statement',
+    footerNote: `${APP_NAME} · Finance Statement`,
   })
 
   autoTable(pdf.doc, {
@@ -58,7 +59,7 @@ export function buildTransactionStatementPdf(rows: StatementRow[], rangeLabel: s
     valueColor: total >= 0 ? COLORS.positive : COLORS.negative,
   })
 
-  pdf.save(`tarana-finance-${todayISO()}.pdf`)
+  pdf.save(`finance-${todayISO()}.pdf`)
 }
 
 // ---- Split report -----------------------------------------------------
@@ -108,9 +109,9 @@ export function buildSplitReportPdf(
   allBalances: BandFundBalance[]
 ) {
   const pdf = new PdfDoc({
-    title: 'Tarana Split Report',
+    title: 'Split Report',
     subtitleLines: [showTitles.join(', '), `Band Fund ${bandPct}% · Generated ${today()}`],
-    footerNote: 'Tarana Split Report',
+    footerNote: `${APP_NAME} · Split Report`,
   })
 
   pdf.paragraph(
@@ -312,5 +313,5 @@ export function buildSplitReportPdf(
   pdf.keyValueRow('Band Fund', fmt(totalBandFund), { valueColor: COLORS.accentDark })
   pdf.keyValueRow('To artists', fmt(totalNet - totalBandFund))
 
-  pdf.save(`tarana-split-${todayISO()}.pdf`)
+  pdf.save(`split-${todayISO()}.pdf`)
 }

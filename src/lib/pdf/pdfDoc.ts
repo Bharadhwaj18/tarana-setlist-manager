@@ -20,7 +20,7 @@ export const MARGIN = { left: 16, right: 16, top: 30, bottom: 22 }
 export const CONTENT_W = PAGE_W - MARGIN.left - MARGIN.right
 export const CONTENT_BOTTOM = PAGE_H - MARGIN.bottom
 
-// Tarana's own warm palette (see globals.css), not a generic report blue/purple.
+// The app's own warm palette (see globals.css), not a generic report blue/purple.
 export const COLORS = {
   ink: '#2a2116',
   sub: '#6b6153',
