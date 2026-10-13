@@ -22,8 +22,8 @@ describe('attentionBadge', () => {
 describe('workspaceSubtitle / roleLabel', () => {
   it('describes personal and shared workspaces', () => {
     expect(workspaceSubtitle(ws({ type: 'personal' }))).toBe('Just you · all your calendars')
-    expect(workspaceSubtitle(ws({ nextShowDate: '2026-10-31' }))).toBe('Band · 4 members · next show Sat 31 Oct')
-    expect(workspaceSubtitle(ws({ kind: null, memberCount: 1 }))).toBe('Workspace · 1 member · no shows booked')
+    expect(workspaceSubtitle(ws({ nextShowDate: '2026-10-31' }))).toBe('Band · 4 members · next event Sat 31 Oct')
+    expect(workspaceSubtitle(ws({ kind: null, memberCount: 1 }))).toBe('Workspace · 1 member · nothing booked')
     expect(roleLabel('owner')).toBe('Owner')
     expect(roleLabel('whatever')).toBe('Member')
   })

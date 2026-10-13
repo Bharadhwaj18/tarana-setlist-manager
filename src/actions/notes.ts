@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireWorkspaceId } from '@/lib/workspace'
+import type { NoteUpdate } from '@/types/notes'
 
 export interface ChecklistItemInput {
   /** Present = an existing item being edited; absent = a new item to insert. */
@@ -18,6 +19,9 @@ export interface NoteFormData {
   color: string | null
   labels: string[]
   checklistItems: ChecklistItemInput[]
+  visibility: 'private' | 'shared'
+  showId: string | null
+  songId: string | null
 }
 
 /**
@@ -60,6 +64,9 @@ export async function createNote(data: NoteFormData): Promise<{ error?: string; 
     pinned: data.pinned,
     color: data.color,
     labels: data.labels.length ? data.labels : null,
+    visibility: data.visibility,
+    show_id: data.showId,
+    song_id: data.songId,
   }).select('id').single()
   if (error) return { error: error.message }
 
@@ -82,6 +89,9 @@ export async function updateNote(id: string, data: NoteFormData): Promise<{ erro
     pinned: data.pinned,
     color: data.color,
     labels: data.labels.length ? data.labels : null,
+    visibility: data.visibility,
+    show_id: data.showId,
+    song_id: data.songId,
   }).eq('id', id)
   if (error) return { error: error.message }
 
@@ -91,9 +101,44 @@ export async function updateNote(id: string, data: NoteFormData): Promise<{ erro
   return {}
 }
 
-export async function deleteNote(id: string): Promise<{ error?: string }> {
+type Res = { error?: string }
+
+async function patch(id: string, fields: NoteUpdate): Promise<Res> {
   const supabase = await createClient()
-  const { error } = await supabase.from('notes').delete().eq('id', id)
+  const { error } = await supabase.from('notes').update(fields).eq('id', id)
+  if (error) return { error: error.message }
+  revalidatePath('/notes')
+  return {}
+}
+
+/** Moves a note to the Trash (kept 30 days, then removed). */
+export async function deleteNote(id: string): Promise<Res> {
+  return patch(id, { deleted_at: new Date().toISOString(), pinned: false })
+}
+
+export async function restoreNote(id: string): Promise<Res> {
+  return patch(id, { deleted_at: null })
+}
+
+export async function setNoteVisibility(id: string, visibility: 'private' | 'shared'): Promise<Res> {
+  return patch(id, { visibility })
+}
+
+export async function setNoteColor(id: string, color: string | null): Promise<Res> {
+  return patch(id, { color })
+}
+
+export async function deleteNoteForever(id: string): Promise<Res> {
+  const supabase = await createClient()
+  const { error } = await supabase.from('notes').delete().eq('id', id).not('deleted_at', 'is', null)
+  if (error) return { error: error.message }
+  revalidatePath('/notes')
+  return {}
+}
+
+export async function emptyTrash(): Promise<Res> {
+  const supabase = await createClient()
+  const { error } = await supabase.from('notes').delete().not('deleted_at', 'is', null)
   if (error) return { error: error.message }
   revalidatePath('/notes')
   return {}

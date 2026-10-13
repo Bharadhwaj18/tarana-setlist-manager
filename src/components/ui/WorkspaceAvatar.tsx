@@ -22,7 +22,7 @@ export function WorkspaceAvatar({ name, color, avatarUrl, size = 'md', className
   if (avatarUrl) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
-      <img src={avatarUrl} alt="" aria-hidden="true" style={style} className={cn('shrink-0 object-cover', className)} />
+      <img src={avatarUrl} alt="" aria-hidden="true" style={style} className={cn('shrink-0 bg-black object-cover', className)} />
     )
   }
 

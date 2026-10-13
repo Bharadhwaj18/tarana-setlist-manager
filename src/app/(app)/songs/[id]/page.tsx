@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { LinkedNotes } from '@/components/notes/LinkedNotes'
 import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight, Pencil } from 'lucide-react'
@@ -131,7 +132,9 @@ export default async function SongPage({ params, searchParams }: Props) {
             </div>
           )}
 
-          {/* Recordings tagged to this song — reuses the same list component as
+          <div className="mb-6"><LinkedNotes songId={id} /></div>
+
+      {/* Recordings tagged to this song — reuses the same list component as
               /recordings, filtered down to this song's own tag. */}
           {taggedRecordings.length > 0 && (
             <div>

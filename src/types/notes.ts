@@ -20,3 +20,21 @@ export const NOTE_COLOR_CLASSES: Record<NoteColor, string> = {
   green: 'bg-emerald-50 border-emerald-200',
   purple: 'bg-violet-50 border-violet-200',
 }
+
+export type NoteVisibility = 'private' | 'shared'
+
+/** One-tap starting points for the things artists keep re-making. */
+export interface NoteTemplate {
+  id: string
+  label: string
+  title: string
+  content?: string
+  items?: string[]
+}
+
+export const NOTE_TEMPLATES: NoteTemplate[] = [
+  { id: 'gig', label: 'Gig checklist', title: 'Gig day', items: ['Load-in time confirmed', 'Soundcheck', 'Instruments and cables', 'Merch', 'Setlist printed', 'Payment collected'] },
+  { id: 'rehearsal', label: 'Rehearsal agenda', title: 'Rehearsal', items: ['Warm-up', 'Songs to polish', 'New song', 'Run the full set', 'Notes for next time'] },
+  { id: 'release', label: 'Release plan', title: 'Release plan', items: ['Master approved', 'Cover art', 'Upload to distributor', 'Announce the date', 'Social posts scheduled', 'Press and playlists'] },
+  { id: 'lyrics', label: 'Lyrics draft', title: 'Untitled lyrics', content: 'Verse 1\n\n\nChorus\n\n\nVerse 2\n\n' },
+]

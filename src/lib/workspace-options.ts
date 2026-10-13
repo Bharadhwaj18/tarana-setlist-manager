@@ -68,10 +68,10 @@ export function attentionBadge(w: Pick<WorkspaceOption, 'tasksDue' | 'nextShowDa
   return null
 }
 
-/** One-line description for switcher rows: "Band · 4 members · next show Sat 31 Oct". */
+/** One-line description for switcher rows: "Band · 4 members · next event Sat 31 Oct". */
 export function workspaceSubtitle(w: WorkspaceOption) {
   if (isPersonal(w)) return 'Just you · all your calendars'
   const members = `${w.memberCount} member${w.memberCount === 1 ? '' : 's'}`
-  const next = w.nextShowDate ? `next show ${formatShortDate(w.nextShowDate)}` : 'no shows booked'
+  const next = w.nextShowDate ? `next event ${formatShortDate(w.nextShowDate)}` : 'nothing booked'
   return `${w.kind || 'Workspace'} · ${members} · ${next}`
 }

@@ -1,14 +1,27 @@
-import { StickyNote } from 'lucide-react'
-import { getCachedNotes, getCachedChecklistItems, getCachedAllProfiles, getCachedUser } from '@/lib/data'
-import { NoteModal } from '@/components/notes/NoteModal'
+import { getCachedNotes, getCachedChecklistItems, getCachedAllProfiles, getCachedShows, getCachedSongs, getCachedUser } from '@/lib/data'
+import { createClient } from '@/lib/supabase/server'
+import { purgeOldTrash } from '@/lib/notes-trash'
 import { NotesList } from '@/components/notes/NotesList'
+import { PageHeader } from '@/components/ui/PageHeader'
 import type { ChecklistItem } from '@/types'
 
-export default async function NotesPage() {
-  const [notes, checklistItems, profiles, { data: { user } }] = await Promise.all([
+interface Props {
+  searchParams: Promise<{ open?: string; new?: string; show?: string; song?: string }>
+}
+
+export default async function NotesPage({ searchParams }: Props) {
+  const { open, new: isNew, show, song } = await searchParams
+
+  // Trash older than 30 days is removed whenever someone opens Notes.
+  const supabase = await createClient()
+  await purgeOldTrash(supabase)
+
+  const [notes, checklistItems, profiles, shows, songs, { data: { user } }] = await Promise.all([
     getCachedNotes(),
     getCachedChecklistItems(),
     getCachedAllProfiles(),
+    getCachedShows(),
+    getCachedSongs(),
     getCachedUser(),
   ])
 
@@ -20,7 +33,6 @@ export default async function NotesPage() {
     (checklistByNote[item.note_id] ??= []).push(item)
   }
 
-  // Names resolved server-side into plain strings, keyed by note id.
   const authorLines: Record<string, string> = {}
   for (const note of notes) {
     authorLines[note.id] =
@@ -28,28 +40,27 @@ export default async function NotesPage() {
       ` · ${new Date(note.updated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit', timeZone: 'Asia/Kolkata' })}`
   }
 
+  const links = {
+    shows: shows.map(s => ({ id: s.id, title: s.title, date: s.show_date })),
+    songs: songs.map(s => ({ id: s.id, title: s.title })),
+  }
+  const liveCount = notes.filter(n => !n.deleted_at).length
+
   return (
     <div className="max-w-5xl">
-      <div className="mb-6 flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Notes</h1>
-          <p className="mt-1 text-sm text-gray-500">{notes.length} note{notes.length !== 1 ? 's' : ''} — shared with everyone in the workspace</p>
-        </div>
-        <NoteModal />
-      </div>
-
-      {!notes.length ? (
-        <div className="flex flex-col items-center gap-4 rounded-xl border-2 border-dashed border-gray-200 py-20 text-center">
-          <StickyNote className="h-12 w-12 text-gray-300" />
-          <div>
-            <p className="font-medium text-gray-500">No notes yet</p>
-            <p className="text-sm text-gray-400">Ideas, lists, anything worth jotting down. For work you assign to people, use Tasks.</p>
-          </div>
-          <NoteModal />
-        </div>
-      ) : (
-        <NotesList notes={notes} checklistByNote={checklistByNote} authorLines={authorLines} />
-      )}
+      <PageHeader
+        title="Notes"
+        subtitle={`${liveCount} note${liveCount === 1 ? '' : 's'}. New notes are private to you until you share them.`}
+      />
+      <NotesList
+        notes={notes}
+        checklistByNote={checklistByNote}
+        authorLines={authorLines}
+        links={links}
+        currentUserId={user?.id}
+        openNoteId={open}
+        composePrefill={isNew ? { showId: show, songId: song } : undefined}
+      />
     </div>
   )
 }

@@ -4,7 +4,7 @@ import { useState, useTransition, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Bell } from 'lucide-react'
+import { Bell, CalendarDays, CalendarX, CheckSquare, ListMusic, Users, Wallet, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { markNotificationRead, markAllNotificationsRead } from '@/actions/notifications'
 import type { NotificationItem } from '@/types/notifications'
@@ -13,6 +13,16 @@ interface Props {
   /** "sidebar" sits on the dark sidebar; "page" sits on the normal page background (phone header). */
   tone?: 'sidebar' | 'page'
   notifications: NotificationItem[]
+}
+
+function iconFor(type: string): LucideIcon {
+  if (type.startsWith('show_')) return CalendarDays
+  if (type.startsWith('task_')) return CheckSquare
+  if (type.startsWith('payment_') || type.startsWith('transaction_')) return Wallet
+  if (type.startsWith('setlist_')) return ListMusic
+  if (type.startsWith('unavailability_')) return CalendarX
+  if (type.startsWith('workspace_')) return Users
+  return Bell
 }
 
 function timeAgo(iso: string) {
@@ -33,9 +43,11 @@ export function NotificationBell({ notifications, tone = 'sidebar' }: Props) {
   const [, startTransition] = useTransition()
   const router = useRouter()
   const unreadCount = notifications.filter(n => !n.read).length
-  const recent = notifications.slice(0, 8)
+  const recent = notifications.slice(0, 12)
+  const fresh = recent.filter(n => !n.read)
+  const earlier = recent.filter(n => n.read)
 
-  const DROPDOWN_WIDTH = 320 // matches w-80
+  const DROPDOWN_WIDTH = 352 // matches w-[22rem]
   const VIEWPORT_MARGIN = 8
 
   // Opens to the right of the bell, portaled to <body> so it's never
@@ -92,37 +104,54 @@ export function NotificationBell({ notifications, tone = 'sidebar' }: Props) {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div
-            className="fixed z-50 w-80 max-w-[90vw] rounded-xl border border-brand-200 bg-white shadow-lg"
+            className="fixed z-50 w-[22rem] max-w-[calc(100vw-1rem)] overflow-hidden rounded-2xl border border-brand-200 bg-white shadow-2xl"
             style={{ top: position.top, left: position.left }}
           >
-            <div className="flex items-center justify-between border-b border-brand-100 px-4 py-2.5">
-              <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Notifications</span>
-              <Link href="/notifications" onClick={() => setOpen(false)} className="text-xs font-medium text-brand-600 hover:underline">
-                See all
-              </Link>
+            <div className="flex items-center justify-between gap-3 border-b border-brand-100 px-4 py-3">
+              <span className="font-display text-lg font-bold text-gray-900">Notifications</span>
+              <div className="flex items-center gap-3 text-xs font-bold">
+                {unreadCount > 0 && (
+                  <button type="button" onClick={() => startTransition(() => { markAllNotificationsRead() })} className="text-gray-500 hover:text-gray-900">
+                    Mark all read
+                  </button>
+                )}
+                <Link href="/notifications" onClick={() => setOpen(false)} className="text-brand-600 hover:underline">
+                  See all
+                </Link>
+              </div>
             </div>
             {recent.length === 0 ? (
-              <p className="px-4 py-8 text-center text-sm text-gray-400">Nothing yet</p>
+              <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
+                <Bell className="h-8 w-8 text-brand-300" />
+                <p className="text-sm font-semibold text-gray-700">You&apos;re all caught up</p>
+                <p className="text-xs text-gray-500">New shows, tasks and payments show up here.</p>
+              </div>
             ) : (
-              <div className="max-h-96 overflow-y-auto">
-                {recent.map(n => (
-                  <button
-                    key={n.id}
-                    onClick={() => handleClick(n)}
-                    className={cn(
-                      'block w-full border-b border-brand-50 px-4 py-3 text-left last:border-0 hover:bg-brand-50',
-                      !n.read && 'bg-brand-50/60'
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-sm font-medium text-gray-900">{n.title}</p>
-                      {!n.read && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-brand-500" />}
-                    </div>
-                    {n.body && <p className="mt-0.5 line-clamp-2 text-xs text-gray-500">{n.body}</p>}
-                    <p className="mt-1 text-[11px] text-gray-400">
-                      {n.senderName ? `${n.senderName} · ` : ''}{timeAgo(n.createdAt)}
-                    </p>
-                  </button>
+              <div className="no-scrollbar max-h-[min(26rem,70vh)] overflow-y-auto">
+                {([['New', fresh], ['Earlier', earlier]] as const).map(([label, items]) => items.length > 0 && (
+                  <section key={label}>
+                    <h3 className="sticky top-0 bg-white/95 px-4 pb-1 pt-3 text-[11px] font-extrabold uppercase tracking-[0.14em] text-gray-400 backdrop-blur">{label}</h3>
+                    {items.map(n => {
+                      const Icon = iconFor(n.type)
+                      return (
+                        <button
+                          key={n.id}
+                          onClick={() => handleClick(n)}
+                          className={cn('flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-brand-50', !n.read && 'bg-brand-50/70')}
+                        >
+                          <span className={cn('mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl', n.read ? 'bg-brand-100 text-gray-500' : 'bg-brand-400 text-white')}>
+                            <Icon className="h-4 w-4" />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className={cn('block text-sm leading-snug', n.read ? 'font-medium text-gray-700' : 'font-bold text-gray-900')}>{n.title}</span>
+                            {n.body && <span className="mt-0.5 line-clamp-2 block text-xs text-gray-500">{n.body}</span>}
+                            <span className="mt-1 block text-[11px] text-gray-400">{n.senderName ? `${n.senderName} · ` : ''}{timeAgo(n.createdAt)}</span>
+                          </span>
+                          {!n.read && <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-brand-500" aria-label="Unread" />}
+                        </button>
+                      )
+                    })}
+                  </section>
                 ))}
               </div>
             )}

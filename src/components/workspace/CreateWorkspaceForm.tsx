@@ -57,7 +57,7 @@ export function CreateWorkspaceForm() {
 
   if (created) {
     const steps = [
-      { href: '/shows/new', icon: CalendarDays, title: 'Add your next show', hint: 'Date, venue and fee in one place' },
+      { href: '/shows/new', icon: CalendarDays, title: 'Add your next event', hint: 'Date, venue and fee in one place' },
       { href: '/songs/new', icon: Music2, title: 'Add a few songs', hint: 'Chord charts and setlists build on these' },
       { href: '/workspace?tab=invites', icon: UserPlus, title: 'Invite the rest of the workspace', hint: 'Send a link on WhatsApp' },
     ]

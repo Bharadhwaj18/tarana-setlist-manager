@@ -11,7 +11,6 @@ import { ACTIVE_SETLIST_COOKIE } from '@/lib/setlist-context'
 import type { User } from '@supabase/supabase-js'
 import { NotificationBell } from './NotificationBell'
 import { WorkspaceSwitcher } from './WorkspaceSwitcher'
-import { WorkspaceRail } from './WorkspaceRail'
 import type { WorkspaceOption } from '@/lib/workspace-options'
 import { ThemeIconButton } from '@/components/ui/ThemeToggle'
 import { MobileTabBar } from './MobileTabBar'
@@ -151,7 +150,6 @@ export function Sidebar({ user, pendingPaymentCount = 0, notifications = [], wor
   return (
     <>
       {/* Desktop: workspace rail + sidebar */}
-      <WorkspaceRail workspaces={workspaces} currentId={currentWorkspaceId} />
       <aside className="hidden w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar lg:flex">
         <div className="flex items-center justify-between border-b border-sidebar-border px-4 py-2.5">
           {logo}

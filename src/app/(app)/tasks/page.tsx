@@ -1,11 +1,11 @@
 import Link from 'next/link'
-import { getCachedTaskData, getCachedUser } from '@/lib/data'
+import { getCachedTaskData, getCachedAllProfiles, getCachedUser } from '@/lib/data'
 import { todayISO } from '@/lib/shows'
-import { addDaysISO } from '@/lib/dates'
-import { byPosition, compareOpenTasks, myTaskGroup } from '@/lib/tasks'
+import { buildPeople, byPosition } from '@/lib/tasks'
 import { BoardsGrid, NewBoardForm, type BoardSummary } from '@/components/tasks/BoardsGrid'
-import { MyTasks, type MyTaskItem } from '@/components/tasks/MyTasks'
+import { TasksList } from '@/components/tasks/TasksList'
 import { cn } from '@/lib/utils'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 interface Props {
   searchParams: Promise<{ view?: string }>
@@ -13,12 +13,11 @@ interface Props {
 
 export default async function TasksPage({ searchParams }: Props) {
   const { view } = await searchParams
-  const tab = view === 'mine' ? 'mine' : 'boards'
-  const [data, { data: { user } }] = await Promise.all([getCachedTaskData(), getCachedUser()])
+  const tab = view === 'boards' ? 'boards' : 'list'
+  const [data, profiles, { data: { user } }] = await Promise.all([getCachedTaskData(), getCachedAllProfiles(), getCachedUser()])
   const today = todayISO()
-  const weekAhead = addDaysISO(today, 7)
+  const { members, nameById } = buildPeople(profiles, user?.id)
 
-  const boardName = new Map(data.boards.map(b => [b.id, b.name]))
   const summaries: BoardSummary[] = data.boards.map(b => {
     const tasks = data.tasks.filter(t => t.board_id === b.id)
     const open = tasks.filter(t => t.progress !== 'completed')
@@ -32,59 +31,50 @@ export default async function TasksPage({ searchParams }: Props) {
     }
   })
 
-  const mine = data.tasks.filter(t => !!user && t.assignee_ids.includes(user.id) && boardName.has(t.board_id))
-  const toItem = (t: (typeof mine)[number]): MyTaskItem => ({
-    id: t.id,
-    boardId: t.board_id,
-    boardName: boardName.get(t.board_id)!,
-    title: t.title,
-    progress: t.progress,
-    priority: t.priority,
-    dueDate: t.due_date,
-    group: myTaskGroup(t.due_date, today, weekAhead),
-  })
-  const open = mine.filter(t => t.progress !== 'completed').sort(compareOpenTasks).map(toItem)
-  const completed = mine
-    .filter(t => t.progress === 'completed')
-    .sort((a, b) => (b.completed_at ?? '').localeCompare(a.completed_at ?? ''))
-    .slice(0, 10)
-    .map(toItem)
-  const dueSoon = open.filter(i => i.group === 'overdue' || i.group === 'today').length
-
+  const openCount = data.tasks.filter(t => t.progress !== 'completed').length
   const tabs = [
-    { key: 'boards', label: 'Boards', href: '/tasks' },
-    { key: 'mine', label: `My tasks${open.length ? ` (${open.length})` : ''}`, href: '/tasks?view=mine' },
+    { key: 'list', label: 'List', href: '/tasks' },
+    { key: 'boards', label: 'Kanban', href: '/tasks?view=boards' },
   ]
 
   return (
     <div className="max-w-5xl">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Tasks</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            {tab === 'boards'
-              ? `${data.boards.length} board${data.boards.length === 1 ? '' : 's'} — shared by everyone in the workspace`
-              : dueSoon ? `${dueSoon} overdue or due today` : 'Everything assigned to you, across all boards'}
-          </p>
-        </div>
-        {tab === 'boards' && data.boards.length > 0 && <NewBoardForm />}
-      </div>
+      <PageHeader
+        title="Tasks"
+        subtitle={tab === 'list'
+          ? `${openCount} open across ${data.boards.length} group${data.boards.length === 1 ? '' : 's'}`
+          : `${data.boards.length} board${data.boards.length === 1 ? '' : 's'}, one per group`}
+        action={tab === 'boards' && data.boards.length > 0 ? <NewBoardForm /> : undefined}
+      />
 
-      <div className="mb-6 flex gap-1 border-b border-gray-200" role="tablist">
+      <div className="mb-5 inline-flex rounded-xl bg-brand-100 p-1" role="tablist" aria-label="View">
         {tabs.map(t => (
           <Link
             key={t.key}
             href={t.href}
             role="tab"
             aria-selected={tab === t.key}
-            className={cn('-mb-px border-b-2 px-4 py-2 text-sm font-medium', tab === t.key ? 'border-brand-500 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-700')}
+            className={cn('rounded-lg px-4 py-2 text-sm font-bold transition-colors', tab === t.key ? 'bg-brand-400 text-white shadow-sm' : 'text-gray-700 hover:text-gray-900')}
           >
             {t.label}
           </Link>
         ))}
       </div>
 
-      {tab === 'boards' ? <BoardsGrid boards={summaries} /> : <MyTasks open={open} completed={completed} today={today} />}
+      {tab === 'list' ? (
+        <TasksList
+          boards={data.boards}
+          buckets={data.buckets}
+          tasks={data.tasks}
+          members={members}
+          nameById={nameById}
+          today={today}
+          currentUserId={user?.id}
+          initialMine={view === 'mine'}
+        />
+      ) : (
+        <BoardsGrid boards={summaries} />
+      )}
     </div>
   )
 }

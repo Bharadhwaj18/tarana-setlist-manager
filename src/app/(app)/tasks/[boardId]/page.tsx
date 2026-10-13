@@ -31,6 +31,7 @@ export default async function BoardPage({ params, searchParams }: Props) {
       members={members}
       nameById={nameById}
       today={todayISO()}
+      currentUserId={user?.id}
       initialTaskId={task}
     />
   )

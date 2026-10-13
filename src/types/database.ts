@@ -335,6 +335,10 @@ export type Database = {
           color: string | null
           recurrence: string | null
           labels: string[] | null
+          visibility: string
+          show_id: string | null
+          song_id: string | null
+          deleted_at: string | null
         }
         Insert: {
           workspace_id?: string | null
@@ -354,6 +358,10 @@ export type Database = {
           color?: string | null
           recurrence?: string | null
           labels?: string[] | null
+          visibility?: string
+          show_id?: string | null
+          song_id?: string | null
+          deleted_at?: string | null
         }
         Update: {
           workspace_id?: string | null
@@ -373,6 +381,10 @@ export type Database = {
           color?: string | null
           recurrence?: string | null
           labels?: string[] | null
+          visibility?: string
+          show_id?: string | null
+          song_id?: string | null
+          deleted_at?: string | null
         }
         Relationships: []
       }

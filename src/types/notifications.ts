@@ -25,6 +25,7 @@ export interface NotificationItem {
   body: string | null
   link: string | null
   read: boolean
+  type: string
   createdAt: string
   senderName: string | null
 }

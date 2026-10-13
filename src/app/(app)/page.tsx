@@ -97,7 +97,7 @@ export default async function TodayPage() {
         {next ? (
           <section className="flex flex-col gap-4 rounded-2xl bg-hero p-6 text-hero-fg shadow-sm">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-xs font-semibold uppercase tracking-[0.12em] text-sidebar-accent">Next show</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.12em] text-sidebar-accent">Next event</span>
               {next.booking_status && (
                 <span className="rounded-full bg-sidebar-accent px-2.5 py-1 text-xs font-bold capitalize text-sidebar-active-fg">{next.booking_status}</span>
               )}

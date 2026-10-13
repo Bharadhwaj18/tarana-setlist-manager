@@ -54,7 +54,7 @@ export default async function SetlistsPage() {
         <EmptyState
           icon={<ListMusic className="h-12 w-12" />}
           title="No setlists yet"
-          description="Create a setlist for your next show"
+          description="Create a setlist for your next event"
           action={newButton}
         />
       ) : (

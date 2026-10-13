@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { LinkedNotes } from '@/components/notes/LinkedNotes'
 import Link from 'next/link'
 import { ChevronLeft, Pencil, MapPin, ListMusic, Wallet, Plus, Building2, User, Phone, Mail, Film, Check } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
@@ -162,6 +163,8 @@ export default async function ShowDetailPage({ params }: Props) {
           {user && (showHasQuote || (documents ?? []).length > 0) && (
             <ShowDocuments showId={show.id} userId={user.id} documents={documents ?? []} />
           )}
+
+          <LinkedNotes showId={show.id} />
 
           {/* Finance */}
           <section className={card}>

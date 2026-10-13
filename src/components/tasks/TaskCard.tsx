@@ -57,7 +57,7 @@ export function TaskCard({ task, labelsById, nameById, today, onOpen }: Props) {
       tabIndex={0}
       onClick={onOpen}
       onKeyDown={e => { if (e.key === 'Enter') onOpen() }}
-      className="cursor-pointer rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+      className="cursor-pointer rounded-xl border border-brand-200 bg-white p-3 shadow-sm transition hover:-translate-y-px hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
     >
       {labels.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-1">

@@ -44,7 +44,7 @@ function WorkspaceCard({ w, currentId, today }: { w: WorkspaceOption; currentId:
 
       {!personal && (
         <div className="grid grid-cols-3 gap-2">
-          <Stat label="Next show" value={w.nextShowDate ? formatShortDate(w.nextShowDate) : 'None booked'} />
+          <Stat label="Next event" value={w.nextShowDate ? formatShortDate(w.nextShowDate) : 'Nothing booked'} />
           <Stat label="Tasks due" value={w.tasksDue > 0 ? String(w.tasksDue) : 'None'} tone={w.tasksDue > 0 ? 'warn' : undefined} />
           <Stat label="Members" value={String(w.memberCount)} />
         </div>

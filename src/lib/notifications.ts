@@ -20,6 +20,7 @@ export function resolveNotificationItems(
     body: n.body,
     link: n.link,
     read: n.read_at !== null,
+    type: n.type,
     createdAt: n.created_at,
     senderName: senderName(n.sender_id),
   }))

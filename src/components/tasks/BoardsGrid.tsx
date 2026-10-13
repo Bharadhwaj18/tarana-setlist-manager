@@ -61,16 +61,19 @@ export function BoardsGrid({ boards }: { boards: BoardSummary[] }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {boards.map(b => (
-        <Link key={b.id} href={`/tasks/${b.id}`} className="group rounded-xl border border-brand-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
+        <Link key={b.id} href={`/tasks/${b.id}`} className="group rounded-2xl border border-brand-200 bg-white p-5 shadow-sm transition hover:-translate-y-px hover:shadow-md">
           <div className="flex items-center gap-2">
             <SquareKanban className="h-4 w-4 shrink-0 text-brand-500" />
             <h2 className="truncate font-semibold text-gray-900 group-hover:text-brand-600">{b.name}</h2>
           </div>
           <p className="mt-1 truncate text-xs text-gray-400">{b.bucketNames.join(' · ')}</p>
-          <div className="mt-4 flex items-center gap-3 text-sm">
+          <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-brand-100">
+            <div className="h-full rounded-full bg-brand-400" style={{ width: `${b.open + b.done ? Math.round((b.done / (b.open + b.done)) * 100) : 0}%` }} />
+          </div>
+          <div className="mt-2 flex items-center gap-3 text-sm">
             <span className="text-gray-700"><strong className="font-semibold">{b.open}</strong> open</span>
             <span className="text-gray-400">{b.done} done</span>
-            {b.overdue > 0 && <span className="ml-auto rounded bg-red-50 px-1.5 py-0.5 text-xs font-medium text-red-600">{b.overdue} overdue</span>}
+            {b.overdue > 0 && <span className="ml-auto rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">{b.overdue} overdue</span>}
           </div>
         </Link>
       ))}
