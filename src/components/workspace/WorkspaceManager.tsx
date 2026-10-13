@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Copy, Check, Trash2 } from 'lucide-react'
 import {
-  renameWorkspace, createInvite, revokeInvite, setMemberTreasurer, setMemberRole, removeMember, leaveWorkspace,
+  renameWorkspace, createInvite, revokeInvite, setMemberTreasurer, setMemberRole, removeMember, leaveWorkspace, deleteWorkspace,
 } from '@/actions/workspace'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -46,6 +46,8 @@ export function WorkspaceManager({ workspaceName, isAdmin, isOwner, members, inv
   const [days, setDays] = useState(7)
   const [maxUses, setMaxUses] = useState('')
   const [copied, setCopied] = useState<string | null>(null)
+  const [confirmText, setConfirmText] = useState('')
+  const [deleting, setDeleting] = useState(false)
 
   const run = (fn: () => Promise<{ error?: string }>, after?: () => void) => {
     setError(null)
@@ -195,6 +197,32 @@ export function WorkspaceManager({ workspaceName, isAdmin, isOwner, members, inv
                 </li>
               ))}
             </ul>
+          )}
+        </section>
+      )}
+
+      {isAdmin && (
+        <section className="rounded-xl border border-red-200 bg-white p-5 shadow-sm">
+          <h2 className={heading}>Delete workspace</h2>
+          <p className="mb-3 text-sm text-gray-500">
+            Permanently deletes {workspaceName} for everyone: songs, setlists, shows, finances, notes, tasks, recordings and documents. This can’t be undone. Your personal space isn’t affected.
+          </p>
+          {!deleting ? (
+            <Button variant="danger" onClick={() => setDeleting(true)}>Delete {workspaceName}…</Button>
+          ) : (
+            <form
+              className="space-y-3"
+              onSubmit={e => { e.preventDefault(); run(() => deleteWorkspace(confirmText), () => router.push('/')) }}
+            >
+              <label className="block text-sm text-gray-700">
+                Type <span className="font-semibold">{workspaceName}</span> to confirm
+                <Input className="mt-1" value={confirmText} onChange={e => setConfirmText(e.target.value)} autoComplete="off" />
+              </label>
+              <div className="flex gap-2">
+                <Button type="submit" variant="danger" loading={pending} disabled={confirmText.trim() !== workspaceName}>Delete forever</Button>
+                <Button type="button" variant="secondary" disabled={pending} onClick={() => { setDeleting(false); setConfirmText('') }}>Cancel</Button>
+              </div>
+            </form>
           )}
         </section>
       )}

@@ -3,6 +3,9 @@
 import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
+import { sendNotification } from '@/actions/notifications'
+import { DOCUMENT_BUCKET } from '@/types/show-document'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { WORKSPACE_COOKIE, normalisePermissions } from '@/lib/workspace-shared'
 
@@ -162,6 +165,52 @@ export async function leaveWorkspace(): Promise<{ error?: string }> {
   if (error) return { error: error.message }
   const cookieStore = await cookies()
   cookieStore.delete(WORKSPACE_COOKIE)
+  revalidatePath('/', 'layout')
+  return {}
+}
+
+/**
+ * Permanently deletes the current workspace and everything in it. Owner/admin only, never a
+ * personal space, and the caller must type the workspace's exact name.
+ */
+export async function deleteWorkspace(confirmName: string): Promise<{ error?: string }> {
+  const auth = await requireAdminContext()
+  if ('error' in auth) return { error: auth.error }
+  const { workspace } = auth.ctx.current
+  if (confirmName.trim() !== workspace.name) return { error: 'Type the workspace name exactly to confirm.' }
+
+  const supabase = await createClient()
+  const [{ data: recordings }, { data: documents }, { data: members }] = await Promise.all([
+    supabase.from('recordings').select('file_path').eq('workspace_id', workspace.id),
+    supabase.from('show_documents').select('file_path').eq('workspace_id', workspace.id),
+    supabase.from('workspace_members').select('user_id').eq('workspace_id', workspace.id),
+  ])
+
+  const { error } = await supabase.rpc('delete_workspace', { p_ws: workspace.id })
+  if (error) return { error: error.message }
+
+  // Uploaded files live in storage, not in the tables that just cascaded away. Best effort:
+  // the workspace is already gone, so a failure here only leaves orphaned files behind.
+  try {
+    const storage = createServiceClient().storage
+    const recordingPaths = (recordings ?? []).map(r => r.file_path)
+    const documentPaths = (documents ?? []).map(d => d.file_path)
+    if (recordingPaths.length) await storage.from('recordings').remove(recordingPaths)
+    if (documentPaths.length) await storage.from(DOCUMENT_BUCKET).remove(documentPaths)
+  } catch {}
+
+  const cookieStore = await cookies()
+  cookieStore.delete(WORKSPACE_COOKIE)
+
+  const others = (members ?? []).map(m => m.user_id).filter(id => id !== auth.ctx.userId)
+  await Promise.all(others.map(recipientId => sendNotification({
+    recipientId,
+    title: `"${workspace.name}" was deleted`,
+    body: 'An admin deleted this workspace.',
+    link: '/',
+    type: 'workspace_deleted',
+  })))
+
   revalidatePath('/', 'layout')
   return {}
 }

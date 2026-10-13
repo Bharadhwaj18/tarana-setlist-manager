@@ -1094,6 +1094,7 @@ export type Database = {
         }[]
       }
       create_workspace: { Args: { p_name: string; p_type?: string }; Returns: string }
+      delete_workspace: { Args: { p_ws: string }; Returns: undefined }
       rename_workspace: { Args: { p_ws: string; p_name: string }; Returns: undefined }
       revoke_workspace_invite: { Args: { p_invite: string }; Returns: undefined }
       accept_workspace_invite: { Args: { p_token: string }; Returns: string }
