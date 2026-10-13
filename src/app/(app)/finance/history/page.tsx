@@ -3,9 +3,9 @@ import { ChevronLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { requireWorkspaceId } from '@/lib/workspace'
 import { getCachedAllProfiles, getCachedUser } from '@/lib/data'
-import { todayISO, isUpcoming } from '@/lib/shows'
 import { FinanceHistoryList } from '@/components/finance/FinanceHistoryList'
-import { FinanceFloatingNav } from '@/components/finance/FinanceFloatingNav'
+import { ExportModal } from '@/components/finance/ExportModal'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 export default async function FinanceHistoryPage() {
   const supabase = await createClient()
@@ -52,25 +52,23 @@ export default async function FinanceHistoryPage() {
     }
   }
 
-  // A show that hasn't happened yet has nothing to split — same rule
-  // /finance/split itself enforces (404s if every unsplit show is still
-  // upcoming). Without this, the floating Split button could show up here
-  // even when pressing it would 404.
-  const today = todayISO()
-  const hasUnsplitShows = (shows ?? []).some(s => !s.split_at && !isUpcoming(s.show_date, today))
-
   return (
-    <div className="max-w-2xl">
-      <Link href="/finance" className="mb-6 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
+    <div>
+      <Link href="/finance" className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-gray-500 hover:text-gray-700">
         <ChevronLeft className="h-4 w-4" /> Finance
       </Link>
-      <div className="mb-1 flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-gray-900">History</h1>
-        <Link href="/finance/split-history" className="text-xs font-medium text-brand-600 underline underline-offset-2 hover:text-brand-800">
-          Split History →
-        </Link>
-      </div>
-      <p className="mb-6 text-sm text-gray-500">Every transaction — Misc, show income, expenses, and splits.</p>
+      <PageHeader
+        title="History"
+        subtitle="Every transaction — Misc, show income, expenses, and splits."
+        action={
+          <div className="flex items-center gap-3">
+            <Link href="/finance/split-history" className="hidden text-sm font-extrabold text-brand-400 hover:underline dark:text-emerald-400 sm:inline">
+              Split history →
+            </Link>
+            <ExportModal members={profiles.map(p => ({ id: p.id, name: p.display_name ?? 'Member' }))} />
+          </div>
+        }
+      />
 
       <FinanceHistoryList
         transactions={historyTxns}
@@ -80,8 +78,6 @@ export default async function FinanceHistoryPage() {
         showTitleById={showTitleById}
         runningBalances={runningBalances}
       />
-
-      <FinanceFloatingNav hasUnsplitShows={hasUnsplitShows} />
     </div>
   )
 }

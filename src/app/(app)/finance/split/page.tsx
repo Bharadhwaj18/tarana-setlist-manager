@@ -6,6 +6,7 @@ import { requireWorkspaceId } from '@/lib/workspace'
 import { getCachedAllProfiles, getCachedUser } from '@/lib/data'
 import { todayISO, isUpcoming } from '@/lib/shows'
 import { SplitWizard } from '@/components/finance/SplitWizard'
+import { PageHeader } from '@/components/ui/PageHeader'
 import type { FinanceTransaction } from '@/types/finance'
 
 export default async function SplitPage() {
@@ -68,11 +69,11 @@ export default async function SplitPage() {
   }
 
   return (
-    <div className="max-w-2xl">
-      <Link href="/finance" className="mb-6 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
+    <div className="max-w-5xl">
+      <Link href="/finance" className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-gray-500 hover:text-gray-700">
         <ChevronLeft className="h-4 w-4" /> Finance
       </Link>
-      <h1 className="mb-6 text-2xl font-bold text-gray-900">Split Show Money</h1>
+      <PageHeader title="Split shows" subtitle="Pick the shows, set the band fund cut, then decide who pays whom." />
       <SplitWizard
         shows={shows}
         members={members}

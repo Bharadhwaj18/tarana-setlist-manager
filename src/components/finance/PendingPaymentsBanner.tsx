@@ -4,11 +4,8 @@ import { useTransition } from 'react'
 import { Button } from '@/components/ui/Button'
 import { markPendingPaymentPaid } from '@/actions/pending-payments'
 import { useToast } from '@/components/ui/Toaster'
+import { fmt } from './money'
 import type { PendingPayment } from '@/types'
-
-function fmt(n: number) {
-  return `₹${Math.abs(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
-}
 
 interface Props {
   /** Already filtered to the current user's own pending payments (from_member === them). */
@@ -55,23 +52,23 @@ export function PendingPaymentsBanner({ payments, profiles }: Props) {
   const total = round2(payments.reduce((s, p) => s + p.amount, 0))
 
   return (
-    <section className="rounded-xl border border-red-200 bg-red-50 p-4">
-      <h2 className="mb-3 text-sm font-semibold text-red-800">
+    <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+      <h2 className="mb-3 font-sans text-sm font-extrabold">
         You owe {fmt(total)} · {groups.length} pending payment{groups.length !== 1 ? 's' : ''}
       </h2>
       <div className="space-y-2">
         {groups.map(g => (
-          <div key={g.to} className="rounded-lg bg-white px-3 py-2.5 shadow-sm">
+          <div key={g.to} className="rounded-xl bg-white px-3.5 py-3 text-gray-800">
             <div className="flex items-center justify-between gap-3">
-              <p className="min-w-0 truncate text-sm font-medium text-gray-800">{nameOf(g.to)}</p>
+              <p className="min-w-0 truncate text-sm font-bold">{nameOf(g.to)}</p>
               <div className="flex shrink-0 items-center gap-3">
-                <span className="text-sm font-bold text-gray-800">{fmt(g.total)}</span>
+                <span className="text-sm font-extrabold tabular-nums">{fmt(g.total)}</span>
                 <Button size="sm" loading={isPending} onClick={() => handleMarkPaid(g.items.map(p => p.id))}>Mark paid</Button>
               </div>
             </div>
             <div className="mt-1 space-y-0.5">
               {g.items.map(p => (
-                <div key={p.id} className="flex items-baseline justify-between gap-3 text-xs text-gray-400">
+                <div key={p.id} className="flex items-baseline justify-between gap-3 text-xs text-gray-500">
                   <span className="min-w-0 truncate">
                     {p.category === 'balance_reimbursement' ? 'Balance reimbursement' : p.description}
                   </span>

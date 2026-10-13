@@ -22,7 +22,7 @@ const PRESETS = [
 
 type Preset = typeof PRESETS[number]['label']
 
-const inputCls = 'w-full rounded-md border border-brand-200 bg-white px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400'
+const inputCls = 'w-full rounded-xl border border-brand-200 bg-white px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400'
 
 export function ExportModal({ members }: { members: Member[] }) {
   const [open, setOpen] = useState(false)
@@ -141,7 +141,7 @@ export function ExportModal({ members }: { members: Member[] }) {
                 <button
                   key={f}
                   onClick={() => setFormat(f)}
-                  className={`flex-1 rounded-md py-2 text-sm font-semibold uppercase transition-colors ${
+                  className={`flex-1 rounded-xl py-2 text-sm font-semibold uppercase transition-colors ${
                     format === f ? 'bg-brand-400 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >

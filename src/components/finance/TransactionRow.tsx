@@ -1,11 +1,13 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { TrendingUp, TrendingDown, Trash2 } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AddTransactionModal } from './AddTransactionModal'
+import { StatusPill } from '@/components/ui/StatusPill'
 import { deleteTransaction } from '@/actions/finance'
 import { useToast } from '@/components/ui/Toaster'
+import { fmt, fmtSigned, CREDIT_TEXT, DEBIT_TEXT } from './money'
 import type { FinanceTransaction } from '@/types/finance'
 import type { Show } from '@/types/shows'
 import type { Budget } from '@/types/budget'
@@ -25,10 +27,6 @@ interface Props {
   afterMemberBalance?: number
 }
 
-function fmt(n: number) {
-  return `₹${Math.abs(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
-}
-
 /**
  * A whole transaction row that opens Edit on tap — no hunting for a tiny
  * pencil icon that only ever showed up on :hover, which never fires on a
@@ -37,10 +35,6 @@ function fmt(n: number) {
  * actually deletes anything, since it's no longer hover-gated as an
  * accidental safety net.
  */
-function fmtSigned(n: number) {
-  return `${n < 0 ? '−' : ''}₹${Math.abs(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
-}
-
 export function TransactionRow({ transaction: t, members, shows, budgets, payerName, badge, afterFundTotal, afterMemberBalance }: Props) {
   const [editOpen, setEditOpen] = useState(false)
   const [isDeleting, startDeleteTransition] = useTransition()
@@ -67,41 +61,33 @@ export function TransactionRow({ transaction: t, members, shows, budgets, payerN
           setEditOpen(true)
         }
       }}
-      className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-gray-50"
+      className="flex cursor-pointer items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-brand-50"
     >
-      <div className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-full', isCredit ? 'bg-green-100' : 'bg-red-100')}>
-        {isCredit
-          ? <TrendingUp className="h-3.5 w-3.5 text-green-600" />
-          : <TrendingDown className="h-3.5 w-3.5 text-red-500" />}
-      </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-gray-800">{t.description}</p>
-        <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-gray-400">
-          <span>{payerName}</span>
-          <span>·</span>
+        <p className="truncate text-sm font-bold text-gray-900">{t.description}</p>
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-gray-500">
           <span>{new Date(t.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}</span>
-          {badge && (
-            <span className={cn(
-              'rounded px-1.5 py-0.5 font-medium',
-              badge.kind === 'show' ? 'bg-brand-100 text-brand-700' : 'bg-gray-100 text-gray-500'
-            )}>
-              {badge.label}
-            </span>
-          )}
+          <span>·</span>
+          <span>{payerName}</span>
           {afterMemberBalance !== undefined && (
-            <span className={cn('font-medium tabular-nums', afterMemberBalance < 0 ? 'text-red-500' : 'text-gray-500')}>
+            <span className={cn('font-medium tabular-nums', afterMemberBalance < 0 ? 'text-red-700' : 'text-gray-500')}>
               {fmtSigned(afterMemberBalance)}
             </span>
           )}
         </p>
       </div>
+      {badge && (
+        <StatusPill tone={badge.kind === 'show' ? 'green' : 'gray'} className="hidden max-w-[40%] truncate sm:inline-flex">
+          {badge.label}
+        </StatusPill>
+      )}
       {afterFundTotal !== undefined && (
         <div className="shrink-0 text-right">
-          <p className="text-[10px] text-gray-400">Fund total</p>
-          <p className={cn('text-xs font-semibold tabular-nums', afterFundTotal < 0 ? 'text-red-500' : 'text-gray-700')}>{fmtSigned(afterFundTotal)}</p>
+          <p className="text-[10px] text-gray-500">Fund total</p>
+          <p className={cn('text-xs font-semibold tabular-nums', afterFundTotal < 0 ? 'text-red-700' : 'text-gray-700')}>{fmtSigned(afterFundTotal)}</p>
         </div>
       )}
-      <span className={cn('shrink-0 text-sm font-bold tabular-nums', isCredit ? 'text-green-600' : 'text-red-500')}>
+      <span className={cn('shrink-0 text-sm font-extrabold tabular-nums', isCredit ? CREDIT_TEXT : DEBIT_TEXT)}>
         {isCredit ? '+' : '−'}{fmt(t.amount)}
       </span>
       <button
@@ -109,7 +95,7 @@ export function TransactionRow({ transaction: t, members, shows, budgets, payerN
         onClick={handleDelete}
         disabled={isDeleting}
         aria-label="Delete transaction"
-        className="shrink-0 rounded-md p-1.5 text-gray-300 transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
+        className="shrink-0 rounded-md p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
       >
         <Trash2 className="h-4 w-4" />
       </button>

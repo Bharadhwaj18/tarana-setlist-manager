@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { Plus, Pencil } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
+import { Chip } from '@/components/ui/Chip'
 import { addTransaction, updateTransaction, addShow } from '@/actions/finance'
 import { useToast } from '@/components/ui/Toaster'
 import { DEBIT_CATEGORIES, CREDIT_CATEGORIES, CREDIT_CATEGORY_LABELS } from '@/types/finance'
@@ -26,9 +27,12 @@ interface Props {
   /** Controlled visibility — pass both to drive this from outside (e.g. a whole tappable row opening it) instead of the built-in pencil trigger, which is skipped entirely when these are provided. */
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  /** Render the trigger as a round floating button above the phone tab bar (hidden on desktop). */
+  fab?: boolean
 }
 
-const inputCls = 'w-full rounded-md border border-brand-200 bg-white px-3 py-2.5 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400'
+const inputCls = 'w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400'
+const labelCls = 'mb-1.5 block text-xs font-bold text-gray-700'
 const NEW_SHOW = '__new__'
 const AUTO = '__auto__'
 const NO_BUDGET = ''
@@ -66,7 +70,23 @@ function fieldsFrom(transaction: FinanceTransaction | undefined, unsplitShows: S
   }
 }
 
-export function AddTransactionModal({ members, shows, budgets = [], transaction, lockedShow, open: controlledOpen, onOpenChange }: Props) {
+function Segmented({ children }: { children: React.ReactNode }) {
+  return <div className="flex rounded-xl bg-brand-100 p-1">{children}</div>
+}
+
+function SegmentButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn('flex-1 rounded-lg px-2 py-2 text-sm font-bold transition-colors', active ? 'bg-brand-400 text-white shadow-sm' : 'text-gray-700 hover:text-gray-900')}
+    >
+      {children}
+    </button>
+  )
+}
+
+export function AddTransactionModal({ members, shows, budgets = [], transaction, lockedShow, open: controlledOpen, onOpenChange, fab }: Props) {
   const isEdit = !!transaction
   const isControlled = controlledOpen !== undefined && onOpenChange !== undefined
   const unsplitShows = shows.filter(s => !s.split_at)
@@ -177,36 +197,61 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
         <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>
           <Plus className="h-4 w-4" /> Add expense
         </Button>
+      ) : fab ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="Add transaction"
+          className="fixed bottom-24 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-brand-400 text-white shadow-lg transition-colors hover:bg-brand-500 lg:hidden"
+        >
+          <Plus className="h-7 w-7" />
+        </button>
       ) : (
-        <Button variant="secondary" onClick={() => setOpen(true)}>
-          <Plus className="h-4 w-4" /> Transaction
+        <Button onClick={() => setOpen(true)}>
+          <Plus className="h-4 w-4" /> Add transaction
         </Button>
       )}
 
-      <Modal open={open} onOpenChange={setOpen} title={isEdit ? 'Edit Transaction' : lockedShow ? `Add Expense — ${lockedShow.title}` : 'Record Transaction'}>
+      <Modal
+        open={open}
+        onOpenChange={setOpen}
+        title={isEdit ? 'Edit transaction' : lockedShow ? `Add expense — ${lockedShow.title}` : 'Add transaction'}
+        className="max-w-[480px] rounded-2xl"
+      >
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Credit / Debit — skipped for Reimbursement, which is always a
+              debit: money the band owes someone back, never money in.
+              Switching direction resets Sub type to that direction's own
+              first option — travel/food/etc. and show_fee/sponsorship/etc.
+              are different lists, a stale pick from the other one wouldn't
+              be valid. */}
+          {!isReimbursement && (
+            <Segmented>
+              <SegmentButton active={dir === 'credit'} onClick={() => { set('dir', 'credit'); set('category', CREDIT_CATEGORIES[0]) }}>
+                Credit · money in
+              </SegmentButton>
+              <SegmentButton active={dir === 'debit'} onClick={() => { set('dir', 'debit'); set('category', DEBIT_CATEGORIES[0]) }}>
+                Debit · money out
+              </SegmentButton>
+            </Segmented>
+          )}
+
           {/* Tag — mandatory, nothing pre-selected. Skipped entirely when
               the transaction is already pinned to one show. */}
           {!lockedShow && (
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Tag *</label>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => set('tag', 'misc')}
-                  className={cn('flex-1 rounded-md py-2 text-sm font-semibold transition-colors', tag === 'misc' ? 'bg-brand-400 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200')}>
-                  Misc
-                </button>
-                <button type="button" onClick={() => set('tag', 'show')}
-                  className={cn('flex-1 rounded-md py-2 text-sm font-semibold transition-colors', tag === 'show' ? 'bg-brand-400 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200')}>
-                  Show Related
-                </button>
-              </div>
+              <label className={labelCls}>Tag *</label>
+              <Segmented>
+                <SegmentButton active={tag === 'misc'} onClick={() => set('tag', 'misc')}>Misc</SegmentButton>
+                <SegmentButton active={tag === 'show'} onClick={() => set('tag', 'show')}>Show related</SegmentButton>
+              </Segmented>
             </div>
           )}
 
           {/* Show sub-selection: which show, with inline creation */}
           {tag === 'show' && !lockedShow && (
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Which show *</label>
+              <label className={labelCls}>Which show *</label>
               <select value={showId} onChange={e => set('showId', e.target.value)} className={inputCls}>
                 {availableShows.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
                 <option value={NEW_SHOW}>+ New show…</option>
@@ -224,42 +269,67 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
             </div>
           )}
 
-          {/* Credit / Debit — skipped for Reimbursement, which is always a
-              debit: money the band owes someone back, never money in.
-              Switching direction resets Sub type to that direction's own
-              first option — travel/food/etc. and show_fee/sponsorship/etc.
-              are different lists, a stale pick from the other one wouldn't
-              be valid. */}
-          {!isReimbursement && (
-            <div className="flex gap-2">
-              <button type="button" onClick={() => { set('dir', 'credit'); set('category', CREDIT_CATEGORIES[0]) }}
-                className={`flex-1 rounded-md py-2 text-sm font-semibold transition-colors ${dir === 'credit' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-                + Credit (add money)
-              </button>
-              <button type="button" onClick={() => { set('dir', 'debit'); set('category', DEBIT_CATEGORIES[0]) }}
-                className={`flex-1 rounded-md py-2 text-sm font-semibold transition-colors ${dir === 'debit' ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-                − Debit (subtract)
-              </button>
+          {/* Amount */}
+          <div>
+            <label className={labelCls}>Amount *</label>
+            <div className="flex items-center gap-2 rounded-xl border-2 border-brand-400 px-3.5 py-2">
+              <span className="font-display text-2xl font-bold text-gray-500">₹</span>
+              <input
+                type="number"
+                min="0.01"
+                step="any"
+                value={amount}
+                onChange={e => set('amount', e.target.value)}
+                placeholder="0"
+                className="compact-field w-full bg-transparent font-display text-2xl font-bold tabular-nums text-gray-900 placeholder-gray-400 focus:outline-none"
+                required
+              />
+            </div>
+          </div>
+
+          {/* Reimbursement: who it's for, right up front and mandatory —
+              the whole point of this category. Everyone else: the usual
+              optional "who recorded this" field, further down. */}
+          {isReimbursement && (
+            <div>
+              <label className={labelCls}>Reimburse *</label>
+              <select value={memberId === AUTO ? '' : memberId} onChange={e => set('memberId', e.target.value)} className={inputCls} required>
+                <option value="" disabled>Who gets this back?</option>
+                {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                Paid back to them in full on top of their cut — never absorbed into their Band Fund balance.
+              </p>
             </div>
           )}
+
+          {/* Description */}
+          <div>
+            <label className={labelCls}>
+              {isReimbursement ? 'What for' : 'Description *'} {isReimbursement && <span className="font-normal text-gray-500">(optional)</span>}
+            </label>
+            <input type="text" value={description} onChange={e => set('description', e.target.value)}
+              placeholder={isReimbursement ? 'e.g. Fuel for car' : 'e.g. Rehearsal space, Sound engineer'}
+              className={inputCls} required={!isReimbursement} />
+          </div>
 
           {/* Sub type — mandatory once a tag is picked; the option list
               follows whichever direction is currently selected. */}
           {tag && (
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Sub type *</label>
-              <select value={category} onChange={e => set('category', e.target.value)} className={inputCls}>
+              <label className={labelCls}>Category *</label>
+              <div className="flex flex-wrap gap-1.5">
                 {(dir === 'credit' ? CREDIT_CATEGORIES : DEBIT_CATEGORIES).map(c => (
-                  <option key={c} value={c}>{categoryLabel(dir, c)}</option>
+                  <Chip key={c} active={category === c} onClick={() => set('category', c)}>{categoryLabel(dir, c)}</Chip>
                 ))}
-              </select>
+              </div>
             </div>
           )}
 
           {showBudgetField && (
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Budget <span className="font-normal text-gray-400">(optional)</span>
+              <label className={labelCls}>
+                Budget <span className="font-normal text-gray-500">(optional)</span>
               </label>
               <select value={budgetId} onChange={e => set('budgetId', e.target.value)} className={inputCls}>
                 <option value={NO_BUDGET}>No budget</option>
@@ -268,61 +338,28 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
             </div>
           )}
 
-          {/* Amount */}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Amount (₹) *</label>
-            <input type="number" min="0.01" step="any" value={amount} onChange={e => set('amount', e.target.value)}
-              placeholder="0" className={inputCls} required />
-          </div>
-
-          {/* Reimbursement: who it's for, right up front and mandatory —
-              the whole point of this category. Everyone else: the usual
-              optional "who recorded this" field, further down. */}
-          {isReimbursement && (
+          <div className="grid grid-cols-2 gap-3">
+            {/* Date */}
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Reimburse *</label>
-              <select value={memberId === AUTO ? '' : memberId} onChange={e => set('memberId', e.target.value)} className={inputCls} required>
-                <option value="" disabled>Who gets this back?</option>
-                {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-              </select>
-              <p className="mt-1 text-xs text-gray-400">
-                Paid back to them in full on top of their cut — never absorbed into their Band Fund balance.
-              </p>
+              <label className={labelCls}>Date</label>
+              <input type="date" value={date} onChange={e => set('date', e.target.value)} className={inputCls} />
             </div>
-          )}
 
-          {/* Description */}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              {isReimbursement ? 'What for' : 'Description *'} {isReimbursement && <span className="font-normal text-gray-400">(optional)</span>}
-            </label>
-            <input type="text" value={description} onChange={e => set('description', e.target.value)}
-              placeholder={isReimbursement ? 'e.g. Fuel for car' : 'e.g. Rehearsal space, Sound engineer'}
-              className={inputCls} required={!isReimbursement} />
+            {/* Paid by / Received by — optional, real members only */}
+            {!isReimbursement && (
+              <div>
+                <label className={labelCls}>{dir === 'credit' ? 'Received by' : 'Paid by'}</label>
+                <select value={memberId} onChange={e => set('memberId', e.target.value)} className={inputCls}>
+                  <option value={AUTO}>Auto (whoever&apos;s adding)</option>
+                  {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </div>
+            )}
           </div>
-
-          {/* Date */}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Date</label>
-            <input type="date" value={date} onChange={e => set('date', e.target.value)} className={inputCls} />
-          </div>
-
-          {/* Paid by / Received by — optional, bottom, real members only */}
-          {!isReimbursement && (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                {dir === 'credit' ? 'Received by' : 'Paid by'} <span className="font-normal text-gray-400">(optional)</span>
-              </label>
-              <select value={memberId} onChange={e => set('memberId', e.target.value)} className={inputCls}>
-                <option value={AUTO}>Auto — whoever&apos;s adding this</option>
-                {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-              </select>
-            </div>
-          )}
 
           <div className="flex justify-end gap-3 pt-1">
             <Button type="button" variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button type="submit" loading={isPending} disabled={!canSubmit}>{isEdit ? 'Save' : 'Add'}</Button>
+            <Button type="submit" loading={isPending} disabled={!canSubmit}>{isEdit ? 'Save' : 'Save transaction'}</Button>
           </div>
         </form>
       </Modal>

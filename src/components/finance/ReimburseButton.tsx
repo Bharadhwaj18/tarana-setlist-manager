@@ -19,8 +19,8 @@ export function ReimburseButton({ memberId, payers }: Props) {
 
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className="text-[11px] font-semibold text-brand-600 underline underline-offset-2">
-        Reimburse
+      <button type="button" onClick={() => setOpen(true)} className="text-[11px] font-extrabold text-brand-400 hover:underline dark:text-emerald-400">
+        Assign payer →
       </button>
     )
   }
@@ -38,13 +38,13 @@ export function ReimburseButton({ memberId, payers }: Props) {
       <select
         value={payerId}
         onChange={e => setPayerId(e.target.value)}
-        className="compact-field min-w-0 flex-1 rounded-md border border-brand-200 bg-white px-2 py-1.5 text-[11px]"
+        className="compact-field min-w-0 flex-1 rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-[11px]"
       >
         <option value="">Who pays?</option>
         {options.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
       </select>
       <Button size="sm" loading={isPending} disabled={!payerId} onClick={submit}>Assign</Button>
-      <button type="button" onClick={() => setOpen(false)} className="text-[11px] text-gray-400">Cancel</button>
+      <button type="button" onClick={() => setOpen(false)} className="text-[11px] text-gray-500">Cancel</button>
     </div>
   )
 }

@@ -5,6 +5,8 @@ import { Check, ArrowRight, Download, X, Plus } from 'lucide-react'
 import { splitShows, type ShowSplitInput, type SplitPayment } from '@/actions/finance'
 import { computeEntitlements, computeBalanceTopUp, computeShowSettlement, poolShowSettlements, routeSettlement, settlementMemberIds, type Payment } from '@/lib/finance/settlement'
 import { Button } from '@/components/ui/Button'
+import { SectionLabel } from '@/components/ui/SectionLabel'
+import { SegmentedTabs } from '@/components/ui/Chip'
 import { useToast } from '@/components/ui/Toaster'
 import { cn } from '@/lib/utils'
 import { buildSplitReportPdf, type SplitReportLine, type SplitReportRow, type SplitReportShow } from '@/lib/pdf/financeReports'
@@ -413,403 +415,493 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
     }
   }
 
+  const activePaymentsNow = mode === 'auto' ? payments : manualPayments
+  const transferCount = activePaymentsNow.filter(p => p.from !== p.to && p.amount > 0).length
+  const artistsTotal = totalNet - totalBandFund
+
+  // Progress is derived from what's actually filled in, not a gate: every section stays on the
+  // page, the stepper just shows where the split stands and jumps between them.
+  const shownStep = selectedShows.length === 0 ? 1 : !canConfirm ? 3 : 4
+  const steps: { id: string; label: string; done: boolean }[] = [
+    { id: 'split-shows', label: 'Select shows', done: selectedShows.length > 0 },
+    { id: 'split-fund', label: 'Band fund cut', done: selectedShows.length > 0 },
+    { id: 'split-who', label: 'Who gets what', done: canConfirm },
+    { id: 'split-review', label: 'Review & confirm', done: false },
+  ]
+
+  const card = 'rounded-2xl border border-brand-200 bg-white p-5 shadow-sm'
+
   return (
-    <div className="space-y-6">
-      {/* Show selection */}
-      <section className="rounded-xl border border-brand-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-3 text-sm font-semibold text-gray-700">Select shows to split together</h2>
-        <div className="space-y-2">
-          {shows.map(s => {
-            const selected = selectedIds.has(s.id)
-            const net = netForShow(s.id)
-            const txns = txnsByShow[s.id] ?? []
-            const involved = involvedByShow[s.id] ?? new Set()
-            const showData = perShow.find(p => p.show.id === s.id)
-
-            const splittable = net > 0
-            return (
-              <div key={s.id} className={cn('rounded-lg border transition-colors', selected ? 'border-brand-400 bg-brand-50' : 'border-brand-200')}>
-                <button type="button" onClick={() => toggleShow(s.id)} disabled={!splittable}
-                  className={cn('flex w-full items-center gap-3 px-4 py-3 text-left', !splittable && 'cursor-not-allowed opacity-60')}>
-                  <span className={cn('flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors',
-                    !splittable ? 'border-gray-200 bg-gray-100' : selected ? 'border-brand-400 bg-brand-400' : 'border-gray-300')}>
-                    {selected && splittable && <Check className="h-3 w-3 text-white" />}
-                  </span>
-                  <div className="flex-1">
-                    <p className={cn('font-medium', splittable ? 'text-gray-900' : 'text-gray-400')}>{s.title}</p>
-                    {s.show_date && <p className="text-xs text-gray-400">
-                      {new Date(s.show_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'long' })}
-                      {s.venue ? ` · ${s.venue}` : ''}
-                    </p>}
-                    {!splittable && <p className="text-xs text-red-400">Awaiting credit — can&apos;t split yet</p>}
-                  </div>
-                  <p className={cn('text-sm font-bold tabular-nums', net < 0 ? 'text-red-500' : 'text-gray-700')}>
-                    {net < 0 ? '−' : ''}{fmt(net)}
-                  </p>
-                </button>
-
-                {selected && (
-                  <div className="space-y-3 border-t border-brand-100 px-4 py-3">
-                    {/* Transactions breakdown */}
-                    {txns.length > 0 && (
-                      <div className="space-y-1 text-xs text-gray-500">
-                        {txns.map(t => (
-                          <div key={t.id} className="flex items-center justify-between">
-                            <span>{t.description} {t.member_id && <span className="text-gray-400">({nameOf(t.member_id)})</span>}</span>
-                            <span className={t.amount >= 0 ? 'text-green-600' : 'text-red-500'}>
-                              {t.amount >= 0 ? '+' : '−'}{fmt(t.amount)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Missed something? Add it straight to this show, right here. */}
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs text-gray-400">
-                        {txns.length === 0 ? 'No expenses logged for this show yet.' : 'Missing an expense?'}
-                      </p>
-                      <AddTransactionModal members={members} shows={shows} lockedShow={{ id: s.id, title: s.title }} />
-                    </div>
-
-                    {/* Involved members */}
-                    <div>
-                      <p className="mb-1.5 text-xs font-medium text-gray-500">Involved</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {members.map(m => (
-                          <button
-                            key={m.id}
-                            type="button"
-                            onClick={() => toggleInvolved(s.id, m.id)}
-                            className={cn('rounded-full px-2.5 py-1 text-xs font-medium transition-colors',
-                              involved.has(m.id) ? 'bg-brand-400 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200')}
-                          >
-                            {m.name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Ideal equal split preview — the plain {bandPct}/{100-bandPct} split, plus
-                        whatever anyone's owed back on top for a guaranteed (fuel etc.) reimbursement.
-                        Includes anyone owed a reimbursement even if they're not "involved" (no cut) —
-                        e.g. someone who fronted an expense for a show they didn't perform in. */}
-                    {showData && showData.settlementIds.length > 0 && (
-                      <div className="space-y-1 border-t border-brand-100 pt-2 text-xs">
-                        {showData.settlementIds.map(id => {
-                          const cut = showData.memberShares[id] ?? 0
-                          const reimbursement = showData.guaranteedReimbursements[id] ?? 0
-                          const notInvolved = !showData.involved.includes(id)
-                          return (
-                            <div key={id} className="flex items-center justify-between text-gray-600">
-                              <span>
-                                {nameOf(id)}
-                                {notInvolved && <span className="ml-1.5 text-[10px] font-medium text-gray-400">(not involved)</span>}
-                                {reimbursement > 0 && <span className="ml-1.5 text-[10px] font-medium text-blue-500">+{fmt(reimbursement)} reimb.</span>}
-                              </span>
-                              <span className="font-semibold tabular-nums">{fmt(cut + reimbursement)}</span>
-                            </div>
-                          )
-                        })}
-                        <div className="flex items-center justify-between pt-1 text-brand-600">
-                          <span>Band Fund ({bandPct}%) <span className="text-gray-400">(kept by {nameOf(showData.bandFundHolderId)})</span></span>
-                          <span className="font-semibold tabular-nums">{fmt(showData.bandFundAmount)}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-        <div className="mt-3 flex items-center justify-between rounded-lg bg-brand-50 px-4 py-2.5">
-          <span className="text-sm font-medium text-gray-600">Total net</span>
-          <span className="text-lg font-bold text-gray-900">{fmt(totalNet)}</span>
-        </div>
-      </section>
-
-      {/* Band fund slider */}
-      <section className="rounded-xl border border-brand-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-4 text-sm font-semibold text-gray-700">Band fund cut</h2>
-        <div className="mb-2 flex items-center justify-between text-sm">
-          <span className="text-gray-500">Band fund <span className="font-bold text-brand-600">{bandPct}%</span> = {fmt(totalBandFund)}</span>
-          <span className="text-gray-500">Artists <span className="font-bold text-green-600">{100 - bandPct}%</span> (equal split)</span>
-        </div>
-        <input type="range" min={0} max={50} step={5} value={bandPct}
-          onChange={e => setBandPct(Number(e.target.value))}
-          className="w-full cursor-pointer accent-brand-400" />
-        <div className="mt-1 flex justify-between text-xs text-gray-400"><span>0%</span><span>50%</span></div>
-      </section>
-
-      {/* Manual / Auto mode switch */}
-      {perShow.length > 0 && (
-        <div className="flex rounded-lg border border-gray-200 bg-gray-100 p-1">
-          <button type="button" onClick={() => setMode('manual')}
-            className={cn('flex-1 rounded-md py-2 text-sm font-semibold transition-colors',
-              mode === 'manual' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700')}>
-            Manual
-          </button>
-          <button type="button" onClick={() => setMode('auto')}
-            className={cn('flex-1 rounded-md py-2 text-sm font-semibold transition-colors',
-              mode === 'auto' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700')}>
-            Auto mode (WIP)
-          </button>
-        </div>
-      )}
-
-      {/* Manual mode — the plain numbers, plus assign your own payer(s) per recipient. */}
-      {mode === 'manual' && perShow.length > 0 && (
-        <section className="rounded-xl border border-gray-200 bg-gray-50 p-5">
-          <h2 className="mb-4 text-sm font-semibold text-gray-600">Who&apos;s supposed to get what</h2>
-          <div className="space-y-2.5">
-            {allInvolvedIds.map(id => {
-              const owed = amountOwedFor(id)
-              const rows = assignmentsFor(id)
-              const assigned = round2(rows.reduce((s, a) => s + (a.payerId ? (a.amount || 0) : 0), 0))
-              const remaining = round2(owed - assigned)
-              const lines = breakdownByPerson[id] ?? []
-              const cut = round2(lines.reduce((s, l) => s + l.entitlement, 0))
-              const guaranteedReimbursement = round2(lines.reduce((s, l) => s + l.guaranteedReimbursed, 0))
-              const topUp = balanceTopUp[id] ?? 0
-
-              return (
-                <div key={id} className="rounded-lg bg-white p-3 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">{nameOf(id)}</span>
-                    <span className="text-sm font-bold tabular-nums text-green-600">Gets {fmt(owed)}</span>
-                  </div>
-                  {(guaranteedReimbursement > 0.01 || topUp > 0.01) && (
-                    <p className="mt-0.5 text-xs text-gray-400">
-                      {fmt(cut)} cut
-                      {guaranteedReimbursement > 0.01 && ` + ${fmt(guaranteedReimbursement)} fuel/expense reimbursement`}
-                      {topUp > 0.01 && ` + ${fmt(topUp)} balance top-up`}
-                    </p>
-                  )}
-                  <div className="mt-2 space-y-1.5">
-                    {rows.map((row, i) => (
-                      <div key={i} className="flex items-center gap-1.5">
-                        <select
-                          value={row.payerId}
-                          onChange={e => updateAssignment(id, i, { payerId: e.target.value })}
-                          className="flex-1 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs focus:border-brand-400 focus:outline-none"
-                        >
-                          <option value="">Paid by…</option>
-                          {members.map(m => (
-                            <option key={m.id} value={m.id}>{m.id === id ? `${m.name} (self, from Band Fund)` : m.name}</option>
-                          ))}
-                        </select>
-                        <input
-                          type="number"
-                          value={row.amount || ''}
-                          onChange={e => updateAssignment(id, i, { amount: Number(e.target.value) })}
-                          placeholder="Amount"
-                          className="w-24 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs tabular-nums focus:border-brand-400 focus:outline-none"
-                        />
-                        {rows.length > 1 && (
-                          <button type="button" onClick={() => removeAssignmentRow(id, i)} aria-label="Remove" className="shrink-0 text-gray-300 hover:text-red-500">
-                            <X className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                    <div className="flex items-center justify-between pt-0.5">
-                      <button type="button" onClick={() => addAssignmentRow(id)} className="flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700">
-                        <Plus className="h-3 w-3" /> Add payer
-                      </button>
-                      {Math.abs(remaining) > 0.01 && (
-                        <span className={cn('text-xs font-medium tabular-nums', remaining > 0 ? 'text-amber-600' : 'text-red-500')}>
-                          {remaining > 0 ? `${fmt(remaining)} unassigned` : `${fmt(-remaining)} over-assigned`}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
+    <div className="space-y-5 pb-20 lg:pb-0">
+      {/* Stepper — compressed to a progress bar on phones */}
+      <nav aria-label="Split steps">
+        <div className="lg:hidden">
+          <div className="mb-1.5 flex items-center justify-between text-xs font-extrabold text-gray-900">
+            <span>Step {shownStep} of 4</span>
+            <span className="font-semibold text-gray-500">{steps[shownStep - 1].label}</span>
           </div>
-
-          <h2 className="mb-4 mt-6 text-sm font-semibold text-gray-600">Band Fund balances</h2>
-          <div className="space-y-1.5">
-            {members.map(m => {
-              const starting = memberBalances[m.id] ?? 0
-              const remaining = remainingFundFor(m.id)
-              return (
-                <div key={m.id} className="flex items-center justify-between rounded-lg bg-white px-4 py-2.5 shadow-sm">
-                  <span className="text-sm font-medium text-gray-700">{m.name}</span>
-                  <div className="text-right">
-                    <span className={cn('text-sm font-bold tabular-nums', remaining < 0 ? 'text-red-500' : 'text-brand-600')}>
-                      {remaining < 0 ? '−' : ''}{fmt(remaining)}
-                    </span>
-                    {Math.abs(remaining - starting) > 0.01 && (
-                      <p className="text-[10px] text-gray-400">was {fmt(starting)}</p>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          <p className="mt-4 text-xs text-gray-400">
-            Assign who pays whom above — Band Fund balances update as you go. Switch to Auto mode for the algorithm&apos;s own suggestion.
-          </p>
-        </section>
-      )}
-
-      {mode === 'auto' && (
-      <>
-      {/* Settlement */}
-      {payments.length > 0 && (
-        <section className="rounded-xl border border-gray-200 bg-gray-50 p-5">
-          <h2 className="mb-4 text-sm font-semibold text-gray-600">
-            Settlement{selectedShows.length > 1 ? ' — pooled across all selected shows' : ''}
-          </h2>
-          <div className="space-y-1.5">
-            {payments.map((p, i) => (
-              <div key={i} className="flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 shadow-sm">
-                {p.from === p.to ? (
-                  <span className="text-sm font-medium text-gray-700">{nameOf(p.from)} keeps their own share (Band Fund)</span>
-                ) : (
-                  <>
-                    <span className="text-sm font-medium text-gray-700">{nameOf(p.from)}</span>
-                    <ArrowRight className="h-3.5 w-3.5 shrink-0 text-gray-300" />
-                    <span className="text-sm font-medium text-gray-700">{nameOf(p.to)}</span>
-                  </>
-                )}
-                <span className="ml-auto text-sm font-bold text-gray-900">{fmt(p.amount)}</span>
-              </div>
+          <div className="flex gap-1">
+            {steps.map((s, i) => (
+              <span key={s.id} className={cn('h-1.5 flex-1 rounded-full', i + 1 <= shownStep ? 'bg-brand-400' : 'bg-brand-200')} />
             ))}
           </div>
-        </section>
-      )}
+        </div>
+        <ol className="hidden items-center gap-2 lg:flex">
+          {steps.map((s, i) => {
+            const current = i + 1 === shownStep
+            return (
+              <li key={s.id} className="flex items-center gap-2">
+                {i > 0 && <span className="h-0.5 w-5 bg-brand-200" />}
+                <a
+                  href={`#${s.id}`}
+                  aria-current={current ? 'step' : undefined}
+                  className={cn(
+                    'rounded-full px-3 py-1.5 text-xs font-extrabold transition-colors',
+                    current ? 'bg-brand-400 text-white' : s.done ? 'bg-brand-100 text-brand-700' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                  )}
+                >
+                  {s.done && !current ? '✓ ' : `${i + 1} · `}{s.label}
+                </a>
+              </li>
+            )
+          })}
+        </ol>
+      </nav>
 
-      {/* Complete breakdown — every number behind every payment above */}
-      {allInvolvedIds.length > 0 && (
-        <section className="rounded-xl border border-gray-200 bg-gray-50 p-5">
-          <h2 className="mb-4 text-sm font-semibold text-gray-600">Complete breakdown</h2>
-          <div className="space-y-4">
-            {allInvolvedIds.map(id => {
-              const lines = breakdownByPerson[id] ?? []
-              const owed = amountOwedFor(id)
-              const topUp = balanceTopUp[id] ?? 0
-              const outgoing = payments.filter(p => p.from === id && p.to !== id)
-              const self = payments.find(p => p.from === id && p.to === id)
-              const incoming = payments.filter(p => p.to === id && p.from !== id)
-              const paidOut = round2(payments.filter(p => p.from === id).reduce((s, p) => s + p.amount, 0))
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start">
+        <div className="min-w-0 space-y-4">
+          {/* 1 · Show selection */}
+          <section id="split-shows" className={cn(card, 'scroll-mt-6')}>
+            <SectionLabel className="mb-3">Select shows to split together</SectionLabel>
+            <div className="space-y-2">
+              {shows.map(s => {
+                const selected = selectedIds.has(s.id)
+                const net = netForShow(s.id)
+                const txns = txnsByShow[s.id] ?? []
+                const involved = involvedByShow[s.id] ?? new Set()
+                const showData = perShow.find(p => p.show.id === s.id)
 
-              return (
-                <div key={id} className="rounded-lg bg-white p-4 shadow-sm">
-                  <p className="mb-2.5 text-sm font-semibold text-gray-800">{nameOf(id)}</p>
-                  <div className="space-y-2 border-b border-gray-100 pb-2.5">
-                    {lines.map((line, i) => (
-                      <div key={i} className="text-xs">
-                        <p className="mb-1 font-medium text-gray-500">{line.showTitle}</p>
-                        <div className="space-y-0.5 pl-2 text-gray-600">
-                          {line.entitlement > 0 ? (
-                            <div className="flex items-center justify-between">
-                              <span>Equal share</span>
-                              <span className="tabular-nums">+{fmt(line.entitlement)}</span>
-                            </div>
-                          ) : (
-                            <div className="flex items-center justify-between text-gray-400">
-                              <span>Not involved in this show</span>
-                              <span className="tabular-nums">+{fmt(0)}</span>
-                            </div>
-                          )}
-                          {line.guaranteedReimbursed > 0 && (
-                            <div className="flex items-center justify-between text-blue-600">
-                              <span>Reimbursement (fuel etc. — paid back in full)</span>
-                              <span className="tabular-nums">+{fmt(line.guaranteedReimbursed)}</span>
-                            </div>
-                          )}
-                          {line.cashPosition < 0 && (
-                            <div className="flex items-center justify-between text-gray-400">
-                              <span>Fronted from balance</span>
-                              <span className="tabular-nums">−{fmt(line.cashPosition)}</span>
-                            </div>
-                          )}
-                          {line.cashPosition > 0 && (
-                            <div className="flex items-center justify-between text-red-500">
-                              <span>Cash you handled for the show (needs to go back)</span>
-                              <span className="tabular-nums">−{fmt(line.cashPosition)}</span>
-                            </div>
-                          )}
-                          {line.isBandFundHolder && (
-                            <div className="flex items-center justify-between text-brand-600">
-                              <span>+ Band Fund cut (you keep it)</span>
-                              <span className="tabular-nums">+{fmt(line.bandFundAmount)}</span>
-                            </div>
-                          )}
-                          <div className="flex items-center justify-between border-t border-gray-100 pt-0.5 font-medium text-gray-700">
-                            <span>Owed from this show</span>
-                            <span className="tabular-nums text-green-600">+{fmt(line.owedFromShow)}</span>
+                const splittable = net > 0
+                return (
+                  <div key={s.id} className={cn('rounded-xl border transition-colors', selected ? 'border-brand-400 bg-brand-50' : 'border-brand-200')}>
+                    <button type="button" onClick={() => toggleShow(s.id)} disabled={!splittable}
+                      className={cn('flex w-full items-center gap-3 px-4 py-3 text-left', !splittable && 'cursor-not-allowed opacity-60')}>
+                      <span className={cn('flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors',
+                        !splittable ? 'border-gray-200 bg-gray-100' : selected ? 'border-brand-400 bg-brand-400' : 'border-gray-300')}>
+                        {selected && splittable && <Check className="h-3 w-3 text-white" />}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className={cn('font-semibold', splittable ? 'text-gray-900' : 'text-gray-400')}>{s.title}</p>
+                        {s.show_date && <p className="text-xs text-gray-500">
+                          {new Date(s.show_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'long' })}
+                          {s.venue ? ` · ${s.venue}` : ''}
+                        </p>}
+                        {!splittable && <p className="text-xs text-red-500">Awaiting credit — can&apos;t split yet</p>}
+                      </div>
+                      <p className={cn('text-sm font-bold tabular-nums', net < 0 ? 'text-red-500' : 'text-gray-800')}>
+                        {net < 0 ? '−' : ''}{fmt(net)}
+                      </p>
+                    </button>
+
+                    {selected && (
+                      <div className="space-y-3 border-t border-brand-100 px-4 py-3">
+                        {/* Transactions breakdown */}
+                        {txns.length > 0 && (
+                          <div className="space-y-1 text-xs text-gray-500">
+                            {txns.map(t => (
+                              <div key={t.id} className="flex items-center justify-between gap-3">
+                                <span className="min-w-0">{t.description} {t.member_id && <span className="text-gray-400">({nameOf(t.member_id)})</span>}</span>
+                                <span className={cn('shrink-0 tabular-nums', t.amount >= 0 ? 'text-emerald-700' : 'text-red-500')}>
+                                  {t.amount >= 0 ? '+' : '−'}{fmt(t.amount)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Missed something? Add it straight to this show, right here. */}
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-xs text-gray-400">
+                            {txns.length === 0 ? 'No expenses logged for this show yet.' : 'Missing an expense?'}
+                          </p>
+                          <AddTransactionModal members={members} shows={shows} lockedShow={{ id: s.id, title: s.title }} />
+                        </div>
+
+                        {/* Involved members */}
+                        <div>
+                          <p className="mb-1.5 text-xs font-semibold text-gray-500">Involved</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {members.map(m => (
+                              <button
+                                key={m.id}
+                                type="button"
+                                onClick={() => toggleInvolved(s.id, m.id)}
+                                className={cn('rounded-full px-3 py-1 text-xs font-bold transition-colors',
+                                  involved.has(m.id) ? 'bg-brand-400 text-white' : 'bg-brand-100 text-gray-500 hover:bg-brand-200')}
+                              >
+                                {m.name}
+                              </button>
+                            ))}
                           </div>
                         </div>
+
+                        {/* Ideal equal split preview — the plain {bandPct}/{100-bandPct} split, plus
+                            whatever anyone's owed back on top for a guaranteed (fuel etc.) reimbursement.
+                            Includes anyone owed a reimbursement even if they're not "involved" (no cut) —
+                            e.g. someone who fronted an expense for a show they didn't perform in. */}
+                        {showData && showData.settlementIds.length > 0 && (
+                          <div className="space-y-1 border-t border-brand-100 pt-2 text-xs">
+                            {showData.settlementIds.map(id => {
+                              const cut = showData.memberShares[id] ?? 0
+                              const reimbursement = showData.guaranteedReimbursements[id] ?? 0
+                              const notInvolved = !showData.involved.includes(id)
+                              return (
+                                <div key={id} className="flex items-center justify-between text-gray-600">
+                                  <span>
+                                    {nameOf(id)}
+                                    {notInvolved && <span className="ml-1.5 text-[10px] font-medium text-gray-400">(not involved)</span>}
+                                    {reimbursement > 0 && <span className="ml-1.5 text-[10px] font-medium text-sky-700">+{fmt(reimbursement)} reimb.</span>}
+                                  </span>
+                                  <span className="font-semibold tabular-nums">{fmt(cut + reimbursement)}</span>
+                                </div>
+                              )
+                            })}
+                            <div className="flex items-center justify-between pt-1 text-brand-600">
+                              <span>Band Fund ({bandPct}%) <span className="text-gray-400">(kept by {nameOf(showData.bandFundHolderId)})</span></span>
+                              <span className="font-semibold tabular-nums">{fmt(showData.bandFundAmount)}</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                  {topUp > 0.01 && (
-                    <div className="flex items-center justify-between pt-2.5 text-xs">
-                      <span className="text-gray-500">Balance top-up <span className="text-gray-400">(brings their real balance back to ₹0)</span></span>
-                      <span className="tabular-nums font-medium text-green-600">+{fmt(topUp)}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between pt-2.5 text-sm font-semibold text-gray-800">
-                    <span>Total owed</span>
-                    <span className="tabular-nums text-green-600">{fmt(owed)}</span>
-                  </div>
-                  {paidOut > 0 && (
-                    <div className="flex items-center justify-between pt-1 text-sm font-semibold text-gray-800">
-                      <span>Total to pay out</span>
-                      <span className="tabular-nums">{fmt(paidOut)}</span>
-                    </div>
-                  )}
-                  <div className="mt-1.5 space-y-1">
-                    {self && (
-                      <p className="text-xs text-gray-500">Keeps {fmt(self.amount)} of their own share from Band Fund</p>
                     )}
-                    {outgoing.map((p, i) => (
-                      <p key={`out-${i}`} className="text-xs text-gray-500">
-                        → Pays {nameOf(p.to)} {fmt(p.amount)}
-                      </p>
-                    ))}
-                    {incoming.map((p, i) => (
-                      <p key={`in-${i}`} className="text-xs text-gray-500">
-                        ← Receives {fmt(p.amount)} from {nameOf(p.from)}
-                      </p>
-                    ))}
                   </div>
-                </div>
-              )
-            })}
-          </div>
-        </section>
-      )}
-      </>
-      )}
+                )
+              })}
+            </div>
+            <div className="mt-3 flex items-center justify-between rounded-xl bg-brand-50 px-4 py-2.5">
+              <span className="text-sm font-medium text-gray-600">Total net</span>
+              <span className="font-display text-lg font-bold text-gray-900">{fmt(totalNet)}</span>
+            </div>
+          </section>
 
-      {/* Report */}
-      {showsReady && (
-        <div className="flex justify-end">
-          <Button variant="secondary" onClick={handleDownloadReport} loading={isDownloading}>
-            <Download className="h-4 w-4" /> Download Report
-          </Button>
+          {/* 2 · Band fund slider */}
+          <section id="split-fund" className={cn(card, 'scroll-mt-6')}>
+            <div className="mb-3 flex items-baseline justify-between gap-3">
+              <SectionLabel>Band fund cut</SectionLabel>
+              <span className="font-display text-2xl font-bold text-gray-900">{bandPct}%</span>
+            </div>
+            <div className="mb-2 flex items-center justify-between gap-3 text-sm text-gray-500">
+              <span>Band fund <span className="font-bold text-brand-600">{bandPct}%</span> = {fmt(totalBandFund)}</span>
+              <span>Artists <span className="font-bold text-emerald-700">{100 - bandPct}%</span> (equal split)</span>
+            </div>
+            <input type="range" min={0} max={50} step={5} value={bandPct}
+              onChange={e => setBandPct(Number(e.target.value))}
+              aria-label="Band fund cut percentage"
+              className="w-full cursor-pointer accent-brand-400" />
+            <div className="mt-1 flex justify-between text-xs font-semibold text-gray-400"><span>0%</span><span>50%</span></div>
+          </section>
+
+          {/* 3 · Who gets what — Manual / Auto mode switch */}
+          {perShow.length > 0 && (
+            <SegmentedTabs
+              tabs={[{ value: 'manual', label: 'Manual' }, { value: 'auto', label: 'Auto mode (WIP)' }]}
+              value={mode}
+              onChange={setMode}
+            />
+          )}
+
+          {/* Manual mode — the plain numbers, plus assign your own payer(s) per recipient. */}
+          {mode === 'manual' && perShow.length > 0 && (
+            <section id="split-who" className={cn(card, 'scroll-mt-6')}>
+              <div className="mb-3 flex items-baseline justify-between gap-3">
+                <SectionLabel>Who&apos;s supposed to get what</SectionLabel>
+                <span className="text-xs text-gray-500">{fmt(artistsTotal)} to artists</span>
+              </div>
+              <div className="divide-y divide-brand-100">
+                {allInvolvedIds.map(id => {
+                  const owed = amountOwedFor(id)
+                  const rows = assignmentsFor(id)
+                  const assigned = round2(rows.reduce((s, a) => s + (a.payerId ? (a.amount || 0) : 0), 0))
+                  const remaining = round2(owed - assigned)
+                  const lines = breakdownByPerson[id] ?? []
+                  const cut = round2(lines.reduce((s, l) => s + l.entitlement, 0))
+                  const guaranteedReimbursement = round2(lines.reduce((s, l) => s + l.guaranteedReimbursed, 0))
+                  const topUp = balanceTopUp[id] ?? 0
+
+                  return (
+                    <div key={id} className="py-3 first:pt-0 last:pb-0">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-extrabold text-brand-700">
+                          {nameOf(id).charAt(0).toUpperCase()}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-gray-900">{nameOf(id)}</span>
+                        <span className="text-sm font-bold tabular-nums text-emerald-700">Gets {fmt(owed)}</span>
+                      </div>
+                      {(guaranteedReimbursement > 0.01 || topUp > 0.01) && (
+                        <p className="mt-1 pl-11 text-xs text-gray-400">
+                          {fmt(cut)} cut
+                          {guaranteedReimbursement > 0.01 && ` + ${fmt(guaranteedReimbursement)} fuel/expense reimbursement`}
+                          {topUp > 0.01 && ` + ${fmt(topUp)} balance top-up`}
+                        </p>
+                      )}
+                      <div className="mt-2 space-y-1.5 pl-0 sm:pl-11">
+                        {rows.map((row, i) => (
+                          <div key={i} className="flex items-center gap-1.5">
+                            <select
+                              value={row.payerId}
+                              onChange={e => updateAssignment(id, i, { payerId: e.target.value })}
+                              className="min-w-0 flex-1 rounded-lg border border-brand-200 bg-white px-2 py-2 text-xs text-gray-900 focus:border-brand-400 focus:outline-none"
+                            >
+                              <option value="">Paid by…</option>
+                              {members.map(m => (
+                                <option key={m.id} value={m.id}>{m.id === id ? `${m.name} (self, from Band Fund)` : m.name}</option>
+                              ))}
+                            </select>
+                            <input
+                              type="number"
+                              value={row.amount || ''}
+                              onChange={e => updateAssignment(id, i, { amount: Number(e.target.value) })}
+                              placeholder="Amount"
+                              className="w-24 rounded-lg border border-brand-200 bg-white px-2 py-2 text-xs tabular-nums text-gray-900 focus:border-brand-400 focus:outline-none"
+                            />
+                            {rows.length > 1 && (
+                              <button type="button" onClick={() => removeAssignmentRow(id, i)} aria-label="Remove" className="shrink-0 text-gray-400 hover:text-red-500">
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                        <div className="flex items-center justify-between pt-0.5">
+                          <button type="button" onClick={() => addAssignmentRow(id)} className="flex items-center gap-1 text-xs font-bold text-brand-600 hover:underline">
+                            <Plus className="h-3 w-3" /> Add payer
+                          </button>
+                          {Math.abs(remaining) > 0.01 && (
+                            <span className={cn('text-xs font-semibold tabular-nums', remaining > 0 ? 'text-amber-600' : 'text-red-500')}>
+                              {remaining > 0 ? `${fmt(remaining)} unassigned` : `${fmt(-remaining)} over-assigned`}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <SectionLabel className="mb-2 mt-6">Band Fund balances</SectionLabel>
+              <div className="divide-y divide-brand-100 rounded-xl border border-brand-100">
+                {members.map(m => {
+                  const starting = memberBalances[m.id] ?? 0
+                  const remaining = remainingFundFor(m.id)
+                  return (
+                    <div key={m.id} className="flex items-center justify-between px-4 py-2.5">
+                      <span className="text-sm font-medium text-gray-800">{m.name}</span>
+                      <div className="text-right">
+                        <span className={cn('text-sm font-bold tabular-nums', remaining < 0 ? 'text-red-500' : 'text-brand-600')}>
+                          {remaining < 0 ? '−' : ''}{fmt(remaining)}
+                        </span>
+                        {Math.abs(remaining - starting) > 0.01 && (
+                          <p className="text-[10px] text-gray-400">was {fmt(starting)}</p>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <p className="mt-4 text-xs text-gray-400">
+                Assign who pays whom above — Band Fund balances update as you go. Switch to Auto mode for the algorithm&apos;s own suggestion.
+              </p>
+            </section>
+          )}
+
+          {mode === 'auto' && (
+          <>
+          {/* Settlement */}
+          {payments.length > 0 && (
+            <section id="split-who" className={cn(card, 'scroll-mt-6')}>
+              <SectionLabel className="mb-3">
+                Settlement{selectedShows.length > 1 ? ' — pooled across all selected shows' : ''}
+              </SectionLabel>
+              <div className="divide-y divide-brand-100">
+                {payments.map((p, i) => (
+                  <div key={i} className="flex items-center gap-2 py-2.5 first:pt-0 last:pb-0">
+                    {p.from === p.to ? (
+                      <span className="text-sm font-medium text-gray-800">{nameOf(p.from)} keeps their own share (Band Fund)</span>
+                    ) : (
+                      <>
+                        <span className="text-sm font-medium text-gray-800">{nameOf(p.from)}</span>
+                        <ArrowRight className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                        <span className="text-sm font-medium text-gray-800">{nameOf(p.to)}</span>
+                      </>
+                    )}
+                    <span className="ml-auto text-sm font-bold tabular-nums text-gray-900">{fmt(p.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Complete breakdown — every number behind every payment above */}
+          {allInvolvedIds.length > 0 && (
+            <section className={card}>
+              <SectionLabel className="mb-3">Complete breakdown</SectionLabel>
+              <div className="space-y-3">
+                {allInvolvedIds.map(id => {
+                  const lines = breakdownByPerson[id] ?? []
+                  const owed = amountOwedFor(id)
+                  const topUp = balanceTopUp[id] ?? 0
+                  const outgoing = payments.filter(p => p.from === id && p.to !== id)
+                  const self = payments.find(p => p.from === id && p.to === id)
+                  const incoming = payments.filter(p => p.to === id && p.from !== id)
+                  const paidOut = round2(payments.filter(p => p.from === id).reduce((s, p) => s + p.amount, 0))
+
+                  return (
+                    <div key={id} className="rounded-xl border border-brand-100 bg-brand-50 p-4">
+                      <p className="mb-2.5 text-sm font-semibold text-gray-900">{nameOf(id)}</p>
+                      <div className="space-y-2 border-b border-brand-100 pb-2.5">
+                        {lines.map((line, i) => (
+                          <div key={i} className="text-xs">
+                            <p className="mb-1 font-medium text-gray-500">{line.showTitle}</p>
+                            <div className="space-y-0.5 pl-2 text-gray-600">
+                              {line.entitlement > 0 ? (
+                                <div className="flex items-center justify-between">
+                                  <span>Equal share</span>
+                                  <span className="tabular-nums">+{fmt(line.entitlement)}</span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center justify-between text-gray-400">
+                                  <span>Not involved in this show</span>
+                                  <span className="tabular-nums">+{fmt(0)}</span>
+                                </div>
+                              )}
+                              {line.guaranteedReimbursed > 0 && (
+                                <div className="flex items-center justify-between text-sky-700">
+                                  <span>Reimbursement (fuel etc. — paid back in full)</span>
+                                  <span className="tabular-nums">+{fmt(line.guaranteedReimbursed)}</span>
+                                </div>
+                              )}
+                              {line.cashPosition < 0 && (
+                                <div className="flex items-center justify-between text-gray-400">
+                                  <span>Fronted from balance</span>
+                                  <span className="tabular-nums">−{fmt(line.cashPosition)}</span>
+                                </div>
+                              )}
+                              {line.cashPosition > 0 && (
+                                <div className="flex items-center justify-between text-red-500">
+                                  <span>Cash you handled for the show (needs to go back)</span>
+                                  <span className="tabular-nums">−{fmt(line.cashPosition)}</span>
+                                </div>
+                              )}
+                              {line.isBandFundHolder && (
+                                <div className="flex items-center justify-between text-brand-600">
+                                  <span>+ Band Fund cut (you keep it)</span>
+                                  <span className="tabular-nums">+{fmt(line.bandFundAmount)}</span>
+                                </div>
+                              )}
+                              <div className="flex items-center justify-between border-t border-brand-100 pt-0.5 font-medium text-gray-700">
+                                <span>Owed from this show</span>
+                                <span className="tabular-nums text-emerald-700">+{fmt(line.owedFromShow)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {topUp > 0.01 && (
+                        <div className="flex items-center justify-between pt-2.5 text-xs">
+                          <span className="text-gray-500">Balance top-up <span className="text-gray-400">(brings their real balance back to ₹0)</span></span>
+                          <span className="tabular-nums font-medium text-emerald-700">+{fmt(topUp)}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between pt-2.5 text-sm font-semibold text-gray-900">
+                        <span>Total owed</span>
+                        <span className="tabular-nums text-emerald-700">{fmt(owed)}</span>
+                      </div>
+                      {paidOut > 0 && (
+                        <div className="flex items-center justify-between pt-1 text-sm font-semibold text-gray-900">
+                          <span>Total to pay out</span>
+                          <span className="tabular-nums">{fmt(paidOut)}</span>
+                        </div>
+                      )}
+                      <div className="mt-1.5 space-y-1">
+                        {self && (
+                          <p className="text-xs text-gray-500">Keeps {fmt(self.amount)} of their own share from Band Fund</p>
+                        )}
+                        {outgoing.map((p, i) => (
+                          <p key={`out-${i}`} className="text-xs text-gray-500">
+                            → Pays {nameOf(p.to)} {fmt(p.amount)}
+                          </p>
+                        ))}
+                        {incoming.map((p, i) => (
+                          <p key={`in-${i}`} className="text-xs text-gray-500">
+                            ← Receives {fmt(p.amount)} from {nameOf(p.from)}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+          )}
+          </>
+          )}
+
+          {/* 4 · Review — on phones the summary and report button live here; on desktop they sit in the side rail */}
+          <section id="split-review" className={cn(card, 'scroll-mt-6 lg:hidden')}>
+            <SectionLabel className="mb-3">Review</SectionLabel>
+            <dl className="space-y-1.5 text-sm">
+              <div className="flex justify-between"><dt className="text-gray-500">Net from {selectedShows.length} show{selectedShows.length !== 1 ? 's' : ''}</dt><dd className="font-bold tabular-nums">{fmt(totalNet)}</dd></div>
+              <div className="flex justify-between"><dt className="text-gray-500">Band fund cut ({bandPct}%)</dt><dd className="font-bold tabular-nums">{fmt(totalBandFund)}</dd></div>
+              <div className="flex justify-between"><dt className="text-gray-500">To artists</dt><dd className="font-bold tabular-nums">{fmt(artistsTotal)}</dd></div>
+              <div className="flex justify-between"><dt className="text-gray-500">Transfers</dt><dd className="font-bold tabular-nums">{transferCount}</dd></div>
+            </dl>
+            {showsReady && (
+              <Button variant="secondary" className="mt-4 w-full" onClick={handleDownloadReport} loading={isDownloading}>
+                <Download className="h-4 w-4" /> Download Report
+              </Button>
+            )}
+            {mode === 'manual' && !manualFullyAssigned && (
+              <p className="mt-3 text-xs text-amber-600">Assign every recipient a payer to confirm.</p>
+            )}
+          </section>
         </div>
-      )}
 
-      {/* Confirm */}
-      <div className="flex items-center justify-between rounded-xl border border-green-200 bg-green-50 px-5 py-4">
-        <div>
-          <p className="text-sm font-semibold text-green-800">
-            {fmt(totalNet - totalBandFund)} to artists, {fmt(totalBandFund)} to Band Fund
+        {/* Desktop side rail — stays in view while you work down the page */}
+        <aside className="hidden space-y-3 lg:sticky lg:top-6 lg:block">
+          <div className="rounded-2xl bg-hero p-4 text-hero-fg">
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-sidebar-accent">Summary</p>
+            <dl className="mt-3 space-y-2 text-sm">
+              <div className="flex justify-between gap-3"><dt className="text-hero-muted">Total from {selectedShows.length} show{selectedShows.length !== 1 ? 's' : ''}</dt><dd className="font-bold tabular-nums">{fmt(totalNet)}</dd></div>
+              <div className="flex justify-between gap-3"><dt className="text-hero-muted">Band fund cut ({bandPct}%)</dt><dd className="font-bold tabular-nums">−{fmt(totalBandFund)}</dd></div>
+              <div className="h-px bg-hero-line" />
+              <div className="flex justify-between gap-3"><dt className="text-hero-muted">Shared by artists</dt><dd className="font-bold tabular-nums">{fmt(artistsTotal)}</dd></div>
+              <div className="flex justify-between gap-3"><dt className="text-hero-muted">Transfers</dt><dd className="font-bold tabular-nums">{transferCount}</dd></div>
+            </dl>
+          </div>
+          <Button className="w-full" size="lg" onClick={handleSplit} loading={isPending} disabled={!canConfirm}>
+            Confirm split
+          </Button>
+          {showsReady && (
+            <Button variant="secondary" className="w-full" onClick={handleDownloadReport} loading={isDownloading}>
+              <Download className="h-4 w-4" /> Download report
+            </Button>
+          )}
+          <p className="text-center text-xs text-gray-400">
+            {mode === 'manual' && !manualFullyAssigned
+              ? 'Assign every recipient a payer to confirm.'
+              : 'Creates the payments you can mark paid later.'}
           </p>
-          <p className="text-xs text-green-600">
-            from {selectedShows.length} show{selectedShows.length !== 1 ? 's' : ''} · net {fmt(totalNet)}
-            {mode === 'manual' && !manualFullyAssigned && ' · assign every recipient a payer to confirm'}
-          </p>
+        </aside>
+      </div>
+
+      {/* Phone confirm bar — sits just above the bottom tab bar */}
+      <div className="fixed inset-x-0 bottom-[4.5rem] z-30 flex items-center gap-3 border-t border-brand-200 bg-white px-4 py-2.5 lg:hidden">
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-gray-500">Total {fmt(totalNet)}</p>
+          <p className="truncate text-xs text-gray-500">{transferCount} transfer{transferCount !== 1 ? 's' : ''} · fund +{fmt(totalBandFund)}</p>
         </div>
         <Button onClick={handleSplit} loading={isPending} disabled={!canConfirm}>
-          Confirm & Split →
+          Confirm split
         </Button>
       </div>
     </div>
