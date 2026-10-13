@@ -1,39 +1,20 @@
 'use client'
 
 import Link from 'next/link'
+import { BrandMark } from '@/components/ui/BrandMark'
+import { APP_NAME } from '@/lib/brand'
 import { usePathname, useRouter } from 'next/navigation'
 import { Music2, ListMusic, Wallet, LogOut, CalendarDays, CalendarRange, StickyNote, SquareKanban, Building2, Settings, Mic, LayoutDashboard } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { ACTIVE_SETLIST_COOKIE } from '@/lib/setlist-context'
-import { useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { NotificationBell } from './NotificationBell'
 import { WorkspaceSwitcher, type WorkspaceOption } from './WorkspaceSwitcher'
 import { ThemeIconButton } from '@/components/ui/ThemeToggle'
 import { MobileTabBar } from './MobileTabBar'
+import { MobileTopBar } from './MobileTopBar'
 import type { NotificationItem } from '@/types/notifications'
-
-function LogoImage() {
-  const [imgError, setImgError] = useState(false)
-  if (imgError) {
-    return (
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-400 shadow-sm">
-        <Music2 className="h-4 w-4 text-white" />
-      </div>
-    )
-  }
-  return (
-    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-black ring-1 ring-sidebar-border shadow-sm">
-      <img
-        src="/logo.png"
-        alt="Tarana"
-        className="h-6 w-6 object-contain"
-        onError={() => setImgError(true)}
-      />
-    </div>
-  )
-}
 
 interface SidebarProps {
   user: User
@@ -160,8 +141,8 @@ export function Sidebar({ user, pendingPaymentCount = 0, notifications = [], wor
 
   const logo = (
     <Link href="/" className="flex items-center gap-2.5">
-      <LogoImage />
-      <span className="font-display text-lg font-bold text-sidebar-strong">Tarana</span>
+      <BrandMark className="ring-1 ring-sidebar-border" />
+      <span className="font-display text-lg font-bold text-sidebar-strong">{APP_NAME}</span>
     </Link>
   )
 
@@ -180,11 +161,8 @@ export function Sidebar({ user, pendingPaymentCount = 0, notifications = [], wor
         {footer}
       </aside>
 
-      {/* Phone: slim top bar + bottom tabs (everything else lives under "More") */}
-      <div className="fixed inset-x-0 top-0 z-40 flex items-center justify-between border-b border-sidebar-border bg-sidebar px-4 py-2 lg:hidden">
-        {logo}
-        <NotificationBell notifications={notifications} />
-      </div>
+      {/* Phone: workspace + notifications on top, tabs at the bottom (everything else lives under "More") */}
+      <MobileTopBar workspaces={workspaces} currentId={currentWorkspaceId} notifications={notifications} />
       <MobileTabBar pendingPaymentCount={pendingPaymentCount} />
     </>
   )

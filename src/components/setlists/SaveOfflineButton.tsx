@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { APP_NAME } from '@/lib/brand'
 import { WifiOff, CloudOff, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { parseSong } from '@/lib/chords/parser'
@@ -83,7 +84,7 @@ function buildOfflineHtml(
 <html lang="en">
 <head>
   <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${escapeHtml(setlistTitle)} — Tarana</title>
+  <title>${escapeHtml(setlistTitle)} — ${APP_NAME}</title>
   <style>
     ${chordCss}
     *,*::before,*::after{box-sizing:border-box}

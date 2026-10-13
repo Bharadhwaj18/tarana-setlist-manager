@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { APP_SLUG } from '@/lib/brand'
 import { Download } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
@@ -72,7 +73,7 @@ export function ExportModal({ members }: { members: Member[] }) {
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = `tarana-finance-${todayISO()}.csv`
+        a.download = `${APP_SLUG}-finance-${todayISO()}.csv`
         a.click()
         URL.revokeObjectURL(url)
         toast('CSV downloaded', 'success')

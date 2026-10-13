@@ -3,7 +3,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * Tarana "Forest" design tokens.
+ * "Forest" design tokens.
  * Light values live in @theme (they generate the utilities). The dark theme redefines
  * the SAME variables under .dark, so every existing bg-white / text-gray-* / bg-brand-*
  * class flips automatically — no per-component dark: variants needed.

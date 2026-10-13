@@ -10,6 +10,8 @@ import { markNotificationRead, markAllNotificationsRead } from '@/actions/notifi
 import type { NotificationItem } from '@/types/notifications'
 
 interface Props {
+  /** "sidebar" sits on the dark sidebar; "page" sits on the normal page background (phone header). */
+  tone?: 'sidebar' | 'page'
   notifications: NotificationItem[]
 }
 
@@ -24,7 +26,7 @@ function timeAgo(iso: string) {
   return `${days}d ago`
 }
 
-export function NotificationBell({ notifications }: Props) {
+export function NotificationBell({ notifications, tone = 'sidebar' }: Props) {
   const [open, setOpen] = useState(false)
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
@@ -76,7 +78,7 @@ export function NotificationBell({ notifications }: Props) {
         ref={buttonRef}
         onClick={handleToggle}
         aria-label="Notifications"
-        className="relative rounded-md p-1.5 text-sidebar-fg hover:bg-sidebar-hover"
+        className={cn('relative rounded-full p-2', tone === 'page' ? 'text-gray-700 hover:bg-brand-100' : 'rounded-md p-1.5 text-sidebar-fg hover:bg-sidebar-hover')}
       >
         <Bell className="h-5 w-5" />
         {unreadCount > 0 && (

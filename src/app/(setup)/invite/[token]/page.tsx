@@ -1,9 +1,9 @@
 import Link from 'next/link'
-import Image from 'next/image'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedUser } from '@/lib/auth-cache'
 import { Button } from '@/components/ui/Button'
 import { AcceptInviteButton } from '@/components/workspace/AcceptInviteButton'
+import { BrandMark } from '@/components/ui/BrandMark'
 
 const STATE_MESSAGES: Record<string, string> = {
   revoked: 'This invite link was cancelled. Ask whoever invited you for a new one.',
@@ -22,7 +22,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
   return (
     <div className="w-full max-w-sm">
       <div className="mb-8 flex flex-col items-center gap-3 text-center">
-        <Image src="/logo.png" alt="Tarana" width={64} height={64} className="rounded-2xl object-contain shadow-lg" />
+        <BrandMark className="h-16 w-16 rounded-2xl" />
       </div>
 
       <div className="rounded-xl bg-white p-8 text-center shadow-sm ring-1 ring-gray-200">

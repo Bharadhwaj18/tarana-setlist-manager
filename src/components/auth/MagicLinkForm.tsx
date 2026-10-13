@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { APP_EMAIL_PLACEHOLDER } from '@/lib/brand'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { createClient } from '@/lib/supabase/client'
@@ -51,7 +52,7 @@ export function MagicLinkForm({ next = '/setlists' }: { next?: string }) {
         <Input
           id="magic-email"
           type="email"
-          placeholder="you@tarana.band"
+          placeholder={APP_EMAIL_PLACEHOLDER}
           className="mt-1"
           error={errors.email?.message}
           {...register('email')}

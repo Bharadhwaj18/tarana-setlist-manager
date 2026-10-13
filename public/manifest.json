@@ -1,6 +1,6 @@
 {
-  "name": "Tarana Setlist Manager",
-  "short_name": "Tarana",
+  "name": "ArtistOps",
+  "short_name": "ArtistOps",
   "description": "Band setlist and chord chart manager",
   "start_url": "/setlists",
   "display": "standalone",

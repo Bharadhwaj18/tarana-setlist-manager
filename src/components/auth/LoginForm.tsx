@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { APP_EMAIL_PLACEHOLDER } from '@/lib/brand'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
@@ -37,7 +38,7 @@ export function LoginForm({ next = '/setlists' }: { next?: string }) {
         <Input
           id="email"
           type="email"
-          placeholder="you@tarana.band"
+          placeholder={APP_EMAIL_PLACEHOLDER}
           className="mt-1"
           error={errors.email?.message}
           {...register('email')}

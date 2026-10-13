@@ -4,14 +4,15 @@ import './globals.css'
 import { ToastProvider } from '@/components/ui/Toaster'
 import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration'
 import { THEME_INIT_SCRIPT } from '@/lib/theme'
+import { APP_NAME, APP_TAGLINE } from '@/lib/brand'
 
 const manrope = Manrope({ variable: '--font-manrope', subsets: ['latin'] })
 const fraunces = Fraunces({ variable: '--font-fraunces', subsets: ['latin'] })
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Setlist Manager',
-  description: 'Band setlist and chord chart manager for Tarana',
+  title: APP_NAME,
+  description: APP_TAGLINE,
   manifest: '/manifest.json',
   icons: {
     icon: '/logo.png',
