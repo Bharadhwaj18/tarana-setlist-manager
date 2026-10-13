@@ -8,6 +8,9 @@ import { todayISO } from '@/lib/shows'
 import { daysUntil } from '@/lib/dates'
 import { compareOpenTasks } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/server'
+import { getWorkspaceContext } from '@/lib/workspace'
+import { QuickAccess } from '@/components/today/QuickAccess'
 
 const IST = 'Asia/Kolkata'
 
@@ -30,7 +33,7 @@ const eyebrow = 'text-xs font-semibold uppercase tracking-[0.12em] text-gray-500
 const card = 'rounded-2xl border border-brand-200 bg-white p-5 shadow-sm'
 
 export default async function TodayPage() {
-  const [shows, setlistsByShow, songCounts, taskData, pending, profiles, { data: { user } }] = await Promise.all([
+  const [shows, setlistsByShow, songCounts, taskData, pending, profiles, { data: { user } }, workspaceCtx] = await Promise.all([
     getCachedShows(),
     getCachedSetlistsByShow(),
     getCachedSetlistSongCounts(),
@@ -38,7 +41,19 @@ export default async function TodayPage() {
     getCachedPendingPayments(),
     getCachedAllProfiles(),
     getCachedUser(),
+    getWorkspaceContext(),
   ])
+
+  // Light head-count queries for the quick-access hints (no rows are transferred).
+  const ws = workspaceCtx?.current.workspace.id
+  const supabase = await createClient()
+  const [songsCount, setlistsCount, recordingsCount] = ws
+    ? await Promise.all([
+        supabase.from('songs').select('id', { count: 'exact', head: true }).eq('workspace_id', ws),
+        supabase.from('setlists').select('id', { count: 'exact', head: true }).eq('workspace_id', ws),
+        supabase.from('recordings').select('id', { count: 'exact', head: true }).eq('workspace_id', ws),
+      ])
+    : [null, null, null]
 
   const today = todayISO()
   const todayLabel = new Intl.DateTimeFormat('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: IST }).format(new Date())
@@ -57,6 +72,15 @@ export default async function TodayPage() {
   const myTasks = taskData.tasks
     .filter(t => !!user && t.assignee_ids.includes(user.id) && t.progress !== 'completed' && boardName.has(t.board_id))
     .sort(compareOpenTasks)
+  const openTaskCount = taskData.tasks.filter(t => t.progress !== 'completed').length
+  const quickCounts = {
+    upcomingShows: upcoming.length,
+    setlists: setlistsCount?.count ?? null,
+    songs: songsCount?.count ?? null,
+    recordings: recordingsCount?.count ?? null,
+    openTasks: openTaskCount,
+    nextShowDate: next?.show_date ?? null,
+  }
   const overdue = myTasks.filter(t => t.due_date && t.due_date < today).length
 
   const owed = pending.filter(p => p.to_member === user?.id).reduce((sum, p) => sum + p.amount, 0)
@@ -117,6 +141,8 @@ export default async function TodayPage() {
           </section>
         )}
 
+        <QuickAccess counts={quickCounts} variant="phone" />
+
         <section className={cn(card, 'flex flex-col gap-3')}>
           <div className="flex items-baseline justify-between">
             <h2 className={eyebrow}>Your tasks</h2>
@@ -146,6 +172,8 @@ export default async function TodayPage() {
           </Link>
         </section>
       </div>
+
+      <QuickAccess counts={quickCounts} variant="desktop" />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1.4fr]">
         <Link href="/finance" className={cn(card, 'transition-colors hover:border-brand-300')}>

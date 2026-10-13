@@ -6,6 +6,7 @@ const m = (id: string, type: string, created_at: string): WorkspaceMembership =>
   workspace: {
     id, name: id, type, owner_id: 'u', plan: 'free', status: 'active', trial_ends_at: null,
     past_due_since: null, read_only_until: null, blocked_at: null, settings: {}, created_at,
+    color: 'forest', kind: null, description: null, avatar_url: null,
   },
   role: 'member',
   permissions: {},

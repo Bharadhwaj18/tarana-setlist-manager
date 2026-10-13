@@ -8,6 +8,7 @@ import { sendNotification } from '@/actions/notifications'
 import { DOCUMENT_BUCKET } from '@/types/show-document'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { WORKSPACE_COOKIE, normalisePermissions } from '@/lib/workspace-shared'
+import { createWorkspaceInputSchema, updateWorkspaceDetailsSchema, type CreateWorkspaceInput, type UpdateWorkspaceDetailsInput } from '@/lib/validators'
 
 async function selectWorkspace(workspaceId: string) {
   const cookieStore = await cookies()
@@ -34,9 +35,17 @@ export async function switchWorkspace(workspaceId: string): Promise<{ error?: st
   return {}
 }
 
-export async function createWorkspace(name: string): Promise<{ error?: string; id?: string }> {
+/** Accepts just a name (older callers) or the full form: name, optional kind and avatar colour. */
+export async function createWorkspace(input: string | CreateWorkspaceInput): Promise<{ error?: string; id?: string }> {
+  const parsed = createWorkspaceInputSchema.safeParse(typeof input === 'string' ? { name: input } : input)
+  if (!parsed.success) return { error: parsed.error.issues[0].message }
   const supabase = await createClient()
-  const { data, error } = await supabase.rpc('create_workspace', { p_name: name, p_type: 'band' })
+  const { data, error } = await supabase.rpc('create_workspace', {
+    p_name: parsed.data.name,
+    p_type: 'band',
+    p_kind: parsed.data.kind || null,
+    p_color: parsed.data.color ?? 'forest',
+  })
   if (error) return { error: error.message }
   await selectWorkspace(data)
   return { id: data }
@@ -47,6 +56,45 @@ export async function renameWorkspace(name: string): Promise<{ error?: string }>
   if ('error' in auth) return { error: auth.error }
   const supabase = await createClient()
   const { error } = await supabase.rpc('rename_workspace', { p_ws: auth.workspaceId, p_name: name })
+  if (error) return { error: error.message }
+  revalidatePath('/', 'layout')
+  return {}
+}
+
+/** Name, kind, description, colour and logo/photo of the current workspace. Omitted fields stay as they are; avatarUrl null removes the image. */
+export async function updateWorkspaceDetails(input: UpdateWorkspaceDetailsInput): Promise<{ error?: string }> {
+  const auth = await requireAdminContext()
+  if ('error' in auth) return { error: auth.error }
+  const parsed = updateWorkspaceDetailsSchema.safeParse(input)
+  if (!parsed.success) return { error: parsed.error.issues[0].message }
+  const d = parsed.data
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('update_workspace_details', {
+    p_ws: auth.workspaceId,
+    p_name: d.name ?? null,
+    p_kind: d.kind ?? null,
+    p_description: d.description ?? null,
+    p_color: d.color ?? null,
+    p_avatar_url: typeof d.avatarUrl === 'string' ? d.avatarUrl : null,
+    p_clear_avatar: d.avatarUrl === null,
+  })
+  if (error) return { error: error.message }
+  revalidatePath('/', 'layout')
+  return {}
+}
+
+/** Sets (or, with null, removes) the logo/photo after the image has been uploaded to the workspace-avatars bucket. */
+export async function setWorkspaceAvatar(publicUrl: string | null): Promise<{ error?: string }> {
+  return updateWorkspaceDetails({ avatarUrl: publicUrl })
+}
+
+/** Hands the workspace to another member; the current owner becomes an admin. Owner only. */
+export async function transferOwnership(userId: string): Promise<{ error?: string }> {
+  const auth = await requireAdminContext()
+  if ('error' in auth) return { error: auth.error }
+  if (auth.ctx.current.role !== 'owner') return { error: 'Only the owner can transfer this workspace.' }
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('transfer_workspace_ownership', { p_ws: auth.workspaceId, p_new_owner: userId })
   if (error) return { error: error.message }
   revalidatePath('/', 'layout')
   return {}

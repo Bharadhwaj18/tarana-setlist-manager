@@ -212,3 +212,19 @@ export const getCachedAllCalendars = cache(async () => {
     workspaces: ctx.memberships.map(m => ({ id: m.workspace.id, name: m.workspace.type === 'personal' ? 'Personal' : m.workspace.name })),
   }
 })
+
+export interface WorkspaceAttention {
+  memberCount: number
+  nextShowDate: string | null
+  tasksDue: number
+}
+
+// One round trip for every workspace the user belongs to: member count, next show and tasks
+// due soon. Feeds the switcher badges and the workspaces overview.
+export const getWorkspaceAttention = cache(async (): Promise<Record<string, WorkspaceAttention>> => {
+  const supabase = await createClient()
+  const { data } = await supabase.rpc('workspace_attention')
+  return Object.fromEntries(
+    (data ?? []).map(r => [r.workspace_id, { memberCount: r.member_count, nextShowDate: r.next_show_date, tasksDue: r.tasks_due }])
+  )
+})

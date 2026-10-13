@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { BrandMark } from '@/components/ui/BrandMark'
-import { APP_NAME } from '@/lib/brand'
+import { Wordmark } from '@/components/ui/Wordmark'
 import { usePathname, useRouter } from 'next/navigation'
 import { Music2, ListMusic, Wallet, LogOut, CalendarDays, CalendarRange, StickyNote, SquareKanban, Building2, Settings, Mic, LayoutDashboard } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -10,7 +10,9 @@ import { cn } from '@/lib/utils'
 import { ACTIVE_SETLIST_COOKIE } from '@/lib/setlist-context'
 import type { User } from '@supabase/supabase-js'
 import { NotificationBell } from './NotificationBell'
-import { WorkspaceSwitcher, type WorkspaceOption } from './WorkspaceSwitcher'
+import { WorkspaceSwitcher } from './WorkspaceSwitcher'
+import { WorkspaceRail } from './WorkspaceRail'
+import type { WorkspaceOption } from '@/lib/workspace-options'
 import { ThemeIconButton } from '@/components/ui/ThemeToggle'
 import { MobileTabBar } from './MobileTabBar'
 import { MobileTopBar } from './MobileTopBar'
@@ -142,13 +144,14 @@ export function Sidebar({ user, pendingPaymentCount = 0, notifications = [], wor
   const logo = (
     <Link href="/" className="flex items-center gap-2.5">
       <BrandMark className="ring-1 ring-sidebar-border" />
-      <span className="font-display text-lg font-bold text-sidebar-strong">{APP_NAME}</span>
+      <Wordmark tone="sidebar" className="text-lg text-sidebar-strong" />
     </Link>
   )
 
   return (
     <>
-      {/* Desktop sidebar */}
+      {/* Desktop: workspace rail + sidebar */}
+      <WorkspaceRail workspaces={workspaces} currentId={currentWorkspaceId} />
       <aside className="hidden w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar lg:flex">
         <div className="flex items-center justify-between border-b border-sidebar-border px-4 py-2.5">
           {logo}

@@ -2,12 +2,13 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ChevronRight, LogOut } from 'lucide-react'
+import { ChevronRight, LogOut, User } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { ACTIVE_SETLIST_COOKIE } from '@/lib/setlist-context'
 import { SectionLabel } from '@/components/ui/SectionLabel'
 import { ThemePicker } from '@/components/ui/ThemeToggle'
-import { WorkspaceSwitcher, type WorkspaceOption } from './WorkspaceSwitcher'
+import { WorkspaceAvatar } from '@/components/ui/WorkspaceAvatar'
+import { isPersonal, roleLabel, workspaceLabel, type WorkspaceOption } from '@/lib/workspace-options'
 
 interface Props {
   email: string
@@ -16,13 +17,15 @@ interface Props {
 }
 
 const GROUPS = [
-  { label: 'Perform', items: [{ href: '/songs', label: 'Songs' }, { href: '/recordings', label: 'Recordings' }] },
+  { label: 'Perform', items: [{ href: '/shows', label: 'Shows' }, { href: '/songs', label: 'Songs' }, { href: '/recordings', label: 'Recordings' }] },
   { label: 'Organise', items: [{ href: '/tasks', label: 'Tasks' }, { href: '/notes', label: 'Notes' }, { href: '/calendar', label: 'Calendar' }, { href: '/event-management', label: 'Agencies' }] },
-  { label: 'Account', items: [{ href: '/workspace', label: 'Workspace & members' }, { href: '/settings', label: 'Settings' }] },
+  { label: 'Account', items: [{ href: '/workspaces', label: 'Workspaces' }, { href: '/workspace', label: 'Workspace & members' }, { href: '/settings', label: 'Settings' }] },
 ]
 
 export function MoreMenu({ email, workspaces, currentWorkspaceId }: Props) {
   const router = useRouter()
+
+  const current = workspaces.find(w => w.id === currentWorkspaceId) ?? workspaces[0]
 
   const signOut = async () => {
     await createClient().auth.signOut()
@@ -39,10 +42,19 @@ export function MoreMenu({ email, workspaces, currentWorkspaceId }: Props) {
 
   return (
     <div className="space-y-5">
-      {workspaces.length > 0 && (
-        <div className="rounded-2xl bg-sidebar pb-3">
-          <WorkspaceSwitcher workspaces={workspaces} currentId={currentWorkspaceId} />
-        </div>
+      {current && (
+        <Link href="/workspaces" className="flex items-center gap-3 rounded-2xl bg-sidebar p-3 text-sidebar-strong">
+          {isPersonal(current) ? (
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sidebar-hover"><User className="h-5 w-5" /></span>
+          ) : (
+            <WorkspaceAvatar name={current.name} color={current.color} avatarUrl={current.avatarUrl} size={44} />
+          )}
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-base font-extrabold">{workspaceLabel(current)}</span>
+            <span className="block text-xs text-sidebar-muted">{isPersonal(current) ? 'Just you' : roleLabel(current.role)} · {workspaces.length} {workspaces.length === 1 ? 'workspace' : 'workspaces'}</span>
+          </span>
+          <span className="text-xs font-bold text-sidebar-muted">Switch &rsaquo;</span>
+        </Link>
       )}
 
       {GROUPS.map(group => (

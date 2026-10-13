@@ -272,3 +272,23 @@ h1, h2 {
     font-size: 16px !important;
   }
 }
+
+/* === Workspace avatar tones (see src/lib/workspace-tones.ts) === */
+:root {
+  --ws-forest: #14392b;
+  --ws-plum: #5b3a6e;
+  --ws-ink: #2b2f3a;
+  --ws-ocean: #1f5578;
+  --ws-amber: #8a5a12;
+  --ws-rose: #8c3a52;
+  --ws-fg: #ffffff;
+}
+.dark {
+  --ws-forest: #1f5a43;
+  --ws-plum: #7a4f92;
+  --ws-ink: #4b5365;
+  --ws-ocean: #2f7ba8;
+  --ws-amber: #b8841f;
+  --ws-rose: #b8506f;
+  --ws-fg: #ffffff;
+}

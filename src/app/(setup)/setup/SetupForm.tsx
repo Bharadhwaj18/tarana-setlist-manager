@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { BrandMark } from '@/components/ui/BrandMark'
-import { APP_NAME } from '@/lib/brand'
+import { Wordmark } from '@/components/ui/Wordmark'
 import { useRouter } from 'next/navigation'
 import { saveDisplayName } from '@/actions/profile'
 import { Button } from '@/components/ui/Button'
@@ -32,7 +32,7 @@ export function SetupForm({ email }: { email: string }) {
       <div className="mb-8 flex flex-col items-center gap-3 text-center">
         <BrandMark className="h-16 w-16 rounded-2xl" />
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Welcome to {APP_NAME}!</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Welcome to <Wordmark className="text-2xl" />!</h1>
           <p className="mt-1 text-sm text-gray-500">
             Set a display name so your bandmates can see who added or edited songs.
           </p>

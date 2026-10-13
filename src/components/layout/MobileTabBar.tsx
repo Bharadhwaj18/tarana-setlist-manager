@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 
 const TABS = [
   { href: '/', label: 'Today', icon: LayoutDashboard },
-  { href: '/shows', label: 'Shows', icon: CalendarDays },
+  { href: '/calendar', label: 'Calendar', icon: CalendarDays },
   { href: '/setlists', label: 'Setlists', icon: ListMusic },
   { href: '/finance', label: 'Finance', icon: Wallet },
   { href: '/more', label: 'More', icon: Ellipsis },

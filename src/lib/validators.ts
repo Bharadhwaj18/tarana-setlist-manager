@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { WORKSPACE_TONE_IDS } from '@/lib/workspace-tones'
 
 export const loginSchema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -117,3 +118,28 @@ export const labelInputSchema = z.object({
 })
 
 export type TaskInput = z.infer<typeof taskInputSchema>
+
+// ---- Workspaces ---------------------------------------------------------------------
+
+export const workspaceNameSchema = z.string().trim().min(1, 'Give the workspace a name').max(60, 'Keep the name under 60 characters')
+export const workspaceKindSchema = z.string().trim().max(30, 'Keep the kind under 30 characters')
+export const workspaceDescriptionSchema = z.string().trim().max(300, 'Keep the description under 300 characters')
+export const workspaceToneSchema = z.enum(WORKSPACE_TONE_IDS)
+
+export const createWorkspaceInputSchema = z.object({
+  name: workspaceNameSchema,
+  kind: workspaceKindSchema.optional(),
+  color: workspaceToneSchema.optional(),
+})
+
+/** Every field optional: omitted means unchanged. avatarUrl null removes the logo/photo. */
+export const updateWorkspaceDetailsSchema = z.object({
+  name: workspaceNameSchema.optional(),
+  kind: workspaceKindSchema.optional(),
+  description: workspaceDescriptionSchema.optional(),
+  color: workspaceToneSchema.optional(),
+  avatarUrl: z.string().trim().url('That image address is not valid').max(500).nullable().optional(),
+})
+
+export type CreateWorkspaceInput = z.infer<typeof createWorkspaceInputSchema>
+export type UpdateWorkspaceDetailsInput = z.infer<typeof updateWorkspaceDetailsSchema>

@@ -705,6 +705,10 @@ export type Database = {
           blocked_at: string | null
           settings: Json
           created_at: string
+          color: string
+          kind: string | null
+          description: string | null
+          avatar_url: string | null
         }
         Insert: {
           id?: string
@@ -719,6 +723,10 @@ export type Database = {
           blocked_at?: string | null
           settings?: Json
           created_at?: string
+          color?: string
+          kind?: string | null
+          description?: string | null
+          avatar_url?: string | null
         }
         Update: {
           id?: string
@@ -733,6 +741,10 @@ export type Database = {
           blocked_at?: string | null
           settings?: Json
           created_at?: string
+          color?: string
+          kind?: string | null
+          description?: string | null
+          avatar_url?: string | null
         }
         Relationships: []
       }
@@ -1093,14 +1105,41 @@ export type Database = {
           detail: string | null
         }[]
       }
-      create_workspace: { Args: { p_name: string; p_type?: string }; Returns: string }
+      create_workspace: { Args: { p_name: string; p_type?: string; p_kind?: string | null; p_color?: string }; Returns: string }
+      update_workspace_details: {
+        Args: {
+          p_ws: string
+          p_name?: string | null
+          p_kind?: string | null
+          p_description?: string | null
+          p_color?: string | null
+          p_avatar_url?: string | null
+          p_clear_avatar?: boolean
+        }
+        Returns: undefined
+      }
+      transfer_workspace_ownership: { Args: { p_ws: string; p_new_owner: string }; Returns: undefined }
+      workspace_attention: {
+        Args: Record<string, never>
+        Returns: { workspace_id: string; member_count: number; next_show_date: string | null; tasks_due: number }[]
+      }
       delete_workspace: { Args: { p_ws: string }; Returns: undefined }
       rename_workspace: { Args: { p_ws: string; p_name: string }; Returns: undefined }
       revoke_workspace_invite: { Args: { p_invite: string }; Returns: undefined }
       accept_workspace_invite: { Args: { p_token: string }; Returns: string }
       invite_preview: {
         Args: { p_token: string }
-        Returns: { workspace_name: string; workspace_type: string; state: string }[]
+        Returns: {
+          workspace_name: string
+          workspace_type: string
+          state: string
+          workspace_color: string | null
+          workspace_avatar_url: string | null
+          invited_by_name: string | null
+          invite_role: string | null
+          expires_at: string | null
+          member_count: number | null
+        }[]
       }
     }
     Enums: { [_ in never]: never }

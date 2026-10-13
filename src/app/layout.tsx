@@ -14,10 +14,6 @@ export const metadata: Metadata = {
   title: APP_NAME,
   description: APP_TAGLINE,
   manifest: '/manifest.json',
-  icons: {
-    icon: '/logo.png',
-    apple: '/logo.png',
-  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
