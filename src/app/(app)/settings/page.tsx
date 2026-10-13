@@ -1,6 +1,7 @@
 import { getCachedUser } from '@/lib/data'
 import { PushSubscribeToggle } from '@/components/settings/PushSubscribeToggle'
 import { TestNotificationButton } from '@/components/settings/TestNotificationButton'
+import { ThemePicker } from '@/components/ui/ThemeToggle'
 
 export default async function SettingsPage() {
   const { data: { user } } = await getCachedUser()
@@ -8,6 +9,12 @@ export default async function SettingsPage() {
   return (
     <div className="max-w-xl">
       <h1 className="mb-6 text-2xl font-bold text-gray-900">Settings</h1>
+
+      <section className="mb-6 rounded-xl border border-brand-200 bg-white p-5 shadow-sm">
+        <h2 className="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-400">Appearance</h2>
+        <p className="mb-4 text-sm text-gray-500">Light, dark, or follow this device.</p>
+        <ThemePicker />
+      </section>
 
       <section className="rounded-xl border border-brand-200 bg-white p-5 shadow-sm">
         <h2 className="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-400">Notifications</h2>

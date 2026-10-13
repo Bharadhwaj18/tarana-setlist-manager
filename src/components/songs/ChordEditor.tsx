@@ -162,7 +162,7 @@ export function ChordEditor({ value, onChange, error }: ChordEditorProps) {
         onChange={e => onChange(e.target.value)}
         rows={16}
         placeholder={`Enter chords in ChordPro format, e.g.:\n\n{title: Amazing Grace}\n{key: G}\n\n[G]Amazing grace, [D]how sweet [Em]the sound\n[C]That saved a [G]wretch like me`}
-        className="font-mono text-sm"
+        className="font-mono text-sm focus:border-brand-400 focus:ring-brand-400"
         error={error}
       />
 

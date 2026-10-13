@@ -1,53 +1,46 @@
 import Link from 'next/link'
 import { Plus, Music2 } from 'lucide-react'
-import { getCachedSongs, getCachedAllProfiles, getCachedUser } from '@/lib/data'
+import { getCachedSongs } from '@/lib/data'
+import { createClient } from '@/lib/supabase/server'
 import { SongSearchList } from '@/components/songs/SongSearchList'
 import { Button } from '@/components/ui/Button'
+import { PageHeader } from '@/components/ui/PageHeader'
+import { EmptyState } from '@/components/ui/EmptyState'
 
 export default async function SongsPage() {
-  const [{ data: { user } }, songs, profiles] = await Promise.all([
-    getCachedUser(),
+  const supabase = await createClient()
+  const [songs, { data: usage }] = await Promise.all([
     getCachedSongs(),
-    getCachedAllProfiles(),
+    supabase.from('setlist_songs').select('song_id'),
   ])
 
-  const profileMap: Record<string, string> = {}
-  for (const p of profiles) {
-    profileMap[p.id] = p.id === user?.id ? 'You' : (p.display_name ?? 'Band member')
-  }
-  if (user && !profileMap[user.id]) profileMap[user.id] = 'You'
+  const setlistCounts: Record<string, number> = {}
+  for (const row of usage ?? []) setlistCounts[row.song_id] = (setlistCounts[row.song_id] ?? 0) + 1
+
+  const needChart = songs.filter(s => !s.chord_chart).length
+  const subtitle = `${songs.length} ${songs.length === 1 ? 'song' : 'songs'}${needChart ? ` · ${needChart} still need a chord chart` : ''}`
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Song Library</h1>
-          <p className="mt-1 text-sm text-gray-500">{songs.length} songs</p>
-        </div>
-        <Button asChild>
-          <Link href="/songs/new">
-            <Plus className="h-4 w-4" />
-            New Song
-          </Link>
-        </Button>
-      </div>
+      <PageHeader
+        title="Songs"
+        subtitle={subtitle}
+        action={
+          <Button asChild>
+            <Link href="/songs/new"><Plus className="h-4 w-4" /> New song</Link>
+          </Button>
+        }
+      />
 
       {!songs.length ? (
-        <div className="flex flex-col items-center gap-4 rounded-xl border-2 border-dashed border-gray-200 py-20 text-center">
-          <Music2 className="h-12 w-12 text-gray-300" />
-          <div>
-            <p className="font-medium text-gray-500">No songs yet</p>
-            <p className="text-sm text-gray-400">Add your first song to get started</p>
-          </div>
-          <Button asChild>
-            <Link href="/songs/new">
-              <Plus className="h-4 w-4" />
-              Add a song
-            </Link>
-          </Button>
-        </div>
+        <EmptyState
+          icon={<Music2 className="h-12 w-12" />}
+          title="No songs yet"
+          description="Add your first song to get started"
+          action={<Button asChild><Link href="/songs/new"><Plus className="h-4 w-4" /> Add a song</Link></Button>}
+        />
       ) : (
-        <SongSearchList songs={songs} profileMap={profileMap} />
+        <SongSearchList songs={songs} setlistCounts={setlistCounts} />
       )}
     </div>
   )

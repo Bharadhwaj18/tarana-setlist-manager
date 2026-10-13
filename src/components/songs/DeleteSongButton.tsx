@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { deleteSong } from '@/actions/songs'
@@ -24,9 +23,13 @@ export function DeleteSongButton({ id }: { id: string }) {
 
   return (
     <>
-      <Button variant="danger" size="sm" onClick={() => setOpen(true)}>
-        <Trash2 className="h-4 w-4" />
-      </Button>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="text-sm font-bold text-red-600 hover:underline"
+      >
+        Delete song
+      </button>
       <Modal
         open={open}
         onOpenChange={setOpen}

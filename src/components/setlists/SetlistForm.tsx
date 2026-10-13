@@ -39,7 +39,7 @@ export function SetlistForm({ setlist, onSubmit, linkedShow }: SetlistFormProps)
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-5">
       {linkedShow && (
-        <div className="flex items-center gap-2 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700">
+        <div className="flex items-center gap-2 rounded-xl bg-brand-100 px-3 py-2 text-sm font-medium text-brand-700">
           <Link2 className="h-4 w-4 shrink-0" />
           Linked to show <span className="font-semibold">{linkedShow.title}</span>
         </div>
@@ -64,7 +64,7 @@ export function SetlistForm({ setlist, onSubmit, linkedShow }: SetlistFormProps)
           id="notes"
           rows={3}
           placeholder="Set length, special requests..."
-          className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
           {...register('notes')}
         />
       </div>

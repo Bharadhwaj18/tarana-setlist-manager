@@ -4,6 +4,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { GripVertical, Trash2 } from 'lucide-react'
 import Link from 'next/link'
+import { StatusPill } from '@/components/ui/StatusPill'
 import { cn } from '@/lib/utils'
 import type { Song } from '@/types'
 
@@ -23,45 +24,45 @@ export function SortableSongRow({ id, song, index, setlistId, onRemove }: Sortab
     transition,
   }
 
+  const hasChart = !!song.chord_chart?.trim()
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={cn(
-        'flex items-center gap-3 rounded-lg border border-brand-200 bg-white px-4 py-3 shadow-sm',
-        isDragging && 'opacity-50 shadow-lg ring-2 ring-brand-400'
+        'relative flex items-center gap-3 border-b border-brand-100 bg-white px-4 py-3 last:border-b-0',
+        isDragging && 'z-10 rounded-lg opacity-60 shadow-lg ring-2 ring-brand-400'
       )}
     >
-      {/* Position number */}
-      <span className="w-6 shrink-0 text-center text-sm font-bold text-gray-500">{index + 1}</span>
-
       {/* Drag handle */}
       <button
         {...attributes}
         {...listeners}
-        className="cursor-grab touch-none text-gray-400 hover:text-gray-700 active:cursor-grabbing"
+        className="cursor-grab touch-none text-gray-300 hover:text-gray-600 active:cursor-grabbing"
         aria-label="Drag to reorder"
       >
         <GripVertical className="h-5 w-5" />
       </button>
 
+      {/* Position number */}
+      <span className="w-5 shrink-0 text-center text-sm font-bold text-gray-400">{index + 1}</span>
+
       {/* Song info — tappable link to song page */}
-      <Link href={`/songs/${song.id}?from=/setlists/${setlistId}`} className="flex min-w-0 flex-1 items-center gap-2">
+      <Link href={`/songs/${song.id}?from=/setlists/${setlistId}`} className="flex min-w-0 flex-1 items-center gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate font-medium text-gray-900">{song.title}</p>
-          {song.artist && <p className="truncate text-xs text-gray-400">{song.artist}</p>}
+          <p className="truncate font-bold text-gray-900">{song.title}</p>
+          {song.artist && <p className="truncate text-xs text-gray-500">{song.artist}</p>}
         </div>
-        {song.song_key && (
-          <span className="shrink-0 rounded bg-brand-100 px-1.5 py-0.5 text-xs font-bold text-brand-700">
-            {song.song_key}
-          </span>
-        )}
+        {!hasChart && <StatusPill tone="amber" className="shrink-0">No chart</StatusPill>}
+        {song.song_key && <StatusPill tone="green" className="shrink-0 rounded-md px-2 text-xs">{song.song_key}</StatusPill>}
+        {song.bpm && <span className="hidden w-16 shrink-0 text-right text-sm text-gray-500 sm:block">{song.bpm} BPM</span>}
       </Link>
 
       {/* Actions */}
       <button
         onClick={onRemove}
-        className="text-brand-200 hover:text-red-500"
+        className="text-gray-300 hover:text-red-500"
         aria-label="Remove from setlist"
       >
         <Trash2 className="h-4 w-4" />

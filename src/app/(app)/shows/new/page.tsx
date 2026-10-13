@@ -15,11 +15,11 @@ export default async function NewShowPage({ searchParams }: Props) {
   ])
 
   return (
-    <div className="max-w-xl">
-      <Link href="/shows" className="mb-6 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
+    <div className="max-w-3xl">
+      <Link href="/shows" className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-700">
         <ChevronLeft className="h-4 w-4" /> Shows
       </Link>
-      <h1 className="mb-8 text-2xl font-bold text-gray-900">New Show</h1>
+      <h1 className="mb-6 text-3xl font-bold text-gray-900">New show</h1>
       <ShowForm eventManagementCompanies={eventManagementCompanies} onSubmit={createShow} initialDate={date} />
     </div>
   )

@@ -88,7 +88,7 @@ export function SetlistSongList({ setlistId, initialItems }: SetlistSongListProp
 
   if (!items.length) {
     return (
-      <div className="rounded-lg border-2 border-dashed border-gray-200 py-12 text-center text-sm text-gray-400">
+      <div className="rounded-2xl border-2 border-dashed border-brand-200 py-12 text-center text-sm text-gray-500">
         No songs added yet. Use &ldquo;Bulk Import&rdquo; or &ldquo;Add Songs&rdquo; to build your setlist.
       </div>
     )
@@ -113,19 +113,18 @@ export function SetlistSongList({ setlistId, initialItems }: SetlistSongListProp
   return (
     <DndContext id="setlist-song-list" sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
       <SortableContext items={items.map(i => i.id)} strategy={verticalListSortingStrategy}>
-        <div className="space-y-2">
+        <div className="overflow-hidden rounded-2xl border border-brand-200 bg-white shadow-sm">
           {renderItems.map((entry, i) => {
             if (entry.type === 'header') {
               return (
                 <div
                   key={`header-${entry.label}-${i}`}
-                  className="flex items-center gap-2 pb-1 pt-4 first:pt-0"
+                  className="flex items-center gap-2 border-b border-brand-100 bg-gray-50 px-4 py-2"
                 >
-                  <Tag className="h-3.5 w-3.5 shrink-0 text-brand-400" />
-                  <span className="text-xs font-semibold uppercase tracking-wider text-brand-500">
+                  <Tag className="h-3.5 w-3.5 shrink-0 text-brand-600" />
+                  <span className="text-xs font-extrabold uppercase tracking-[0.12em] text-brand-600">
                     {entry.label}
                   </span>
-                  <div className="h-px flex-1 bg-brand-200" />
                 </div>
               )
             }

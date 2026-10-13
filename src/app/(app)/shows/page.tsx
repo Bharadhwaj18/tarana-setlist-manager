@@ -4,7 +4,9 @@ import { getCachedShows, getCachedShowTransactions, getCachedSetlistsByShow, get
 import { todayISO, isUpcoming, canonicalCity } from '@/lib/shows'
 import { Button } from '@/components/ui/Button'
 import { ShowSearchList } from '@/components/shows/ShowSearchList'
-import { ShowsDashboard } from '@/components/shows/ShowsDashboard'
+import { PageHeader } from '@/components/ui/PageHeader'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { SectionLabel } from '@/components/ui/SectionLabel'
 
 export default async function ShowsPage() {
   const [shows, txns, setlists, eventManagementCompanies] = await Promise.all([
@@ -34,6 +36,10 @@ export default async function ShowsPage() {
   // future counts as something the band has actually played yet.
   const played = shows.filter(s => !isUpcoming(s.show_date, today))
   const totalRevenue = played.reduce((sum, s) => sum + (netByShow[s.id] ?? 0), 0)
+  const thisYear = today.slice(0, 4)
+  const playedThisYear = played.filter(s => s.show_date?.startsWith(thisYear)).length
+  const waitingToSplit = played.filter(s => !s.split_at && (netByShow[s.id] ?? 0) > 0).length
+  const upcomingCount = shows.length - played.length
 
   const formatCounts: Record<string, number> = {}
   const formatRevenue: Record<string, number> = {}
@@ -75,40 +81,48 @@ export default async function ShowsPage() {
     .sort((a, b) => b.count - a.count)
     .slice(0, 8)
 
-  return (
-    <div className="max-w-3xl">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Shows</h1>
-          <p className="mt-1 text-sm text-gray-500">{shows.length} show{shows.length !== 1 ? 's' : ''} — the base record for setlists and finance, latest first</p>
-        </div>
-        <Button asChild>
-          <Link href="/shows/new"><Plus className="h-4 w-4" /> New Show</Link>
-        </Button>
-      </div>
+  const stats = [
+    { label: 'This year', value: `${playedThisYear} show${playedThisYear === 1 ? '' : 's'}` },
+    { label: 'Earned, all time', value: `₹${Math.round(totalRevenue).toLocaleString('en-IN')}` },
+    { label: 'Waiting to split', value: `${waitingToSplit} show${waitingToSplit === 1 ? '' : 's'}`, alert: waitingToSplit > 0 },
+  ]
 
-      <ShowsDashboard
-        totalPlayed={played.length}
-        totalRevenue={totalRevenue}
-        formatBreakdown={formatBreakdown}
-        revenueByFormat={revenueByFormat}
-        showsPerYear={showsPerYear}
-        topCities={topCities}
+  return (
+    <div>
+      <PageHeader
+        title="Shows"
+        subtitle={`${upcomingCount} coming up · ${played.length} played`}
+        action={
+          <Button asChild>
+            <Link href="/shows/new"><Plus className="h-4 w-4" /> New show</Link>
+          </Button>
+        }
       />
 
-      {!shows.length ? (
-        <div className="flex flex-col items-center gap-4 rounded-xl border-2 border-dashed border-gray-200 py-20 text-center">
-          <CalendarDays className="h-12 w-12 text-gray-300" />
-          <div>
-            <p className="font-medium text-gray-500">No shows yet</p>
-            <p className="text-sm text-gray-400">Add a show, then build its setlist and log its finances from here</p>
-          </div>
-          <Button asChild>
-            <Link href="/shows/new"><Plus className="h-4 w-4" /> Add a show</Link>
-          </Button>
+      {played.length > 0 && (
+        <div className="mb-5 grid grid-cols-3 divide-x divide-brand-200 rounded-2xl border border-brand-200 bg-white shadow-sm">
+          {stats.map(st => (
+            <div key={st.label} className="min-w-0 px-3 py-3 sm:px-5">
+              <SectionLabel className="truncate !text-[10px] sm:!text-[11px]">{st.label}</SectionLabel>
+              <p className={`mt-1 truncate font-display text-lg font-bold sm:text-2xl ${st.alert ? 'text-red-600' : 'text-gray-900'}`}>{st.value}</p>
+            </div>
+          ))}
         </div>
+      )}
+
+      {!shows.length ? (
+        <EmptyState
+          icon={<CalendarDays className="h-12 w-12" />}
+          title="No shows yet"
+          description="Add a show, then build its setlist and log its finances from here"
+          action={<Button asChild><Link href="/shows/new"><Plus className="h-4 w-4" /> Add a show</Link></Button>}
+        />
       ) : (
-        <ShowSearchList shows={shows} netByShow={netByShow} setlistByShow={setlistByShow} today={today} eventManagementById={eventManagementById} />
+        <ShowSearchList
+          shows={shows} netByShow={netByShow} setlistByShow={setlistByShow} today={today}
+          eventManagementById={eventManagementById}
+          insights={{ formatBreakdown, revenueByFormat, showsPerYear, topCities }}
+        />
       )}
     </div>
   )

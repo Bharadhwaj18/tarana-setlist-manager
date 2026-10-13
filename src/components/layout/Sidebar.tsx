@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Music2, ListMusic, Wallet, LogOut, Menu, X, CalendarDays, CalendarRange, StickyNote, SquareKanban, Building2, Settings, Mic } from 'lucide-react'
+import { Music2, ListMusic, Wallet, LogOut, CalendarDays, CalendarRange, StickyNote, SquareKanban, Building2, Settings, Mic, LayoutDashboard } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { ACTIVE_SETLIST_COOKIE } from '@/lib/setlist-context'
@@ -10,6 +10,8 @@ import { useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { NotificationBell } from './NotificationBell'
 import { WorkspaceSwitcher, type WorkspaceOption } from './WorkspaceSwitcher'
+import { ThemeIconButton } from '@/components/ui/ThemeToggle'
+import { MobileTabBar } from './MobileTabBar'
 import type { NotificationItem } from '@/types/notifications'
 
 function LogoImage() {
@@ -22,7 +24,7 @@ function LogoImage() {
     )
   }
   return (
-    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-900 shadow-sm">
+    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-black ring-1 ring-sidebar-border shadow-sm">
       <img
         src="/logo.png"
         alt="Tarana"
@@ -44,24 +46,33 @@ interface SidebarProps {
   currentWorkspaceId?: string
 }
 
-const navItems = [
-  { href: '/shows', label: 'Shows', icon: CalendarDays },
-  { href: '/songs', label: 'Songs', icon: Music2 },
-  { href: '/setlists', label: 'Setlists', icon: ListMusic },
-  { href: '/recordings', label: 'Recordings', icon: Mic },
-  { href: '/finance', label: 'Finance', icon: Wallet },
-  { href: '/event-management', label: 'Marketing', icon: Building2 },
-  { href: '/tasks', label: 'Tasks', icon: SquareKanban },
-  { href: '/notes', label: 'Notes', icon: StickyNote },
-  { href: '/calendar', label: 'Calendar', icon: CalendarRange },
-  { href: '/settings', label: 'Settings', icon: Settings },
+const navGroups = [
+  { label: null, items: [{ href: '/', label: 'Today', icon: LayoutDashboard }] },
+  {
+    label: 'Perform',
+    items: [
+      { href: '/shows', label: 'Shows', icon: CalendarDays },
+      { href: '/setlists', label: 'Setlists', icon: ListMusic },
+      { href: '/songs', label: 'Songs', icon: Music2 },
+      { href: '/recordings', label: 'Recordings', icon: Mic },
+    ],
+  },
+  { label: 'Money', items: [{ href: '/finance', label: 'Finance', icon: Wallet }] },
+  {
+    label: 'Organise',
+    items: [
+      { href: '/tasks', label: 'Tasks', icon: SquareKanban },
+      { href: '/notes', label: 'Notes', icon: StickyNote },
+      { href: '/calendar', label: 'Calendar', icon: CalendarRange },
+      { href: '/event-management', label: 'Agencies', icon: Building2 },
+    ],
+  },
 ]
 
 export function Sidebar({ user, pendingPaymentCount = 0, notifications = [], workspaces = [], currentWorkspaceId = '' }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
-  const [mobileOpen, setMobileOpen] = useState(false)
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -73,7 +84,6 @@ export function Sidebar({ user, pendingPaymentCount = 0, notifications = [], wor
   // setlist context. Any other nav item leaves it alone; opening a
   // different setlist's song naturally overwrites it anyway.
   const handleNavClick = (href: string) => {
-    setMobileOpen(false)
     if (href === '/songs') {
       // Plain DOM/browser API write from an event handler — not a render or
       // effect — which is exactly where React's docs say this belongs.
@@ -82,107 +92,100 @@ export function Sidebar({ user, pendingPaymentCount = 0, notifications = [], wor
     }
   }
 
+  const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href))
+
   const nav = (
-    <nav className="flex flex-1 flex-col gap-1 py-4">
-      {navItems.map(({ href, label, icon: Icon }) => (
-        <Link
-          key={href}
-          href={href}
-          onClick={() => handleNavClick(href)}
-          className={cn(
-            'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-            pathname.startsWith(href)
-              ? 'bg-brand-200 text-gray-900'
-              : 'text-gray-700 hover:bg-brand-100 hover:text-gray-900'
+    <nav className="flex flex-1 flex-col gap-2.5 py-2">
+      {navGroups.map((group, i) => (
+        <div key={group.label ?? i} className="flex flex-col gap-0.5">
+          {group.label && (
+            <span className="px-3 pb-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-sidebar-muted [@media(max-height:640px)]:hidden">{group.label}</span>
           )}
-        >
-          <Icon className="h-5 w-5 shrink-0" />
-          <span className="flex-1">{label}</span>
-          {href === '/finance' && pendingPaymentCount > 0 && (
-            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white">
-              {pendingPaymentCount}
-            </span>
-          )}
-        </Link>
+          {group.items.map(({ href, label, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              onClick={() => handleNavClick(href)}
+              className={cn(
+                'flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
+                isActive(href)
+                  ? 'bg-sidebar-active text-sidebar-active-fg'
+                  : 'text-sidebar-fg hover:bg-sidebar-hover hover:text-sidebar-strong'
+              )}
+            >
+              <Icon className="h-[18px] w-[18px] shrink-0" />
+              <span className="flex-1">{label}</span>
+              {href === '/finance' && pendingPaymentCount > 0 && (
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white">
+                  {pendingPaymentCount}
+                </span>
+              )}
+            </Link>
+          ))}
+        </div>
       ))}
     </nav>
   )
 
   const switcher = workspaces.length > 0 ? (
-    <WorkspaceSwitcher workspaces={workspaces} currentId={currentWorkspaceId} onSwitched={() => setMobileOpen(false)} />
+    <WorkspaceSwitcher workspaces={workspaces} currentId={currentWorkspaceId} />
   ) : null
 
   const footer = (
-    <div className="border-t border-brand-200 p-4">
-      <div className="mb-3 flex items-center gap-3">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-400 text-xs font-bold text-white">
-          {user.email?.[0].toUpperCase()}
-        </div>
-        <p className="truncate text-xs text-gray-600">{user.email}</p>
+    <div className="flex items-center gap-1.5 border-t border-sidebar-border px-3 py-2.5">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-xs font-bold text-sidebar-active-fg" title={user.email ?? ''}>
+        {user.email?.[0].toUpperCase()}
       </div>
+      <p className="min-w-0 flex-1 truncate text-xs text-sidebar-muted">{user.email}</p>
+      <Link
+        href="/settings"
+        aria-label="Settings"
+        className={cn(
+          'rounded-md p-1.5 transition-colors',
+          isActive('/settings') ? 'bg-sidebar-active text-sidebar-active-fg' : 'text-sidebar-muted hover:bg-sidebar-hover hover:text-sidebar-strong'
+        )}
+      >
+        <Settings className="h-4 w-4" />
+      </Link>
+      <ThemeIconButton className="rounded-md p-1.5 text-sidebar-muted hover:bg-sidebar-hover hover:text-sidebar-strong" />
       <button
         onClick={handleSignOut}
-        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-600 hover:bg-brand-100 hover:text-gray-900"
+        aria-label="Sign out"
+        className="rounded-md p-1.5 text-sidebar-muted hover:bg-sidebar-hover hover:text-sidebar-strong"
       >
         <LogOut className="h-4 w-4" />
-        Sign out
       </button>
     </div>
   )
 
   const logo = (
-    <Link href="/shows" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5">
+    <Link href="/" className="flex items-center gap-2.5">
       <LogoImage />
-      <span className="font-bold text-gray-900">Tarana</span>
+      <span className="font-display text-lg font-bold text-sidebar-strong">Tarana</span>
     </Link>
   )
 
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden w-56 shrink-0 flex-col border-r border-brand-200 bg-brand-300 lg:flex">
-        <div className="flex items-center justify-between border-b border-brand-200 px-4 py-4">
+      <aside className="hidden w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar lg:flex">
+        <div className="flex items-center justify-between border-b border-sidebar-border px-4 py-2.5">
           {logo}
           <NotificationBell notifications={notifications} />
         </div>
         {switcher}
-        <div className="flex flex-1 flex-col overflow-y-auto px-3">
+        <div className="no-scrollbar flex flex-1 flex-col overflow-y-auto px-3">
           {nav}
         </div>
         {footer}
       </aside>
 
-      {/* Mobile top bar */}
-      <div className="fixed inset-x-0 top-0 z-40 flex items-center justify-between border-b border-brand-200 bg-brand-300 px-4 py-3 lg:hidden">
+      {/* Phone: slim top bar + bottom tabs (everything else lives under "More") */}
+      <div className="fixed inset-x-0 top-0 z-40 flex items-center justify-between border-b border-sidebar-border bg-sidebar px-4 py-2 lg:hidden">
         {logo}
-        <div className="flex items-center gap-1">
-          <NotificationBell notifications={notifications} />
-          <button onClick={() => setMobileOpen(v => !v)} className="rounded-md p-1.5 text-gray-600 hover:bg-brand-100">
-            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
-        </div>
+        <NotificationBell notifications={notifications} />
       </div>
-
-      {/* Mobile drawer */}
-      <div className={cn('fixed inset-0 z-30 lg:hidden', mobileOpen ? 'pointer-events-auto' : 'pointer-events-none')}>
-        <div
-          className={cn('absolute inset-0 bg-black/30 transition-opacity duration-300', mobileOpen ? 'opacity-100' : 'opacity-0')}
-          onClick={() => setMobileOpen(false)}
-        />
-        <aside className={cn(
-          'absolute left-0 top-0 flex h-full w-56 flex-col bg-brand-300 shadow-xl transition-transform duration-300 ease-in-out',
-          mobileOpen ? 'translate-x-0' : '-translate-x-full'
-        )}>
-          <div className="flex items-center border-b border-brand-200 px-4 py-4">
-            {logo}
-          </div>
-          {switcher}
-          <div className="flex flex-1 flex-col overflow-y-auto px-3">
-            {nav}
-          </div>
-          {footer}
-        </aside>
-      </div>
+      <MobileTabBar pendingPaymentCount={pendingPaymentCount} />
     </>
   )
 }

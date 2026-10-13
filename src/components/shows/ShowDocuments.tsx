@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { FileText, Upload, Trash2, Download } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { SectionLabel } from '@/components/ui/SectionLabel'
 import { useToast } from '@/components/ui/Toaster'
 import { createClient } from '@/lib/supabase/client'
 import { createShowDocument, deleteShowDocument } from '@/actions/show-documents'
@@ -81,8 +82,8 @@ export function ShowDocuments({ showId, userId, documents }: Props) {
   }
 
   return (
-    <section className="mb-5 rounded-xl border border-brand-200 bg-white p-5 shadow-sm">
-      <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">Quotation &amp; Invoice</h2>
+    <section className="rounded-2xl border border-brand-200 bg-white p-5 shadow-sm">
+      <SectionLabel className="mb-3">Quotation &amp; Invoice</SectionLabel>
 
       {documents.length === 0 ? (
         <p className="mb-4 text-sm text-gray-400">Nothing saved yet. Add the quotation or invoice you shared.</p>

@@ -1,15 +1,21 @@
 import Link from 'next/link'
 import { Plus, ListMusic } from 'lucide-react'
-import { getCachedSetlists, getCachedSetlistSongCounts, getCachedAllProfiles, getCachedUser } from '@/lib/data'
-import { SetlistSearchList } from '@/components/setlists/SetlistSearchList'
+import { createClient } from '@/lib/supabase/server'
+import { getCachedSetlists, getCachedSetlistSongCounts } from '@/lib/data'
+import { todayISO } from '@/lib/shows'
+import { SetlistsBrowser, type PreviewSong } from '@/components/setlists/SetlistsBrowser'
 import { Button } from '@/components/ui/Button'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { PageHeader } from '@/components/ui/PageHeader'
+
+const PREVIEW_SONGS = 5
 
 export default async function SetlistsPage() {
-  const [{ data: { user } }, setlists, counts, profiles] = await Promise.all([
-    getCachedUser(),
+  const supabase = await createClient()
+  const [setlists, counts, { data: songRows }] = await Promise.all([
     getCachedSetlists(),
     getCachedSetlistSongCounts(),
-    getCachedAllProfiles(),
+    supabase.from('setlist_songs').select('setlist_id, position, song:songs(id, title, artist, song_key)').order('position'),
   ])
 
   const countMap: Record<string, number> = {}
@@ -17,41 +23,42 @@ export default async function SetlistsPage() {
     countMap[setlist_id] = (countMap[setlist_id] ?? 0) + 1
   })
 
-  const profileMap: Record<string, string> = {}
-  for (const p of profiles) {
-    profileMap[p.id] = p.id === user?.id ? 'You' : (p.display_name ?? 'Band member')
+  const previews: Record<string, PreviewSong[]> = {}
+  for (const row of songRows ?? []) {
+    const song = row.song
+    if (!song) continue
+    const list = (previews[row.setlist_id] ??= [])
+    if (list.length < PREVIEW_SONGS) list.push({ id: song.id, title: song.title, artist: song.artist, key: song.song_key })
   }
-  if (user && !profileMap[user.id]) profileMap[user.id] = 'You'
+
+  const today = todayISO()
+  const upcomingCount = setlists.filter(s => s.show_date && s.show_date >= today).length
+
+  const newButton = (
+    <Button asChild>
+      <Link href="/setlists/new">
+        <Plus className="h-4 w-4" /> New setlist
+      </Link>
+    </Button>
+  )
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Setlists</h1>
-          <p className="mt-1 text-sm text-gray-500">{setlists.length} setlists</p>
-        </div>
-        <Button asChild>
-          <Link href="/setlists/new">
-            <Plus className="h-4 w-4" /> New Setlist
-          </Link>
-        </Button>
-      </div>
+      <PageHeader
+        title="Setlists"
+        subtitle={`${setlists.length} ${setlists.length === 1 ? 'setlist' : 'setlists'}${upcomingCount ? ` · ${upcomingCount} for upcoming shows` : ''}`}
+        action={newButton}
+      />
 
       {!setlists.length ? (
-        <div className="flex flex-col items-center gap-4 rounded-xl border-2 border-dashed border-gray-200 py-20 text-center">
-          <ListMusic className="h-12 w-12 text-gray-300" />
-          <div>
-            <p className="font-medium text-gray-500">No setlists yet</p>
-            <p className="text-sm text-gray-400">Create a setlist for your next show</p>
-          </div>
-          <Button asChild>
-            <Link href="/setlists/new">
-              <Plus className="h-4 w-4" /> Create a setlist
-            </Link>
-          </Button>
-        </div>
+        <EmptyState
+          icon={<ListMusic className="h-12 w-12" />}
+          title="No setlists yet"
+          description="Create a setlist for your next show"
+          action={newButton}
+        />
       ) : (
-        <SetlistSearchList setlists={setlists} countMap={countMap} profileMap={profileMap} />
+        <SetlistsBrowser setlists={setlists} countMap={countMap} previews={previews} today={today} />
       )}
     </div>
   )

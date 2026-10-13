@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
 import { Textarea } from '@/components/ui/Textarea'
+import { Chip } from '@/components/ui/Chip'
+import { SectionLabel } from '@/components/ui/SectionLabel'
 import { cn } from '@/lib/utils'
 import { VisibilitySelect } from '@/components/calendar/VisibilitySelect'
 import { asVisibility, type Visibility } from '@/lib/visibility'
@@ -56,15 +58,19 @@ function Toggle({ label, active, onClick }: { label: string; active: boolean; on
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={active}
       className={cn(
-        'rounded-md px-3 py-2 text-sm font-semibold transition-colors',
-        active ? 'bg-brand-400 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+        'rounded-lg px-4 py-2 text-sm font-bold transition-colors',
+        active ? 'bg-brand-400 text-white' : 'bg-brand-100 text-gray-700 hover:bg-brand-200'
       )}
     >
       {label}
     </button>
   )
 }
+
+const card = 'scroll-mt-4 space-y-4 rounded-2xl border border-brand-200 bg-white p-5 shadow-sm'
+const selectClass = 'mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm transition-colors focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400'
 
 export function ShowForm({ show, eventManagementCompanies = [], onSubmit, initialDate }: ShowFormProps) {
   const [fields, setFields] = useState(() => fieldsFrom(show, initialDate))
@@ -129,16 +135,30 @@ export function ShowForm({ show, eventManagementCompanies = [], onSubmit, initia
     })
   }
 
+  const sections = [
+    { id: 'gig', label: 'The gig' },
+    { id: 'booking', label: 'Booking & contact' },
+    ...(showFinance ? [{ id: 'money', label: 'Money & TDS' }] : []),
+    { id: 'notes', label: 'Notes & media' },
+  ]
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Basics */}
-      <div className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <nav aria-label="Form sections" className="flex gap-2 overflow-x-auto pb-1">
+        {sections.map(sec => (
+          <a key={sec.id} href={`#show-${sec.id}`} className="shrink-0 rounded-full bg-brand-100 px-3.5 py-1.5 text-xs font-bold text-gray-700 hover:bg-brand-200">{sec.label}</a>
+        ))}
+      </nav>
+
+      {/* The gig */}
+      <section id="show-gig" className={card}>
+        <SectionLabel>The gig</SectionLabel>
         <div>
           <Label htmlFor="title">Show Title *</Label>
           <Input id="title" className="mt-1" placeholder="Babai Tiffins HSR" value={fields.title}
             onChange={e => set('title', e.target.value)} />
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <Label htmlFor="show_date">Show Date</Label>
             <Input id="show_date" type="date" className="mt-1" value={fields.show_date}
@@ -151,49 +171,39 @@ export function ShowForm({ show, eventManagementCompanies = [], onSubmit, initia
           </div>
         </div>
         <div>
-          <Label htmlFor="format">Format</Label>
-          <select
-            id="format"
-            className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm transition-colors focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
-            value={fields.format}
-            onChange={e => set('format', e.target.value)}
-          >
-            <option value="">—</option>
-            {SHOW_FORMATS.map(f => <option key={f} value={f}>{f}</option>)}
-          </select>
+          <Label>Format</Label>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {SHOW_FORMATS.map(f => (
+              <Chip key={f} active={fields.format === f} onClick={() => set('format', fields.format === f ? '' : f)}>{f}</Chip>
+            ))}
+          </div>
         </div>
-      </div>
+        <div>
+          <Label>Status</Label>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {BOOKING_STATUSES.map(st => (
+              <Chip key={st} active={fields.booking_status === st} onClick={() => set('booking_status', fields.booking_status === st ? '' : st)}>{st}</Chip>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* Booking */}
-      <div className="space-y-4 rounded-lg border border-brand-200 bg-brand-50 p-4">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500">Booking</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="booking_status">Status</Label>
-            <select
-              id="booking_status"
-              className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm transition-colors focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
-              value={fields.booking_status}
-              onChange={e => set('booking_status', e.target.value)}
-            >
-              <option value="">—</option>
-              {BOOKING_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div>
-            <Label htmlFor="event_management_id">Booked through</Label>
-            <select
-              id="event_management_id"
-              className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm transition-colors focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
-              value={fields.event_management_id}
-              onChange={e => pickCompany(e.target.value)}
-            >
-              <option value={DIRECT_BOOKING}>Direct booking</option>
-              {eventManagementCompanies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
+      <section id="show-booking" className={card}>
+        <SectionLabel>Booking &amp; contact</SectionLabel>
+        <div>
+          <Label htmlFor="event_management_id">Booked through</Label>
+          <select
+            id="event_management_id"
+            className={selectClass}
+            value={fields.event_management_id}
+            onChange={e => pickCompany(e.target.value)}
+          >
+            <option value={DIRECT_BOOKING}>Direct booking</option>
+            {eventManagementCompanies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
         </div>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
             <Label htmlFor="poc_name">POC name</Label>
             <Input id="poc_name" placeholder="Optional" className="mt-1" value={fields.poc_name}
@@ -210,102 +220,108 @@ export function ShowForm({ show, eventManagementCompanies = [], onSubmit, initia
               onChange={e => set('poc_email', e.target.value)} />
           </div>
         </div>
-      </div>
+      </section>
 
-      {showFinance && (<>
-      {/* Fee & payment */}
-      <div className="space-y-3 rounded-lg border border-brand-200 bg-brand-50 p-4">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500">Fee &amp; Payment</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="fee">{fields.tds_applicable ? 'Amount received (₹)' : 'Quoted fee (₹)'}</Label>
-            <Input id="fee" type="number" min="0" step="any" placeholder="0" className="mt-1" value={fields.fee}
-              onChange={e => set('fee', e.target.value)} />
-            {fields.tds_applicable && (
-              <p className="mt-1 text-xs text-gray-500">What actually hit the account, after TDS was withheld.</p>
-            )}
-          </div>
-          <div>
-            <Label htmlFor="payment_reference">Payment / invoice ref</Label>
-            <Input id="payment_reference" placeholder="Optional" className="mt-1" value={fields.payment_reference}
-              onChange={e => set('payment_reference', e.target.value)} />
-          </div>
-        </div>
-        <div>
-          <Label>Payment received?</Label>
-          <div className="mt-1 flex gap-2">
-            <Toggle label="Not yet" active={!fields.fee_received} onClick={() => set('fee_received', false)} />
-            <Toggle label="Received" active={fields.fee_received} onClick={() => set('fee_received', true)} />
-          </div>
-        </div>
-      </div>
-
-      {/* TDS */}
-      <div className="space-y-3 rounded-lg border border-brand-200 bg-brand-50 p-4">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500">TDS</h3>
-        <div>
-          <Label>Is TDS applicable for this show?</Label>
-          <div className="mt-1 flex gap-2">
-            <Toggle label="No" active={!fields.tds_applicable} onClick={() => set('tds_applicable', false)} />
-            <Toggle label="Yes" active={fields.tds_applicable} onClick={() => set('tds_applicable', true)} />
-          </div>
-        </div>
-        {fields.tds_applicable && (
-          <>
+      {showFinance && (
+        <div id="show-money" className="scroll-mt-4 space-y-4">
+          {/* Fee & payment */}
+          <section className={card}>
+            <SectionLabel>Fee &amp; Payment</SectionLabel>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="fee">{fields.tds_applicable ? 'Amount received (₹)' : 'Quoted fee (₹)'}</Label>
+                <Input id="fee" type="number" min="0" step="any" placeholder="0" className="mt-1" value={fields.fee}
+                  onChange={e => set('fee', e.target.value)} />
+                {fields.tds_applicable && (
+                  <p className="mt-1 text-xs text-gray-500">What actually hit the account, after TDS was withheld.</p>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="payment_reference">Payment / invoice ref</Label>
+                <Input id="payment_reference" placeholder="Optional" className="mt-1" value={fields.payment_reference}
+                  onChange={e => set('payment_reference', e.target.value)} />
+              </div>
+            </div>
             <div>
-              <Label htmlFor="tds_percentage">TDS rate (%)</Label>
-              <Input id="tds_percentage" type="number" min="0" max="100" step="any" placeholder="10" className="mt-1" value={fields.tds_percentage}
-                onChange={e => set('tds_percentage', e.target.value)} />
-            </div>
-            {tdsAmount > 0 && (
-              <div className="rounded-md bg-white px-3 py-2 text-xs text-gray-600">
-                {fmt(feeNum)} received is the other {(100 - tdsPercentageNum).toFixed(tdsPercentageNum % 1 ? 1 : 0)}% —
-                that puts the gross fee at <span className="font-semibold text-gray-800">{fmt(grossFee)}</span>, with{' '}
-                <span className="font-semibold text-gray-800">{fmt(tdsAmount)}</span> in TDS still to claim via the certificate.
+              <Label>Payment received?</Label>
+              <div className="mt-2 flex gap-2">
+                <Toggle label="Not yet" active={!fields.fee_received} onClick={() => set('fee_received', false)} />
+                <Toggle label="Received" active={fields.fee_received} onClick={() => set('fee_received', true)} />
               </div>
+            </div>
+          </section>
+
+          {/* TDS */}
+          <section className={card}>
+            <SectionLabel>TDS</SectionLabel>
+            <div>
+              <Label>Is TDS applicable for this show?</Label>
+              <div className="mt-2 flex gap-2">
+                <Toggle label="No" active={!fields.tds_applicable} onClick={() => set('tds_applicable', false)} />
+                <Toggle label="Yes" active={fields.tds_applicable} onClick={() => set('tds_applicable', true)} />
+              </div>
+            </div>
+            {fields.tds_applicable && (
+              <>
+                <div>
+                  <Label htmlFor="tds_percentage">TDS rate (%)</Label>
+                  <Input id="tds_percentage" type="number" min="0" max="100" step="any" placeholder="10" className="mt-1" value={fields.tds_percentage}
+                    onChange={e => set('tds_percentage', e.target.value)} />
+                </div>
+                {tdsAmount > 0 && (
+                  <div className="rounded-xl bg-brand-50 px-3 py-2.5 text-xs text-gray-600">
+                    {fmt(feeNum)} received is the other {(100 - tdsPercentageNum).toFixed(tdsPercentageNum % 1 ? 1 : 0)}% —
+                    that puts the gross fee at <span className="font-semibold text-gray-900">{fmt(grossFee)}</span>, with{' '}
+                    <span className="font-semibold text-gray-900">{fmt(tdsAmount)}</span> in TDS still to claim via the certificate.
+                  </div>
+                )}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <Label>Filed / deposited?</Label>
+                    <div className="mt-2 flex gap-2">
+                      <Toggle label="Not yet" active={!fields.tds_filed} onClick={() => set('tds_filed', false)} />
+                      <Toggle label="Filed" active={fields.tds_filed} onClick={() => set('tds_filed', true)} />
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Certificate received?</Label>
+                    <div className="mt-2 flex gap-2">
+                      <Toggle label="Not yet" active={!fields.tds_certificate_received} onClick={() => set('tds_certificate_received', false)} />
+                      <Toggle label="Received" active={fields.tds_certificate_received} onClick={() => set('tds_certificate_received', true)} />
+                    </div>
+                  </div>
+                </div>
+              </>
             )}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Filed / deposited?</Label>
-                <div className="mt-1 flex gap-2">
-                  <Toggle label="Not yet" active={!fields.tds_filed} onClick={() => set('tds_filed', false)} />
-                  <Toggle label="Filed" active={fields.tds_filed} onClick={() => set('tds_filed', true)} />
-                </div>
-              </div>
-              <div>
-                <Label>Certificate received?</Label>
-                <div className="mt-1 flex gap-2">
-                  <Toggle label="Not yet" active={!fields.tds_certificate_received} onClick={() => set('tds_certificate_received', false)} />
-                  <Toggle label="Received" active={fields.tds_certificate_received} onClick={() => set('tds_certificate_received', true)} />
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-      </>)}
+          </section>
+        </div>
+      )}
 
-      {/* Media */}
-      <div>
-        <Label htmlFor="media_url">Media link</Label>
-        <Input id="media_url" type="url" placeholder="https://mega.nz/folder/..." className="mt-1" value={fields.media_url}
-          onChange={e => set('media_url', e.target.value)} />
-      </div>
+      {/* Notes & media */}
+      <section id="show-notes" className={card}>
+        <SectionLabel>Notes &amp; media</SectionLabel>
+        <div>
+          <Label htmlFor="media_url">Media link</Label>
+          <Input id="media_url" type="url" placeholder="https://mega.nz/folder/..." className="mt-1" value={fields.media_url}
+            onChange={e => set('media_url', e.target.value)} />
+        </div>
+        <div>
+          <Label htmlFor="notes">Notes</Label>
+          <Textarea id="notes" rows={3} placeholder="Anything else about this show..." className="mt-1" value={fields.notes}
+            onChange={e => set('notes', e.target.value)} />
+        </div>
+        <VisibilitySelect id="visibility" value={fields.visibility} onChange={v => set('visibility', v)} />
+      </section>
 
-      {/* Notes */}
-      <div>
-        <Label htmlFor="notes">Notes</Label>
-        <Textarea id="notes" rows={3} placeholder="Anything else about this show..." className="mt-1" value={fields.notes}
-          onChange={e => set('notes', e.target.value)} />
-      </div>
-
-      <VisibilitySelect id="visibility" value={fields.visibility} onChange={v => set('visibility', v)} />
-
-      {error && <p className="text-sm text-red-600">{error}</p>}
-
-      <div className="flex justify-end gap-3 pt-1">
-        <Button type="button" variant="secondary" onClick={() => history.back()}>Cancel</Button>
-        <Button type="submit" loading={isPending} disabled={!canSubmit}>{show ? 'Save changes' : 'Create show'}</Button>
+      {/* Sticky save bar — sits above the phone tab bar */}
+      <div className="sticky bottom-[4.5rem] z-10 -mx-4 flex items-center justify-between gap-3 border-t border-brand-200 bg-brand-50/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:bottom-0 lg:px-8">
+        <p className="min-w-0 truncate text-sm text-gray-500">
+          {error ? <span className="text-red-600">{error}</span> : showFinance ? 'Changes are saved when you press the button.' : 'Money and TDS appear once a quote is out.'}
+        </p>
+        <div className="flex shrink-0 gap-2">
+          <Button type="button" variant="secondary" onClick={() => history.back()}>Cancel</Button>
+          <Button type="submit" loading={isPending} disabled={!canSubmit}>{show ? 'Save changes' : 'Create show'}</Button>
+        </div>
       </div>
     </form>
   )

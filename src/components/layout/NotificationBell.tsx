@@ -76,7 +76,7 @@ export function NotificationBell({ notifications }: Props) {
         ref={buttonRef}
         onClick={handleToggle}
         aria-label="Notifications"
-        className="relative rounded-md p-1.5 text-gray-600 hover:bg-brand-100"
+        className="relative rounded-md p-1.5 text-sidebar-fg hover:bg-sidebar-hover"
       >
         <Bell className="h-5 w-5" />
         {unreadCount > 0 && (

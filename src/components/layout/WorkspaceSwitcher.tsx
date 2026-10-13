@@ -49,11 +49,11 @@ export function WorkspaceSwitcher({ workspaces, currentId, onSwitched }: Props) 
         aria-haspopup="listbox"
         aria-expanded={open}
         disabled={pending}
-        className="flex w-full items-center gap-2 rounded-lg bg-brand-200/70 px-3 py-2 text-left text-sm font-medium text-gray-900 hover:bg-brand-200 disabled:opacity-60"
+        className="flex w-full items-center gap-2 rounded-lg bg-sidebar-hover px-3 py-2 text-left text-sm font-medium text-sidebar-strong hover:bg-sidebar-border disabled:opacity-60"
       >
         {current.type === 'personal' ? <UserIcon className="h-4 w-4 shrink-0" /> : <Users className="h-4 w-4 shrink-0" />}
         <span className="flex-1 truncate">{labelFor(current)}</span>
-        <ChevronsUpDown className="h-4 w-4 shrink-0 text-gray-500" />
+        <ChevronsUpDown className="h-4 w-4 shrink-0 text-sidebar-muted" />
       </button>
       {open && (
         <>

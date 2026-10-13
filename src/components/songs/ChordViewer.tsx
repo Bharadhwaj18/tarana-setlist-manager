@@ -5,9 +5,9 @@ import { ChevronUp, ChevronDown, Save, MonitorPlay, Play, Pause, Minus, Plus } f
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { parseSong } from '@/lib/chords/parser'
-import { formatSong, formatSongAsChordPro, getCss } from '@/lib/chords/formatter'
+import { formatSong, formatSongAsChordPro } from '@/lib/chords/formatter'
 import { transposeSong, transposeKey } from '@/lib/chords/transposer'
-import { getLightChordSheetCss } from '@/lib/chords/theme'
+import { ensureChordSheetCss } from './chordSheetStyles'
 import { saveTranspose } from '@/actions/songs'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toaster'
@@ -24,7 +24,9 @@ const SCROLL_PERCENT_MIN = 20
 const SCROLL_PERCENT_MAX = 200
 const SCROLL_PERCENT_STEP = 10
 
-const CHORD_VIEWER_CSS_ID = 'chord-viewer-css'
+const TEXT_SIZE_MIN = 11
+const TEXT_SIZE_MAX = 26
+const TEXT_SIZE_DEFAULT = 14
 
 interface ChordViewerProps {
   chordChart: string
@@ -43,6 +45,7 @@ export function ChordViewer({
   const [song, setSong] = useState<Song>(() => parseSong(chordChart))
   const [semitones, setSemitones] = useState(0)
   const [performMode, setPerformMode] = useState(false)
+  const [textSize, setTextSize] = useState(TEXT_SIZE_DEFAULT)
   const [isSaving, startSave] = useTransition()
   const internalRef = useRef<HTMLDivElement>(null)
   // Dedicated, self-contained scroll container — same technique as
@@ -68,13 +71,8 @@ export function ChordViewer({
   }
 
   useEffect(() => {
-    // Injected once per page (shared by every ChordViewer instance) — check
-    // the DOM directly rather than tracking it as component state.
-    if (document.getElementById(CHORD_VIEWER_CSS_ID)) return
-    const style = document.createElement('style')
-    style.id = CHORD_VIEWER_CSS_ID
-    style.textContent = getCss() + '\n' + getLightChordSheetCss()
-    document.head.appendChild(style)
+    // Injected once per page (shared by every ChordViewer instance and the editor preview).
+    ensureChordSheetCss()
   }, [])
 
   const transpose = (delta: number) => {
@@ -102,10 +100,10 @@ export function ChordViewer({
 
   if (!chordChart) {
     return (
-      <div className="rounded-lg border border-dashed border-gray-300 p-10 text-center text-sm text-gray-400">
+      <div className="rounded-2xl border-2 border-dashed border-brand-200 p-10 text-center text-sm text-gray-500">
         No chord chart added yet.{' '}
         {songId ? (
-          <Link href={`/songs/${songId}/edit`} className="font-medium text-brand-500 underline underline-offset-2 hover:text-brand-600">
+          <Link href={`/songs/${songId}/edit`} className="font-semibold text-brand-600 underline underline-offset-2 hover:text-brand-700">
             Edit song to add chords
           </Link>
         ) : (
@@ -119,13 +117,13 @@ export function ChordViewer({
     <>
       <div className="space-y-4">
         {/* Transpose + Perform controls */}
-        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-brand-200 bg-brand-50 px-4 py-2.5">
-          <span className="text-sm font-medium text-gray-600">Transpose</span>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-brand-200 bg-gray-50 px-4 py-2.5">
+          <span className="text-xs font-extrabold uppercase tracking-[0.1em] text-gray-500">Transpose</span>
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="sm" onClick={() => transpose(-1)} className="h-7 w-7 p-0">
               <ChevronDown className="h-4 w-4" />
             </Button>
-            <span className="w-16 text-center text-sm font-mono font-semibold text-brand-500">
+            <span className="w-16 text-center text-sm font-mono font-semibold text-brand-600">
               {semitones > 0 ? `+${semitones}` : semitones === 0 ? 'Original' : semitones}
             </span>
             <Button variant="ghost" size="sm" onClick={() => transpose(1)} className="h-7 w-7 p-0">
@@ -152,15 +150,17 @@ export function ChordViewer({
             </>
           )}
 
+          {/* Text size */}
+          <div className="ml-auto flex items-center gap-1 text-gray-500">
+            <span className="hidden text-xs font-bold sm:inline">Text</span>
+            <Button variant="ghost" size="sm" aria-label="Smaller text" onClick={() => setTextSize(s => Math.max(TEXT_SIZE_MIN, s - 1))} className="h-7 px-2 text-xs font-extrabold">A−</Button>
+            <Button variant="ghost" size="sm" aria-label="Larger text" onClick={() => setTextSize(s => Math.min(TEXT_SIZE_MAX, s + 1))} className="h-7 px-2 text-xs font-extrabold">A+</Button>
+          </div>
+
           {/* Perform button */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setPerformMode(true)}
-            className="ml-auto text-brand-600 hover:text-brand-700"
-          >
+          <Button size="sm" onClick={() => setPerformMode(true)}>
             <MonitorPlay className="h-4 w-4" />
-            <span className="hidden sm:inline">Perform</span>
+            Perform mode
           </Button>
         </div>
 
@@ -171,10 +171,11 @@ export function ChordViewer({
           app shell doesn't guarantee that). Same idea as PerformanceMode's
           own scrollRef container.
         */}
-        <div ref={scrollRef} className="max-h-[70vh] overflow-y-auto rounded-lg ring-1 ring-gray-100">
+        <div ref={scrollRef} className="max-h-[70vh] overflow-y-auto rounded-2xl border border-brand-200 bg-white">
           <div
             ref={printRef ?? internalRef}
-            className="bg-white p-6"
+            className="chord-view p-5 sm:p-6"
+            style={{ '--chord-size': `${textSize}px` } as React.CSSProperties}
             dangerouslySetInnerHTML={{ __html: html }}
           />
         </div>
@@ -187,7 +188,7 @@ export function ChordViewer({
         than behind the desktop sidebar; it sits below Perform mode's
         overlay (z-[200]) so it's hidden automatically while that's open.
       */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-4 z-30 flex justify-center px-4 lg:left-56">
+      <div className="pointer-events-none fixed inset-x-0 bottom-24 z-30 flex justify-center px-4 lg:bottom-4 lg:left-60">
         <div className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-gray-800 bg-gray-900/95 px-2 py-1.5 text-white shadow-lg backdrop-blur-sm">
           <Button
             variant="ghost"

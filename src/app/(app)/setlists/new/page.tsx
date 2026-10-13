@@ -33,7 +33,7 @@ export default async function NewSetlistPage({ searchParams }: Props) {
         <Link href="/setlists" className="mb-6 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
           <ChevronLeft className="h-4 w-4" /> Setlists
         </Link>
-        <h1 className="mb-1 text-2xl font-bold text-gray-900">New Setlist</h1>
+        <h1 className="mb-1 text-3xl font-bold text-gray-900">New setlist</h1>
         <p className="mb-7 text-sm text-gray-500">
           {upcoming.length > 0 ? 'Pick an upcoming show to create its setlist immediately, or start blank.' : 'Give your setlist a title to get started.'}
         </p>
@@ -44,7 +44,7 @@ export default async function NewSetlistPage({ searchParams }: Props) {
               <form key={s.id} action={createSetlistFromShow.bind(null, s.id)}>
                 <button
                   type="submit"
-                  className="flex w-full items-center justify-between rounded-lg border border-brand-200 bg-white px-4 py-3 text-left shadow-sm transition-colors hover:border-brand-400 hover:bg-brand-50"
+                  className="flex w-full items-center justify-between rounded-2xl border border-brand-200 bg-white px-4 py-3.5 text-left shadow-sm transition-colors hover:border-brand-400"
                 >
                   <div>
                     <p className="font-medium text-gray-900">{s.title}</p>
@@ -62,7 +62,7 @@ export default async function NewSetlistPage({ searchParams }: Props) {
 
         <Link
           href="/setlists/new?blank=1"
-          className="flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-4 py-3 text-sm font-medium text-gray-500 transition-colors hover:border-gray-400 hover:text-gray-700"
+          className="flex items-center justify-center gap-1.5 rounded-2xl border border-dashed border-gray-300 px-4 py-3.5 text-sm font-medium text-gray-500 transition-colors hover:border-gray-400 hover:text-gray-700"
         >
           <Plus className="h-4 w-4" /> New Setlist (start blank)
         </Link>
@@ -75,7 +75,7 @@ export default async function NewSetlistPage({ searchParams }: Props) {
       <Link href={show ? `/shows/${show.id}` : '/setlists'} className="mb-6 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
         <ChevronLeft className="h-4 w-4" /> {show ? show.title : 'Setlists'}
       </Link>
-      <h1 className="mb-1 text-2xl font-bold text-gray-900">New Setlist</h1>
+      <h1 className="mb-1 text-3xl font-bold text-gray-900">New setlist</h1>
       {show && <p className="mb-7 text-sm text-gray-500">For the show &ldquo;{show.title}&rdquo;</p>}
       {!show && <div className="mb-7" />}
       <SetlistForm onSubmit={createSetlist} linkedShow={show ? { id: show.id, title: show.title, show_date: show.show_date, venue: show.venue } : undefined} />

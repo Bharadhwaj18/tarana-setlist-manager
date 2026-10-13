@@ -1,23 +1,260 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Tarana "Forest" design tokens.
+ * Light values live in @theme (they generate the utilities). The dark theme redefines
+ * the SAME variables under .dark, so every existing bg-white / text-gray-* / bg-brand-*
+ * class flips automatically — no per-component dark: variants needed.
+ * In dark mode "white" means the card surface, and text-white on a primary button ends up
+ * as near-black on sage, which is what we want.
+ */
 @theme {
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-manrope), system-ui, sans-serif;
+  --font-display: var(--font-fraunces), Georgia, serif;
   --font-mono: var(--font-geist-mono);
 
-  /* Tarana brand palette */
-  --color-brand-50:  #fefae0;   /* cream — page background */
-  --color-brand-100: #e9edc9;   /* moss — selected states, light surfaces */
-  --color-brand-200: #ccd5ae;   /* sage — borders, section labels */
-  --color-brand-300: #faedcd;   /* peach — sidebar, warm surfaces */
-  --color-brand-400: #d4a373;   /* tan — primary action */
-  --color-brand-500: #c08d62;   /* darker tan — hover */
-  --color-brand-600: #a87a52;   /* deep tan — active */
-  --color-brand-700: #7a5436;   /* dark brown — text on light */
+  /* Brand — forest green */
+  --color-brand-50:  #f3f4f0;   /* page ground */
+  --color-brand-100: #e6ebe4;   /* hover / selected surface */
+  --color-brand-200: #dde1d8;   /* borders */
+  --color-brand-300: #b4c4b9;   /* muted icons, strong borders */
+  --color-brand-400: #1f5a43;   /* primary action */
+  --color-brand-500: #184a37;   /* primary hover */
+  --color-brand-600: #14392b;   /* primary active, links */
+  --color-brand-700: #14392b;   /* emphasised text */
+  --color-brand-800: #0e2a20;
+
+  /* Neutrals with a whisper of green */
+  --color-gray-50:  #f6f7f4;
+  --color-gray-100: #eceee9;
+  --color-gray-200: #dde1d8;
+  --color-gray-300: #c6cdc3;
+  --color-gray-400: #8a968f;
+  --color-gray-500: #5e6b63;
+  --color-gray-600: #4a574f;
+  --color-gray-700: #34443b;
+  --color-gray-800: #223028;
+  --color-gray-900: #16241d;
+  --color-gray-950: #0d1712;
+
+  /* Sidebar */
+  --color-sidebar: #14392b;
+  --color-sidebar-hover: #1c4a39;
+  --color-sidebar-border: #2d5d4b;
+  --color-sidebar-fg: #dde8e1;
+  --color-sidebar-muted: #7fa08f;
+  --color-sidebar-active: #f3f4f0;
+  --color-sidebar-active-fg: #14392b;
+  --color-sidebar-accent: #a9cdb8;
+  --color-sidebar-strong: #ffffff;
+
+  /* Feature card (e.g. next show on Today) */
+  --color-hero: #14392b;
+  --color-hero-hover: #1c4a39;
+  --color-hero-line: #2d5d4b;
+  --color-hero-fg: #ffffff;
+  --color-hero-muted: #a9c2b5;
+}
+
+:root { color-scheme: light; }
+
+.dark {
+  color-scheme: dark;
+  --color-white: #1a201d;       /* card / surface */
+
+  --color-brand-50:  #131715;
+  --color-brand-100: #1d2722;
+  --color-brand-200: #28302c;
+  --color-brand-300: #3a4741;
+  --color-brand-400: #a9cdb8;
+  --color-brand-500: #bcd9c8;
+  --color-brand-600: #cbe3d5;
+  --color-brand-700: #a9cdb8;
+  --color-brand-800: #d6eadf;
+
+  --color-gray-50:  #1a201d;
+  --color-gray-100: #1f2723;
+  --color-gray-200: #2a332f;
+  --color-gray-300: #3a4741;
+  --color-gray-400: #6f857a;
+  --color-gray-500: #94a39a;
+  --color-gray-600: #aebdb4;
+  --color-gray-700: #c3d2c9;
+  --color-gray-800: #dce7e0;
+  --color-gray-900: #f0f4f1;
+  --color-gray-950: #ffffff;
+
+  --color-sidebar: #0e1210;
+  --color-sidebar-hover: #1d2722;
+  --color-sidebar-border: #222a26;
+  --color-sidebar-fg: #c3d2c9;
+  --color-sidebar-muted: #6f857a;
+  --color-sidebar-active: #a9cdb8;
+  --color-sidebar-active-fg: #131715;
+  --color-sidebar-accent: #a9cdb8;
+  --color-sidebar-strong: #f0f4f1;
+
+  --color-hero: #1b4535;
+  --color-hero-hover: #2a5c48;
+  --color-hero-line: #2f6150;
+
+  /* red */
+  --color-red-50: #2f2421;
+  --color-red-100: #3e2624;
+  --color-red-200: #5a2b29;
+  --color-red-300: #f16060;
+  --color-red-400: #f37373;
+  --color-red-500: #f47c7c;
+  --color-red-600: #f58b8b;
+  --color-red-700: #f7a2a2;
+  --color-red-800: #f9b4b4;
+  --color-red-900: #fac7c7;
+  /* orange */
+  --color-orange-50: #30281c;
+  --color-orange-100: #402e1c;
+  --color-orange-200: #5d391b;
+  --color-orange-300: #fa8839;
+  --color-orange-400: #fb9650;
+  --color-orange-500: #fb9d5c;
+  --color-orange-600: #fba86f;
+  --color-orange-700: #fcb98b;
+  --color-orange-800: #fdc7a2;
+  --color-orange-900: #fdd5b9;
+  /* amber */
+  --color-amber-50: #302d1b;
+  --color-amber-100: #3f351a;
+  --color-amber-200: #5c4618;
+  --color-amber-300: #f7ad30;
+  --color-amber-400: #f8b648;
+  --color-amber-500: #f8bb54;
+  --color-amber-600: #f9c368;
+  --color-amber-700: #facf85;
+  --color-amber-800: #fbd89d;
+  --color-amber-900: #fce2b6;
+  /* yellow */
+  --color-yellow-50: #2f2f1b;
+  --color-yellow-100: #3d3919;
+  --color-yellow-200: #584c17;
+  --color-yellow-300: #edbe2d;
+  --color-yellow-400: #efc646;
+  --color-yellow-500: #f0ca52;
+  --color-yellow-600: #f2d066;
+  --color-yellow-700: #f5d984;
+  --color-yellow-800: #f7e19c;
+  --color-yellow-900: #f9e8b5;
+  /* green */
+  --color-green-50: #1b3124;
+  --color-green-100: #1b3c28;
+  --color-green-200: #1c5231;
+  --color-green-300: #43ce76;
+  --color-green-400: #59d486;
+  --color-green-500: #64d68e;
+  --color-green-600: #76db9b;
+  --color-green-700: #91e2af;
+  --color-green-800: #a7e8bf;
+  --color-green-900: #bdeecf;
+  /* emerald */
+  --color-emerald-50: #192f27;
+  --color-emerald-100: #183a2e;
+  --color-emerald-200: #174e3b;
+  --color-emerald-300: #34c494;
+  --color-emerald-400: #4ccba1;
+  --color-emerald-500: #58cea7;
+  --color-emerald-600: #6bd4b1;
+  --color-emerald-700: #88dcc0;
+  --color-emerald-800: #9fe3cd;
+  --color-emerald-900: #b7ead9;
+  /* teal */
+  --color-teal-50: #192f2b;
+  --color-teal-100: #193a34;
+  --color-teal-200: #184e46;
+  --color-teal-300: #37c3b3;
+  --color-teal-400: #4fcabc;
+  --color-teal-500: #5bcdc1;
+  --color-teal-600: #6dd3c8;
+  --color-teal-700: #8adcd3;
+  --color-teal-800: #a1e3db;
+  --color-teal-900: #b9eae4;
+  /* sky */
+  --color-sky-50: #192d31;
+  --color-sky-100: #183740;
+  --color-sky-200: #16485a;
+  --color-sky-300: #32b3ec;
+  --color-sky-400: #4abcef;
+  --color-sky-500: #56c0f0;
+  --color-sky-600: #6ac7f1;
+  --color-sky-700: #87d2f4;
+  --color-sky-800: #9fdbf6;
+  --color-sky-900: #b7e4f8;
+  /* blue */
+  --color-blue-50: #1d2a33;
+  --color-blue-100: #203142;
+  --color-blue-200: #243d5e;
+  --color-blue-300: #5895f7;
+  --color-blue-400: #6ca1f8;
+  --color-blue-500: #76a8f9;
+  --color-blue-600: #85b2f9;
+  --color-blue-700: #9dc1fb;
+  --color-blue-800: #b1cdfb;
+  --color-blue-900: #c4dafc;
+  /* indigo */
+  --color-indigo-50: #212732;
+  --color-indigo-100: #262c41;
+  --color-indigo-200: #30355d;
+  --color-indigo-300: #7a7df3;
+  --color-indigo-400: #8a8cf5;
+  --color-indigo-500: #9294f5;
+  --color-indigo-600: #9ea0f6;
+  --color-indigo-700: #b1b3f8;
+  --color-indigo-800: #c1c2f9;
+  --color-indigo-900: #d0d1fb;
+  /* violet */
+  --color-violet-50: #252633;
+  --color-violet-100: #2d2a42;
+  --color-violet-200: #3c325e;
+  --color-violet-300: #9c74f7;
+  --color-violet-400: #a885f8;
+  --color-violet-500: #ae8df9;
+  --color-violet-600: #b79af9;
+  --color-violet-700: #c5aefb;
+  --color-violet-800: #d1befb;
+  --color-violet-900: #dccefc;
+  /* pink */
+  --color-pink-50: #2f2429;
+  --color-pink-100: #3e2732;
+  --color-pink-200: #592c42;
+  --color-pink-300: #ef63a8;
+  --color-pink-400: #f176b3;
+  --color-pink-500: #f27fb8;
+  --color-pink-600: #f38ec0;
+  --color-pink-700: #f6a4cc;
+  --color-pink-800: #f7b6d6;
+  --color-pink-900: #f9c8e0;
 }
 
 body {
-  background-color: #fefae0;
-  color: #1a1a1a;
+  background-color: var(--color-brand-50);
+  color: var(--color-gray-900);
+  font-family: var(--font-sans);
+}
+
+/* Scrolls when it has to, but without a visible bar */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+h1, h2 {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* iOS Safari auto-zooms the whole page when focusing any input/select/

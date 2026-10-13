@@ -2,9 +2,16 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Search, CalendarDays, MapPin, CheckCircle2, Circle, Sparkles, Building2 } from 'lucide-react'
+import { Search, CalendarDays, Plus } from 'lucide-react'
 import { isUpcoming } from '@/lib/shows'
 import { countdownLabel } from '@/lib/dates'
+import { SegmentedTabs } from '@/components/ui/Chip'
+import { SectionLabel } from '@/components/ui/SectionLabel'
+import { StatusPill, type PillTone } from '@/components/ui/StatusPill'
+import { DateTile } from '@/components/ui/DateTile'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { Button } from '@/components/ui/Button'
+import { BarList, ShowsDashboard, type ShowsInsights } from './ShowsDashboard'
 import type { Show } from '@/types'
 
 interface ShowSearchListProps {
@@ -15,140 +22,209 @@ interface ShowSearchListProps {
    *  decided consistently rather than by the viewer's own clock. */
   today: string
   eventManagementById: Record<string, { id: string; name: string }>
+  insights: ShowsInsights
 }
+
+type Tab = 'upcoming' | 'played' | 'insights'
+
+const BOOKED = ['Confirmed', 'Advance Received', 'Completed']
+const statusTone = (status: string): PillTone => (BOOKED.includes(status) ? 'green' : 'amber')
 
 function fmt(n: number) {
   return `₹${Math.abs(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
 }
 
-function ShowCard({ s, net, setlist, today, badge, agency }: {
+const monthLabel = (d: string) =>
+  new Intl.DateTimeFormat('en-IN', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(d + 'T00:00:00Z'))
+
+function groupBy<T>(items: T[], key: (item: T) => string) {
+  const groups: { key: string; items: T[] }[] = []
+  for (const item of items) {
+    const k = key(item)
+    const last = groups[groups.length - 1]
+    if (last && last.key === k) last.items.push(item)
+    else groups.push({ key: k, items: [item] })
+  }
+  return groups
+}
+
+function ShowRow({ s, net, setlist, today, agency, mode, strong }: {
   s: Show
   net: number
   setlist: { id: string; title: string } | undefined
   today: string
-  badge?: 'upcoming'
   agency?: string
+  mode: 'upcoming' | 'played'
+  strong?: boolean
 }) {
   const isSplit = !!s.split_at
-  const date = s.show_date
-    ? new Date(s.show_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-    : null
+  const meta = [s.venue, agency ? `via ${agency}` : null].filter(Boolean).join(' · ')
 
   return (
-    <Link
-      href={`/shows/${s.id}`}
-      className="flex flex-col gap-2 rounded-xl border border-brand-200 bg-white p-4 shadow-sm transition-colors hover:border-brand-400 sm:flex-row sm:items-center sm:justify-between"
-    >
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <p className="truncate font-semibold text-gray-900">{s.title}</p>
-          {s.tds_applicable && (
-            <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">TDS</span>
-          )}
-          {s.format && (
-            <span className="shrink-0 rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700">{s.format}</span>
-          )}
-          {badge === 'upcoming' && s.show_date && (
-            <span className="shrink-0 rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700">
-              {countdownLabel(s.show_date, today)}
-            </span>
-          )}
+    <div className="flex flex-col gap-2 rounded-2xl border border-brand-200 bg-white p-3 shadow-sm transition-colors hover:border-brand-300 sm:flex-row sm:items-center sm:gap-4 sm:px-4">
+      <Link href={`/shows/${s.id}`} className="flex min-w-0 flex-1 items-center gap-3.5">
+        {s.show_date ? (
+          <DateTile date={s.show_date} tone={strong ? 'strong' : 'soft'} />
+        ) : (
+          <div className="flex w-[52px] shrink-0 items-center justify-center rounded-xl bg-brand-100 py-3 text-gray-400"><CalendarDays className="h-5 w-5" /></div>
+        )}
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <p className="truncate text-[15px] font-bold text-gray-900">{s.title}</p>
+            {mode === 'upcoming' && s.show_date && <StatusPill tone="green">{countdownLabel(s.show_date, today)}</StatusPill>}
+          </div>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
+            {meta && <span className="truncate">{meta}</span>}
+            {s.format && <StatusPill tone="gray">{s.format}</StatusPill>}
+            {s.booking_status && mode === 'upcoming' && <StatusPill tone={statusTone(s.booking_status)}>{s.booking_status}</StatusPill>}
+            {s.tds_applicable && <StatusPill tone="amber">TDS</StatusPill>}
+          </div>
         </div>
-        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
-          {date && <span className="flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" />{date}</span>}
-          {s.venue && <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{s.venue}</span>}
-          {agency && <span className="flex items-center gap-1 text-violet-600"><Building2 className="h-3.5 w-3.5" />via {agency}</span>}
-          <span className={setlist ? 'text-green-600' : 'text-gray-400'}>
-            {setlist ? `Setlist: ${setlist.title}` : 'No setlist yet'}
-          </span>
-        </div>
+      </Link>
+
+      <div className="flex shrink-0 items-center justify-between gap-4 pl-[66px] sm:flex-col sm:items-end sm:justify-center sm:gap-1 sm:pl-0">
+        {mode === 'upcoming' ? (
+          setlist ? (
+            <Link href={`/setlists/${setlist.id}`} className="max-w-[12rem] truncate text-xs font-semibold text-gray-500 hover:text-brand-600">
+              Setlist · {setlist.title}
+            </Link>
+          ) : (
+            <Link href={`/setlists/new?showId=${s.id}`} className="text-xs font-bold text-amber-700 hover:underline">+ Add setlist</Link>
+          )
+        ) : (
+          <>
+            <span className="text-sm font-bold text-gray-900">{fmt(net)}</span>
+            <StatusPill tone={isSplit ? 'green' : 'amber'}>{isSplit ? 'Split' : 'Unsplit'}</StatusPill>
+          </>
+        )}
       </div>
-      <div className="flex shrink-0 items-center gap-4 sm:justify-end">
-        <span className="text-sm font-bold text-gray-700">{fmt(net)}</span>
-        <span className={`flex items-center gap-1 text-xs font-medium ${isSplit ? 'text-green-600' : 'text-amber-600'}`}>
-          {isSplit ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
-          {isSplit ? 'Split' : 'Unsplit'}
-        </span>
-      </div>
-    </Link>
+    </div>
   )
 }
 
-export function ShowSearchList({ shows, netByShow, setlistByShow, today, eventManagementById }: ShowSearchListProps) {
+export function ShowSearchList({ shows, netByShow, setlistByShow, today, eventManagementById, insights }: ShowSearchListProps) {
+  const [tab, setTab] = useState<Tab>('upcoming')
   const [query, setQuery] = useState('')
+  const [format, setFormat] = useState('')
   const agencyOf = (s: Show) => (s.event_management_id ? eventManagementById[s.event_management_id]?.name : undefined)
 
   const q = query.trim().toLowerCase()
-  const filtered = q
-    ? shows.filter(s =>
-        s.title.toLowerCase().includes(q) ||
-        s.venue?.toLowerCase().includes(q) ||
-        s.notes?.toLowerCase().includes(q) ||
-        s.format?.toLowerCase().includes(q) ||
-        agencyOf(s)?.toLowerCase().includes(q) ||
-        setlistByShow[s.id]?.title.toLowerCase().includes(q)
-      )
-    : shows
+  const matches = (s: Show) =>
+    (!format || s.format === format) &&
+    (!q ||
+      s.title.toLowerCase().includes(q) ||
+      s.venue?.toLowerCase().includes(q) ||
+      s.notes?.toLowerCase().includes(q) ||
+      s.format?.toLowerCase().includes(q) ||
+      agencyOf(s)?.toLowerCase().includes(q) ||
+      setlistByShow[s.id]?.title.toLowerCase().includes(q))
 
-  // Upcoming shows get their own section, soonest first — everything else
-  // (already-played + undated) stays in the regular latest-first list below,
-  // not duplicated. Only when not searching — a search should still surface
-  // matches from either group in one flat list.
-  const upcoming = !q
-    ? shows.filter(s => isUpcoming(s.show_date, today)).sort((a, b) => a.show_date!.localeCompare(b.show_date!))
-    : []
-  const rest = !q ? shows.filter(s => !isUpcoming(s.show_date, today)) : filtered
+  const upcoming = shows.filter(s => isUpcoming(s.show_date, today)).sort((a, b) => a.show_date!.localeCompare(b.show_date!))
+  const played = shows.filter(s => !isUpcoming(s.show_date, today))
+  const formats = [...new Set(shows.map(s => s.format).filter((f): f is string => !!f))].sort()
+
+  // Searching surfaces matches from every group in one flat list, whichever tab you were on.
+  const searching = q !== ''
+  const flat = searching ? shows.filter(matches) : []
+  const upcomingShown = upcoming.filter(matches)
+  const playedShown = played.filter(matches)
+  const firstUpcomingId = upcoming[0]?.id
+
+  const row = (s: Show, mode: 'upcoming' | 'played') => (
+    <ShowRow
+      key={s.id} s={s} net={netByShow[s.id] ?? 0} setlist={setlistByShow[s.id]} today={today}
+      agency={agencyOf(s)} mode={mode} strong={mode === 'upcoming' && s.id === firstUpcomingId}
+    />
+  )
+
+  const insightsPreview = insights.formatBreakdown.length > 0 && (
+    <aside className="hidden self-start rounded-2xl border border-brand-200 bg-white p-5 shadow-sm lg:block">
+      <div className="mb-4 flex items-baseline justify-between">
+        <SectionLabel>Insights</SectionLabel>
+        <button type="button" onClick={() => setTab('insights')} className="text-xs font-bold text-brand-600 hover:underline">See all →</button>
+      </div>
+      <BarList rows={insights.formatBreakdown.slice(0, 4).map(r => ({ label: r.label, value: r.count }))} formatValue={n => String(n)} labelWidth="w-24" />
+    </aside>
+  )
 
   return (
     <div>
-      <div className="relative mb-5">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-300" />
-        <input
-          type="text"
-          placeholder="Search by title, venue, format, or notes…"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          className="w-full rounded-lg border border-brand-200 bg-white py-2.5 pl-9 pr-3 text-sm placeholder-gray-400 focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
-        />
-      </div>
+      <SegmentedTabs
+        className="mb-4"
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          { value: 'upcoming', label: 'Upcoming', count: upcoming.length },
+          { value: 'played', label: 'Played', count: played.length },
+          { value: 'insights', label: 'Insights' },
+        ]}
+      />
 
-      {filtered.length === 0 ? (
-        <p className="py-12 text-center text-sm text-gray-400">
-          {query ? `No shows matching "${query}"` : 'No shows yet'}
-        </p>
-      ) : q ? (
-        <div className="space-y-2">
-          {filtered.map(s => (
-            <ShowCard key={s.id} s={s} net={netByShow[s.id] ?? 0} setlist={setlistByShow[s.id]} today={today} agency={agencyOf(s)} />
-          ))}
+      {tab !== 'insights' && (
+        <div className="mb-5 flex flex-col gap-2 sm:flex-row">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-300" />
+            <input
+              type="text"
+              placeholder="Search by title, venue, format, or notes…"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              className="w-full rounded-xl border border-brand-200 bg-white py-2.5 pl-9 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
+            />
+          </div>
+          {formats.length > 0 && (
+            <select
+              value={format}
+              onChange={e => setFormat(e.target.value)}
+              aria-label="Filter by format"
+              className="rounded-xl border border-brand-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-700 focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
+            >
+              <option value="">All formats</option>
+              {formats.map(f => <option key={f} value={f}>{f}</option>)}
+            </select>
+          )}
         </div>
+      )}
+
+      {tab === 'insights' ? (
+        <ShowsDashboard {...insights} />
+      ) : searching ? (
+        flat.length === 0 ? (
+          <p className="py-12 text-center text-sm text-gray-400">No shows matching &quot;{query}&quot;</p>
+        ) : (
+          <div className="space-y-2">{flat.map(s => row(s, isUpcoming(s.show_date, today) ? 'upcoming' : 'played'))}</div>
+        )
+      ) : tab === 'upcoming' ? (
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+          <div className="space-y-6">
+            {upcomingShown.length === 0 ? (
+              <EmptyState
+                icon={<CalendarDays className="h-10 w-10" />}
+                title="Nothing coming up"
+                description="Add your next gig and its setlist, payment and split all live in one place."
+                action={<Button asChild><Link href="/shows/new"><Plus className="h-4 w-4" /> Add a show</Link></Button>}
+              />
+            ) : (
+              groupBy(upcomingShown, s => monthLabel(s.show_date!)).map(g => (
+                <section key={g.key}>
+                  <SectionLabel className="mb-2">{g.key}</SectionLabel>
+                  <div className="space-y-2">{g.items.map(s => row(s, 'upcoming'))}</div>
+                </section>
+              ))
+            )}
+          </div>
+          {insightsPreview}
+        </div>
+      ) : playedShown.length === 0 ? (
+        <p className="py-12 text-center text-sm text-gray-400">No shows here yet</p>
       ) : (
         <div className="space-y-6">
-          {upcoming.length > 0 && (
-            <div>
-              <h2 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-brand-600">
-                <Sparkles className="h-3.5 w-3.5" /> Upcoming Shows ({upcoming.length})
-              </h2>
-              <div className="space-y-2">
-                {upcoming.map(s => (
-                  <ShowCard key={s.id} s={s} net={netByShow[s.id] ?? 0} setlist={setlistByShow[s.id]} today={today} badge="upcoming" agency={agencyOf(s)} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {rest.length > 0 && (
-            <div>
-              {upcoming.length > 0 && (
-                <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">All Other Shows</h2>
-              )}
-              <div className="space-y-2">
-                {rest.map(s => (
-                  <ShowCard key={s.id} s={s} net={netByShow[s.id] ?? 0} setlist={setlistByShow[s.id]} today={today} agency={agencyOf(s)} />
-                ))}
-              </div>
-            </div>
-          )}
+          {groupBy(playedShown, s => (s.show_date ? s.show_date.slice(0, 4) : 'No date')).map(g => (
+            <section key={g.key}>
+              <SectionLabel className="mb-2">{g.key}</SectionLabel>
+              <div className="space-y-2">{g.items.map(s => row(s, 'played'))}</div>
+            </section>
+          ))}
         </div>
       )}
     </div>
