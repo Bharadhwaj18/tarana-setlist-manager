@@ -2,7 +2,7 @@
   "name": "ArtistOps",
   "short_name": "ArtistOps",
   "description": "Band setlist and chord chart manager",
-  "start_url": "/setlists",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#f3f4f0",
   "theme_color": "#14392b",

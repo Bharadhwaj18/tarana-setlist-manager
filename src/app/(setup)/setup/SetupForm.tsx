@@ -21,7 +21,7 @@ export function SetupForm({ email }: { email: string }) {
       if (result?.error) {
         setError(result.error)
       } else {
-        router.push('/setlists')
+        router.push('/')
       }
     })
   }

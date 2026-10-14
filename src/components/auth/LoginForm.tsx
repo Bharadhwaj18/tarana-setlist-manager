@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
 
-export function LoginForm({ next = '/setlists' }: { next?: string }) {
+export function LoginForm({ next = '/' }: { next?: string }) {
   const router = useRouter()
   const [serverError, setServerError] = useState('')
   const supabase = createClient()

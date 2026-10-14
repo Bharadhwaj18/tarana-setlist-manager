@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
 import { Mail } from 'lucide-react'
 
-export function MagicLinkForm({ next = '/setlists' }: { next?: string }) {
+export function MagicLinkForm({ next = '/' }: { next?: string }) {
   const [sent, setSent] = useState(false)
   const [serverError, setServerError] = useState('')
   const supabase = createClient()

@@ -22,7 +22,7 @@ export default async function SetupPage() {
     .maybeSingle()
 
   // Only skip setup if we got a successful response confirming name is set
-  if (!profileError && profile?.display_name?.trim()) redirect('/setlists')
+  if (!profileError && profile?.display_name?.trim()) redirect('/')
 
   return <SetupForm email={effectiveUser.email ?? ''} />
 }
