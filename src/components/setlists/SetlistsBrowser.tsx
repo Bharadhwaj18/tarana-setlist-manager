@@ -1,8 +1,10 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { deleteSetlist } from '@/actions/setlists'
+import { LongPressMenu, type MenuItem } from '@/components/ui/LongPressMenu'
 import Link from 'next/link'
-import { ArrowRight, Play, Search } from 'lucide-react'
+import { ArrowRight, ListMusic, Pencil, Play, Search, Trash2 } from 'lucide-react'
 import { Chip } from '@/components/ui/Chip'
 import { DateTile } from '@/components/ui/DateTile'
 import { SectionLabel } from '@/components/ui/SectionLabel'
@@ -139,9 +141,15 @@ export function SetlistsBrowser({ setlists, countMap, previews, today }: Props) 
                 {group.items.map(s => {
                   const count = countMap[s.id] ?? 0
                   const active = s.id === selectedId
+                  const menu: MenuItem[] = [
+                    { label: 'Open', href: `/setlists/${s.id}`, icon: ListMusic },
+                    { label: 'Stage mode', href: stageHref(s.id, previews[s.id]?.[0]), icon: Play },
+                    { label: 'Edit', href: `/setlists/${s.id}/edit`, icon: Pencil },
+                    { label: 'Delete', icon: Trash2, danger: true, onSelect: () => { if (window.confirm(`Delete "${s.title}"? This can’t be undone.`)) void deleteSetlist(s.id) } },
+                  ]
                   return (
+                    <LongPressMenu key={s.id} title={s.title} items={menu}>
                     <Link
-                      key={s.id}
                       href={`/setlists/${s.id}`}
                       onClick={e => pick(e, s.id)}
                       className={cn(
@@ -158,6 +166,7 @@ export function SetlistsBrowser({ setlists, countMap, previews, today }: Props) 
                       </div>
                       <span className="text-xl text-gray-400 lg:hidden">›</span>
                     </Link>
+                    </LongPressMenu>
                   )
                 })}
               </div>

@@ -3,8 +3,9 @@
 import { useMemo, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { CalendarDays, Check, CheckCircle2, ChevronDown, FolderClosed, ListChecks, Plus, Search, SquareKanban, User } from 'lucide-react'
-import { createBoard, createTask } from '@/actions/tasks'
+import { CalendarDays, Check, Pencil, RotateCcw, Trash2, CheckCircle2, ChevronDown, FolderClosed, ListChecks, Plus, Search, SquareKanban, User } from 'lucide-react'
+import { createBoard, createTask, deleteTask, setTaskProgress } from '@/actions/tasks'
+import { LongPressMenu, type MenuItem } from '@/components/ui/LongPressMenu'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useToast } from '@/components/ui/Toaster'
 import { cn } from '@/lib/utils'
@@ -238,9 +239,15 @@ function TaskRow({ task, group, today, nameById, onOpen, onGroup }: { task: Task
   const overdue = !done && !!task.due_date && task.due_date < today
   const priority = task.priority as TaskPriority
   const doneItems = task.checklist.filter(c => c.done).length
+  const menu: MenuItem[] = [
+    { label: 'Open', icon: Pencil, onSelect: onOpen },
+    { label: done ? 'Mark as not started' : 'Mark as done', icon: done ? RotateCcw : CheckCircle2, onSelect: () => { void setTaskProgress(task.id, done ? 'not_started' : 'completed') } },
+    { label: 'Delete', icon: Trash2, danger: true, onSelect: () => { if (window.confirm(`Delete "${task.title}"?`)) void deleteTask(task.id) } },
+  ]
 
   return (
-    <li className="flex items-center gap-3 px-4 py-3 hover:bg-brand-50">
+    <li className="hover:bg-brand-50">
+      <LongPressMenu title={task.title} items={menu} className="flex items-center gap-3 px-4 py-3">
       <ProgressToggle task={task} />
       <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
         <p className={cn('truncate text-sm font-semibold', done ? 'text-gray-400 line-through' : 'text-gray-900')}>{task.title}</p>
@@ -268,6 +275,7 @@ function TaskRow({ task, group, today, nameById, onOpen, onGroup }: { task: Task
           {task.assignee_ids.slice(0, 3).map(id => <Avatar key={id} name={nameById[id] ?? 'Member'} />)}
         </span>
       )}
+      </LongPressMenu>
     </li>
   )
 }

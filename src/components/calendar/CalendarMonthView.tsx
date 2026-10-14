@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, type ReactNode } from 'react'
+import { useSwipe } from '@/lib/use-swipe'
 import { addMonths, subMonths, format } from 'date-fns'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { buildMonthGrid, groupItemsByDate, externalLabel, type DayItems, type ExternalItem } from '@/lib/calendar'
@@ -86,6 +87,7 @@ export function CalendarMonthView({
   const prev = () => setCurrentMonth(m => subMonths(m, 1))
   const next = () => setCurrentMonth(m => addMonths(m, 1))
   const monthLabel = format(currentMonth, 'MMMM yyyy')
+  const swipe = useSwipe(next, prev)
 
   const selectedItems = byDate[selectedDate] ?? EMPTY_DAY
   const detailProps = { date: selectedDate, items: selectedItems, readOnly, workspaceNameById, members, boards, nameById }
@@ -169,7 +171,7 @@ export function CalendarMonthView({
         </div>
 
         {/* Phone month: dots under each day, the agenda below */}
-        <div className="rounded-2xl border border-brand-200 bg-white px-2 pb-2 pt-2.5 shadow-sm md:hidden">
+        <div {...swipe} className="rounded-2xl border border-brand-200 bg-white px-2 pb-2 pt-2.5 shadow-sm md:hidden">
           <div className="flex items-center justify-between px-2.5 pb-2">
             <h2 className="font-display text-lg font-bold text-gray-900">{monthLabel}</h2>
             <div className="flex items-center gap-1">

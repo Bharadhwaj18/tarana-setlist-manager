@@ -1,4 +1,9 @@
+'use client'
+
 import Link from 'next/link'
+import { Music2, Pencil, Trash2 } from 'lucide-react'
+import { LongPressMenu, type MenuItem } from '@/components/ui/LongPressMenu'
+import { deleteSong } from '@/actions/songs'
 import { StatusPill } from '@/components/ui/StatusPill'
 import type { Song } from '@/types'
 
@@ -8,7 +13,13 @@ interface SongRowProps {
 }
 
 export function SongRow({ song, setlistCount }: SongRowProps) {
+  const menu: MenuItem[] = [
+    { label: 'Open', href: `/songs/${song.id}`, icon: Music2 },
+    { label: 'Edit', href: `/songs/${song.id}/edit`, icon: Pencil },
+    { label: 'Delete', icon: Trash2, danger: true, onSelect: () => { if (window.confirm(`Delete "${song.title}"? This can’t be undone.`)) void deleteSong(song.id) } },
+  ]
   return (
+    <LongPressMenu title={song.title} items={menu}>
     <Link
       href={`/songs/${song.id}`}
       className="flex items-center gap-3 border-b border-gray-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-gray-50"
@@ -26,5 +37,6 @@ export function SongRow({ song, setlistCount }: SongRowProps) {
         {setlistCount} {setlistCount === 1 ? 'setlist' : 'setlists'}
       </span>
     </Link>
+    </LongPressMenu>
   )
 }

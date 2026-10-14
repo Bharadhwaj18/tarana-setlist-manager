@@ -1,8 +1,11 @@
 'use client'
 
 import { useState } from 'react'
+import { deleteShow } from '@/actions/shows'
+import { LongPressMenu, type MenuItem } from '@/components/ui/LongPressMenu'
 import Link from 'next/link'
-import { Search, CalendarDays, Plus } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Search, CalendarDays, ListMusic, Pencil, Plus, Trash2 } from 'lucide-react'
 import { isUpcoming } from '@/lib/shows'
 import { countdownLabel } from '@/lib/dates'
 import { SegmentedTabs } from '@/components/ui/Chip'
@@ -57,11 +60,18 @@ function ShowRow({ s, net, setlist, today, agency, mode, strong }: {
   mode: 'upcoming' | 'played'
   strong?: boolean
 }) {
+  const router = useRouter()
   const isSplit = !!s.split_at
   const meta = [s.venue, agency ? `via ${agency}` : null].filter(Boolean).join(' · ')
+  const menu: MenuItem[] = [
+    { label: 'Open', href: `/shows/${s.id}`, icon: CalendarDays },
+    { label: 'Edit', href: `/shows/${s.id}/edit`, icon: Pencil },
+    setlist ? { label: 'Open setlist', href: `/setlists/${setlist.id}`, icon: ListMusic } : { label: 'Add setlist', href: `/setlists/new?showId=${s.id}`, icon: Plus },
+    { label: 'Delete', icon: Trash2, danger: true, onSelect: () => { if (window.confirm(`Delete "${s.title}"? This can’t be undone.`)) void deleteShow(s.id).then(r => { if (r?.error) window.alert(r.error); else router.refresh() }) } },
+  ]
 
   return (
-    <div className="flex flex-col gap-2 rounded-2xl border border-brand-200 bg-white p-3 shadow-sm transition-colors hover:border-brand-300 sm:flex-row sm:items-center sm:gap-4 sm:px-4">
+    <LongPressMenu title={s.title} items={menu} className="flex flex-col gap-2 rounded-2xl border border-brand-200 bg-white p-3 shadow-sm transition-colors hover:border-brand-300 sm:flex-row sm:items-center sm:gap-4 sm:px-4">
       <Link href={`/shows/${s.id}`} className="flex min-w-0 flex-1 items-center gap-3.5">
         {s.show_date ? (
           <DateTile date={s.show_date} tone={strong ? 'strong' : 'soft'} />
@@ -98,7 +108,7 @@ function ShowRow({ s, net, setlist, today, agency, mode, strong }: {
           </>
         )}
       </div>
-    </div>
+    </LongPressMenu>
   )
 }
 
