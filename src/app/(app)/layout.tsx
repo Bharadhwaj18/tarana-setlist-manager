@@ -24,28 +24,22 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   if (!effectiveUser) redirect('/login')
 
-  // Check display name — but skip the setup redirect when offline
-  // (if the profile query errors, the user has already done setup before)
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('display_name')
-    .eq('id', effectiveUser.id)
-    .maybeSingle()
+  // Everything the shell needs is independent of everything else, so fetch it in ONE round
+  // trip instead of a chain of awaits (each await used to add a full database latency).
+  const [{ data: profile, error: profileError }, pendingPayments, notifications, profiles, { options: workspaceOptions, currentId: currentWorkspaceId }] = await Promise.all([
+    supabase.from('profiles').select('display_name').eq('id', effectiveUser.id).maybeSingle(),
+    getCachedPendingPayments(),
+    getCachedNotifications(effectiveUser.id, 40),
+    getCachedAllProfiles(),
+    getWorkspaceOptions(),
+  ])
 
+  // Skip the setup redirect when offline (if the profile query errors, the user has already done setup before)
   if (!profileError && !profile?.display_name?.trim()) redirect('/setup')
 
-  // How many split payments this person still owes a bandmate — the
-  // Sidebar's Finance badge, visible from anywhere in the app until each
-  // one's marked paid.
-  const pendingPayments = await getCachedPendingPayments()
+  // How many split payments this person still owes a bandmate: the Sidebar's Finance badge.
   const pendingCount = pendingPayments.filter(p => p.from_member === effectiveUser.id).length
-
-  const [notifications, profiles] = await Promise.all([
-    getCachedNotifications(effectiveUser.id),
-    getCachedAllProfiles(),
-  ])
   const notificationItems = resolveNotificationItems(notifications, profiles, effectiveUser.id)
-  const { options: workspaceOptions, currentId: currentWorkspaceId } = await getWorkspaceOptions()
 
   return (
     <div className="flex h-screen">
