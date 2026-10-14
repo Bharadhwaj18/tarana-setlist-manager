@@ -125,15 +125,18 @@ export const getCachedTaskData = cache(async (): Promise<TaskData> => {
   if (!ctx) return empty
   const ws = ctx.current.workspace.id
   const supabase = await createClient()
-  const [boards, buckets, tasks] = await Promise.all([
+  // Every open task, but only the most recent finished ones: a workspace's completed history
+  // grows forever and nobody needs all of it on every page load.
+  const [boards, buckets, openTasks, doneTasks] = await Promise.all([
     supabase.from('task_boards').select('*').eq('workspace_id', ws).is('archived_at', null).order('created_at'),
     supabase.from('task_buckets').select('*').eq('workspace_id', ws).order('position'),
-    supabase.from('tasks').select('*').eq('workspace_id', ws).order('position'),
+    supabase.from('tasks').select('*').eq('workspace_id', ws).neq('progress', 'completed').order('position'),
+    supabase.from('tasks').select('*').eq('workspace_id', ws).eq('progress', 'completed').order('completed_at', { ascending: false, nullsFirst: false }).limit(150),
   ])
   return {
     boards: boards.data ?? [],
     buckets: buckets.data ?? [],
-    tasks: tasks.data ?? [],
+    tasks: [...(openTasks.data ?? []), ...(doneTasks.data ?? [])],
   }
 })
 

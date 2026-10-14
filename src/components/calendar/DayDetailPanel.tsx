@@ -75,7 +75,7 @@ interface Props {
   nameById: Record<string, string>
   readOnly?: boolean
   workspaceNameById?: Record<string, string>
-  /** `panel` = card beside the month with inline forms (desktop). `agenda` = plain list under the month, forms in a bottom sheet (phones). */
+  /** `panel` = card beside the month (desktop). `agenda` = plain list under the month (phones). Add forms open in a dialog (a bottom sheet on phones) in both. */
   layout: 'panel' | 'agenda'
   className?: string
 }
@@ -217,7 +217,7 @@ export function DayDetailPanel({ date, items, members, boards = [], nameById, re
   )
 
   const form = mode && (
-    <div className="space-y-3 rounded-2xl border border-brand-200 bg-brand-50 p-3.5">
+    <div className="mt-3 space-y-4">
       <div className="flex items-center gap-1.5">
         <Chip active={mode === 'unavailable'} onClick={() => setMode('unavailable')}>Unavailable</Chip>
         <Chip active={mode === 'event'} onClick={() => setMode('event')}>Event</Chip>
@@ -232,7 +232,7 @@ export function DayDetailPanel({ date, items, members, boards = [], nameById, re
             </select>
           </div>
           <div>
-            <Label htmlFor={`unavail-end-${layout}`}>Through</Label>
+            <Label htmlFor={`unavail-end-${layout}`}>Until</Label>
             <Input id={`unavail-end-${layout}`} type="date" className="mt-1" value={endDate} min={date} onChange={e => setEndDate(e.target.value)} />
           </div>
           <div>
@@ -252,7 +252,7 @@ export function DayDetailPanel({ date, items, members, boards = [], nameById, re
             <Input id={`event-title-${layout}`} placeholder="Rehearsal, deadline, anything" className="mt-1" value={eventTitle} onChange={e => setEventTitle(e.target.value)} autoFocus />
           </div>
           <div>
-            <Label htmlFor={`event-end-${layout}`}>Through</Label>
+            <Label htmlFor={`event-end-${layout}`}>Until</Label>
             <Input id={`event-end-${layout}`} type="date" className="mt-1" value={eventEndDate} min={date} onChange={e => setEventEndDate(e.target.value)} />
           </div>
           <div>
@@ -303,24 +303,15 @@ export function DayDetailPanel({ date, items, members, boards = [], nameById, re
       {header}
       {list}
 
-      {layout === 'panel' ? (
-        <>
-          {form}
-          {!mode && actions}
-        </>
-      ) : (
-        <>
-          {actions}
-          <Modal
-            open={mode !== null}
-            onOpenChange={open => { if (!open) setMode(null) }}
-            title={longDate}
-            className="max-md:bottom-0 max-md:left-0 max-md:top-auto max-md:max-h-[85vh] max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-b-none max-md:rounded-t-3xl max-md:p-5 max-md:pb-8"
-          >
-            {form}
-          </Modal>
-        </>
-      )}
+      {actions}
+      <Modal
+        open={mode !== null}
+        onOpenChange={open => { if (!open) setMode(null) }}
+        title={longDate}
+        className="max-w-md max-md:bottom-0 max-md:left-0 max-md:top-auto max-md:max-h-[85vh] max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-b-none max-md:rounded-t-3xl max-md:p-5 max-md:pb-8"
+      >
+        {form}
+      </Modal>
 
       {!readOnly && <QuickTaskModal boards={boards} members={members} open={taskModalOpen} onOpenChange={setTaskModalOpen} dueDate={date} />}
     </div>
