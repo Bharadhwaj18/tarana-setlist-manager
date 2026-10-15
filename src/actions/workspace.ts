@@ -7,13 +7,15 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { sendNotification } from '@/actions/notifications'
 import { DOCUMENT_BUCKET } from '@/types/show-document'
 import { getWorkspaceContext } from '@/lib/workspace'
-import { PENDING_INVITE_COOKIE, WORKSPACE_COOKIE } from '@/lib/workspace-shared'
+import { PENDING_INVITE_COOKIE, WORKSPACE_CHOSEN_COOKIE, WORKSPACE_COOKIE } from '@/lib/workspace-shared'
 import { SECTIONS, type SectionLevel, type SectionKey } from '@/lib/workspace-sections'
 import { createWorkspaceInputSchema, updateWorkspaceDetailsSchema, type CreateWorkspaceInput, type UpdateWorkspaceDetailsInput } from '@/lib/validators'
 
 async function selectWorkspace(workspaceId: string) {
   const cookieStore = await cookies()
   cookieStore.set(WORKSPACE_COOKIE, workspaceId, { path: '/', maxAge: 60 * 60 * 24 * 365, sameSite: 'lax' })
+  // No maxAge: lasts for this visit, so the workspace picker shows again next time they come in.
+  cookieStore.set(WORKSPACE_CHOSEN_COOKIE, '1', { path: '/', sameSite: 'lax' })
   revalidatePath('/', 'layout')
 }
 

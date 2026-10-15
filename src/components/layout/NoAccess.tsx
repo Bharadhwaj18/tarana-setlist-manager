@@ -28,7 +28,7 @@ export function NoAccess({ section, workspaceName }: { section: string; workspac
           <Link href="/" className="rounded-xl bg-brand-400 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-500">
             Back to Today
           </Link>
-          <Link href="/workspaces" className="rounded-xl border border-brand-200 bg-white px-5 py-2.5 text-sm font-bold text-gray-700 hover:bg-brand-50">
+          <Link href="/choose-workspace" className="rounded-xl border border-brand-200 bg-white px-5 py-2.5 text-sm font-bold text-gray-700 hover:bg-brand-50">
             Switch workspace
           </Link>
         </div>

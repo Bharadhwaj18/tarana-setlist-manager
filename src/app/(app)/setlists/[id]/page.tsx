@@ -81,7 +81,7 @@ export default async function SetlistPage({ params }: Props) {
         <div className="flex flex-wrap items-center gap-2">
           {firstSong && (
             <Button asChild>
-              <Link href={`/songs/${firstSong.id}?from=/setlists/${id}`}><Play className="h-4 w-4" /> Stage mode</Link>
+              <Link href={`/songs/${firstSong.id}?from=/setlists/${id}&stage=1`}><Play className="h-4 w-4" /> Stage mode</Link>
             </Button>
           )}
           <Button variant="secondary" asChild>

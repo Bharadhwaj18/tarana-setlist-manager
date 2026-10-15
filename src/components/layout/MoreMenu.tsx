@@ -21,7 +21,7 @@ interface Props {
 const GROUPS = [
   { label: 'Perform', items: [{ href: '/shows', label: 'Shows' }, { href: '/songs', label: 'Songs' }, { href: '/recordings', label: 'Recordings' }] },
   { label: 'Organise', items: [{ href: '/tasks', label: 'Tasks' }, { href: '/notes', label: 'Notes' }, { href: '/calendar', label: 'Calendar' }, { href: '/event-management', label: 'Agencies' }] },
-  { label: 'Account', items: [{ href: '/workspaces', label: 'Workspaces' }, { href: '/workspace', label: 'Workspace & members' }, { href: '/settings', label: 'Settings' }] },
+  { label: 'Account', items: [{ href: '/choose-workspace', label: 'Workspaces' }, { href: '/workspace', label: 'Workspace & members' }, { href: '/settings', label: 'Settings' }] },
 ]
 
 export function MoreMenu({ email, workspaces, currentWorkspaceId, hiddenSections = [] }: Props) {
@@ -46,7 +46,7 @@ export function MoreMenu({ email, workspaces, currentWorkspaceId, hiddenSections
   return (
     <div className="space-y-5">
       {current && (
-        <Link href="/workspaces" className="flex items-center gap-3 rounded-2xl bg-sidebar p-3 text-sidebar-strong">
+        <Link href="/choose-workspace" className="flex items-center gap-3 rounded-2xl bg-sidebar p-3 text-sidebar-strong">
           {isPersonal(current) ? (
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sidebar-hover"><User className="h-5 w-5" /></span>
           ) : (

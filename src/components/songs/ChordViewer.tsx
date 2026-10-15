@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useTransition } from 'react'
-import { ChevronUp, ChevronDown, Save, MonitorPlay, Play, Pause, Minus, Plus } from 'lucide-react'
+import { ChevronUp, ChevronDown, Save, MonitorPlay } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { parseSong } from '@/lib/chords/parser'
@@ -11,18 +11,8 @@ import { ensureChordSheetCss } from './chordSheetStyles'
 import { saveTranspose } from '@/actions/songs'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toaster'
-import { useAutoScroll } from '@/hooks/useAutoScroll'
-import { PerformanceMode, type SetlistNavSong } from './PerformanceMode'
+import { StageMode, type SetlistNavSong } from './StageMode'
 import type { Song } from 'chordsheetjs'
-
-// Scroll speed is shown as a percentage (100% = normal) rather than a raw
-// px/sec number. useAutoScroll's default speed (40px/s) is what 100% maps to.
-// Percent is derived from `speed` on every render rather than tracked as its
-// own state — speed (inside useAutoScroll) stays the single source of truth.
-const SCROLL_BASE_SPEED = 40
-const SCROLL_PERCENT_MIN = 20
-const SCROLL_PERCENT_MAX = 200
-const SCROLL_PERCENT_STEP = 10
 
 const TEXT_SIZE_MIN = 11
 const TEXT_SIZE_MAX = 26
@@ -37,38 +27,24 @@ interface ChordViewerProps {
   bpm?: number | null
   setlistSongs?: SetlistNavSong[]
   setlistId?: string
+  setlistTitle?: string
+  /** This song's band notes, shown in Stage mode when it's opened outside a setlist. */
+  notes?: string | null
+  /** Open straight into Stage mode (e.g. from a setlist's "Stage mode" button). */
+  autoStage?: boolean
 }
 
 export function ChordViewer({
-  chordChart, songKey, printRef, songId, songTitle, bpm, setlistSongs, setlistId
+  chordChart, songKey, printRef, songId, songTitle, bpm, setlistSongs, setlistId, setlistTitle, notes, autoStage,
 }: ChordViewerProps) {
   const [song, setSong] = useState<Song>(() => parseSong(chordChart))
   const [semitones, setSemitones] = useState(0)
-  const [performMode, setPerformMode] = useState(false)
+  const [stageOpen, setStageOpen] = useState(!!autoStage)
   const [textSize, setTextSize] = useState(TEXT_SIZE_DEFAULT)
   const [isSaving, startSave] = useTransition()
   const internalRef = useRef<HTMLDivElement>(null)
-  // Dedicated, self-contained scroll container — same technique as
-  // PerformanceMode's `scrollRef`: a definite-height `overflow-y-auto` box
-  // that useAutoScroll drives directly, instead of reaching into the shared
-  // app layout (whose height depends on ancestor CSS we don't control here).
-  const scrollRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const toast = useToast()
-
-  const { isScrolling, setIsScrolling, speed, setSpeed } = useAutoScroll(scrollRef)
-  const scrollPercent = Math.round((speed / SCROLL_BASE_SPEED) * 100)
-
-  const adjustScrollSpeed = (deltaPercent: number) => {
-    setSpeed(prevSpeed => {
-      const currentPercent = Math.round((prevSpeed / SCROLL_BASE_SPEED) * 100)
-      const nextPercent = Math.min(
-        SCROLL_PERCENT_MAX,
-        Math.max(SCROLL_PERCENT_MIN, currentPercent + deltaPercent)
-      )
-      return (SCROLL_BASE_SPEED * nextPercent) / 100
-    })
-  }
 
   useEffect(() => {
     // Injected once per page (shared by every ChordViewer instance and the editor preview).
@@ -116,7 +92,7 @@ export function ChordViewer({
   return (
     <>
       <div className="space-y-4">
-        {/* Transpose + Perform controls */}
+        {/* Transpose, text size and Stage mode */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-brand-200 bg-gray-50 px-4 py-2.5">
           <span className="text-xs font-extrabold uppercase tracking-[0.1em] text-gray-500">Transpose</span>
           <div className="flex items-center gap-1">
@@ -157,21 +133,13 @@ export function ChordViewer({
             <Button variant="ghost" size="sm" aria-label="Larger text" onClick={() => setTextSize(s => Math.min(TEXT_SIZE_MAX, s + 1))} className="h-7 px-2 text-xs font-extrabold">A+</Button>
           </div>
 
-          {/* Perform button */}
-          <Button size="sm" onClick={() => setPerformMode(true)}>
+          <Button size="sm" onClick={() => setStageOpen(true)}>
             <MonitorPlay className="h-4 w-4" />
-            Perform mode
+            Stage mode
           </Button>
         </div>
 
-        {/*
-          Bounded height + overflow-y-auto here is what makes the auto-scroll
-          actually work — it needs an element that genuinely overflows itself,
-          not one whose height passively depends on an ancestor (the shared
-          app shell doesn't guarantee that). Same idea as PerformanceMode's
-          own scrollRef container.
-        */}
-        <div ref={scrollRef} className="max-h-[70vh] overflow-y-auto rounded-2xl border border-brand-200 bg-white">
+        <div className="rounded-2xl border border-brand-200 bg-white">
           <div
             ref={printRef ?? internalRef}
             className="chord-view p-5 sm:p-6"
@@ -181,59 +149,15 @@ export function ChordViewer({
         </div>
       </div>
 
-      {/*
-        Floating scroll island — fixed to the viewport (not the page flow) so
-        it stays reachable no matter how far down the chord sheet you've
-        scrolled. `lg:left-56` keeps it centered in the content area rather
-        than behind the desktop sidebar; it sits below Perform mode's
-        overlay (z-[200]) so it's hidden automatically while that's open.
-      */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-24 z-30 flex justify-center px-4 lg:bottom-4 lg:left-60">
-        <div className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-gray-800 bg-gray-900/95 px-2 py-1.5 text-white shadow-lg backdrop-blur-sm">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsScrolling(!isScrolling)}
-            className="h-8 gap-1.5 rounded-full px-3 text-white hover:bg-white/10 hover:text-white"
-          >
-            {isScrolling ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-            {isScrolling ? 'Pause' : 'Scroll'}
-          </Button>
-          <div className="h-5 w-px bg-white/10" />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => adjustScrollSpeed(-SCROLL_PERCENT_STEP)}
-            className="h-8 w-8 rounded-full p-0 text-white hover:bg-white/10 hover:text-white"
-            title="Slower"
-          >
-            <Minus className="h-3.5 w-3.5" />
-          </Button>
-          <span className="w-12 text-center text-sm font-mono font-semibold text-amber-400">
-            {scrollPercent}%
-          </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => adjustScrollSpeed(SCROLL_PERCENT_STEP)}
-            className="h-8 w-8 rounded-full p-0 text-white hover:bg-white/10 hover:text-white"
-            title="Faster"
-          >
-            <Plus className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      </div>
-
-      {performMode && (
-        <PerformanceMode
-          song={song}
-          songKey={currentKey ?? null}
-          songId={songId ?? ''}
-          songTitle={songTitle ?? 'Song'}
-          bpm={bpm}
-          setlistSongs={setlistSongs}
-          setlistId={setlistId}
-          onClose={() => setPerformMode(false)}
+      {stageOpen && (
+        <StageMode
+          songs={setlistSongs && setlistSongs.some(s => s.id === songId) ? setlistSongs : [{
+            id: songId ?? '', title: songTitle ?? 'Song', chord_chart: chordChart, song_key: songKey ?? null, bpm: bpm ?? null, notes,
+          }]}
+          startSongId={songId ?? ''}
+          setlistId={setlistSongs?.some(s => s.id === songId) ? setlistId : undefined}
+          setlistTitle={setlistTitle}
+          onClose={() => setStageOpen(false)}
         />
       )}
     </>

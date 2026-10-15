@@ -17,14 +17,14 @@ import type { RecordingWithSong } from '@/types'
 
 interface Props {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ from?: string }>
+  searchParams: Promise<{ from?: string; stage?: string }>
 }
 
 export default async function SongPage({ params, searchParams }: Props) {
   const denied = await sectionGuard('songs')
   if (denied) return denied
   const { id } = await params
-  const { from } = await searchParams
+  const { from, stage } = await searchParams
 
   // `from` in the URL is the explicit, authoritative source. When it's
   // missing — browser back/forward, a bookmarked/shared link, or any link
@@ -118,12 +118,17 @@ export default async function SongPage({ params, searchParams }: Props) {
           songTitle={song.title}
           bpm={song.bpm}
           setlistId={setlistId ?? undefined}
+          setlistTitle={setlist?.title}
+          notes={song.notes}
+          autoStage={stage === '1'}
           setlistSongs={setlistSongs.map(ss => ({
             id: ss.song_id,
             title: ss.song.title,
             chord_chart: ss.song.chord_chart ?? '',
             song_key: ss.song.song_key ?? null,
             bpm: ss.song.bpm ?? null,
+            notes: ss.song.notes ?? null,
+            section: ss.section ?? null,
           }))}
         />
 

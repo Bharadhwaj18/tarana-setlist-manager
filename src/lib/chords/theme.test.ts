@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { getLightChordSheetCss, getPerfChordSheetCss, getPrintChordSheetCss } from './theme'
+import { getLightChordSheetCss, getStageChordSheetCss, getPrintChordSheetCss } from './theme'
 
 // These lock in the exact values that were previously hand-duplicated across
-// ChordViewer, PerformanceMode and SongPdfExport, so consolidating them into
+// ChordViewer, Stage mode and SongPdfExport, so consolidating them into
 // one generator can't silently drift a theme's actual appearance.
 
 describe('getLightChordSheetCss (ChordViewer)', () => {
@@ -17,26 +17,27 @@ describe('getLightChordSheetCss (ChordViewer)', () => {
   })
 
   it('is not scoped under any parent selector', () => {
-    expect(css).not.toContain('.perf-sheet')
+    expect(css).not.toContain('.stage-sheet')
   })
 })
 
-describe('getPerfChordSheetCss (PerformanceMode)', () => {
-  const css = getPerfChordSheetCss(24)
+describe('getStageChordSheetCss (Stage mode)', () => {
+  const css = getStageChordSheetCss(24)
 
-  it('scopes every rule under .perf-sheet', () => {
-    expect(css).toContain('.perf-sheet .chord-sheet')
-    expect(css).toContain('.perf-sheet .chord ')
-    expect(css).toContain('.perf-sheet .section-label')
+  it('scopes every rule under .stage-sheet', () => {
+    expect(css).toContain('.stage-sheet .chord-sheet')
+    expect(css).toContain('.stage-sheet .chord ')
+    expect(css).toContain('.stage-sheet .section-label')
   })
 
   it('scales the chord size relative to the sheet font size', () => {
     expect(css).toContain('font-size: 24px')
-    expect(css).toContain('font-size: 21px') // round(24 * 0.88)
+    expect(css).toContain('font-size: 22px') // round(24 * 0.9)
   })
 
-  it('uses the dark-mode amber chord color', () => {
-    expect(css).toContain('color: #fbbf24')
+  it('takes its colours from the stage palette, not the app theme', () => {
+    expect(css).toContain('color: var(--stage-chord)')
+    expect(css).toContain('color: var(--stage-text)')
   })
 })
 

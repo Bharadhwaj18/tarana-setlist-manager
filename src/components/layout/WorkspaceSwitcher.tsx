@@ -152,14 +152,14 @@ export function WorkspaceSwitcher({ workspaces, currentId }: Props) {
               <Link href="/workspace/new" onClick={close} className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-semibold text-gray-800 hover:bg-brand-50">
                 <Plus className="h-4 w-4 text-gray-400" /> Create a workspace
               </Link>
-              <Link href="/workspaces#join" onClick={close} className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-semibold text-gray-800 hover:bg-brand-50">
+              <Link href="/choose-workspace#join" onClick={close} className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-semibold text-gray-800 hover:bg-brand-50">
                 <Compass className="h-4 w-4 text-gray-400" /> Join with a link
               </Link>
               <Link href="/workspace" onClick={close} className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-semibold text-gray-800 hover:bg-brand-50">
                 <Settings className="h-4 w-4 text-gray-400" />
                 <span className="min-w-0 flex-1 truncate">{isPersonal(current) ? 'About your personal space' : `Workspace settings for ${current.name}`}</span>
               </Link>
-              <Link href="/workspaces" onClick={close} className="flex items-center justify-between rounded-lg px-2.5 py-2 text-xs font-bold text-brand-700 hover:bg-brand-50">
+              <Link href="/choose-workspace" onClick={close} className="flex items-center justify-between rounded-lg px-2.5 py-2 text-xs font-bold text-brand-700 hover:bg-brand-50">
                 Manage workspaces <span aria-hidden="true">&rarr;</span>
               </Link>
             </div>

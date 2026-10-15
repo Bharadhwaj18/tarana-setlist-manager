@@ -106,11 +106,11 @@ export function MobileTopBar({ workspaces, currentId, notifications }: Props) {
             <Link href="/workspace/new" onClick={() => setOpen(false)} className="flex items-center justify-center gap-2 rounded-2xl bg-brand-400 px-4 py-3 text-sm font-extrabold text-white">
               <Plus className="h-4 w-4" /> Create
             </Link>
-            <Link href="/workspaces#join" onClick={() => setOpen(false)} className="flex items-center justify-center gap-2 rounded-2xl border border-brand-200 bg-white px-4 py-3 text-sm font-extrabold text-gray-800">
+            <Link href="/choose-workspace#join" onClick={() => setOpen(false)} className="flex items-center justify-center gap-2 rounded-2xl border border-brand-200 bg-white px-4 py-3 text-sm font-extrabold text-gray-800">
               <Compass className="h-4 w-4" /> Join with a link
             </Link>
           </div>
-          <Link href="/workspaces" onClick={() => setOpen(false)} className="mt-3 block text-center text-sm font-bold text-brand-700">
+          <Link href="/choose-workspace" onClick={() => setOpen(false)} className="mt-3 block text-center text-sm font-bold text-brand-700">
             Manage workspaces &rarr;
           </Link>
         </div>

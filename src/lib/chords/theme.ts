@@ -1,7 +1,7 @@
 // Single source of truth for the decorative CSS applied to a rendered chord
 // sheet (the `.chord`, `.paragraph`, `.row`, `.column`, `.comment` and
 // `.section-label` classes that `getCss()`'s structural rules don't cover).
-// Previously this was hand-duplicated across ChordViewer, PerformanceMode
+// Previously this was hand-duplicated across ChordViewer, Stage mode
 // and SongPdfExport — any tweak had to be repeated three times and could
 // drift between them. Each theme's exact values are preserved as they were.
 
@@ -60,20 +60,23 @@ export function getLightChordSheetCss(): string {
   })
 }
 
-/** Fullscreen Performance mode — dark background, large adjustable font. */
-export function getPerfChordSheetCss(fontSize: number): string {
+/**
+ * Stage mode — colours come from the stage's own --stage-* variables (dark or light, set on its root),
+ * never from the app theme, so the sheet stays readable whatever theme the app is in.
+ */
+export function getStageChordSheetCss(fontSize: number): string {
   return buildChordSheetCss({
-    prefix: '.perf-sheet ',
+    prefix: '.stage-sheet ',
     fontFamily: "'Courier New', monospace",
     fontSize,
-    lineHeight: 2.2,
-    textColor: '#e5e7eb',
-    chordColor: '#fbbf24',
-    chordFontSize: Math.round(fontSize * 0.88),
+    lineHeight: 2.1,
+    textColor: 'var(--stage-text)',
+    chordColor: 'var(--stage-chord)',
+    chordFontSize: Math.round(fontSize * 0.9),
     columnGap: '0.3rem',
-    paragraphMarginBottom: '2.5rem',
-    commentColor: '#4b5563',
-    sectionLabel: { color: '#6ee7b7', fontWeight: 700, letterSpacing: '0.12em', marginBottom: '0.5rem' },
+    paragraphMarginBottom: '2.25rem',
+    commentColor: 'var(--stage-muted)',
+    sectionLabel: { color: 'var(--stage-section)', fontWeight: 800, letterSpacing: '0.12em', marginBottom: '0.5rem' },
   })
 }
 

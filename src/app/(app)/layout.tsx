@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
-import { PENDING_INVITE_COOKIE } from '@/lib/workspace-shared'
+import { cookies, headers } from 'next/headers'
+import { PENDING_INVITE_COOKIE, WORKSPACE_CHOSEN_COOKIE } from '@/lib/workspace-shared'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedUser, getCachedPendingPayments, getCachedNotifications, getCachedAllProfiles, getCachedFinanceSettings } from '@/lib/data'
 import { FinanceSettingsProvider } from '@/components/finance/FinanceSettingsContext'
@@ -48,6 +48,13 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   // Skip the setup redirect when offline (if the profile query errors, the user has already done setup before)
   if (!profileError && !profile?.display_name?.trim()) redirect('/setup')
+
+  // Coming in fresh with more than one workspace? Pick one first, then carry on to where they were going.
+  // Creating a workspace is one of the picker's own choices, so that page never bounces back to it.
+  const path = (await headers()).get('x-pathname') ?? '/'
+  if (workspaceOptions.length > 1 && !path.startsWith('/workspace/new') && !(await cookies()).get(WORKSPACE_CHOSEN_COOKIE)) {
+    redirect(path === '/' ? '/choose-workspace' : `/choose-workspace?next=${encodeURIComponent(path)}`)
+  }
 
   // How many split payments this person still owes a bandmate: the Sidebar's Finance badge.
   const pendingCount = pendingPayments.filter(p => p.from_member === effectiveUser.id).length

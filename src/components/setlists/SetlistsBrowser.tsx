@@ -50,7 +50,7 @@ function longDate(dateStr: string) {
   return new Intl.DateTimeFormat('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(dateStr + 'T00:00:00Z'))
 }
 
-const stageHref = (setlistId: string, first?: PreviewSong) => (first ? `/songs/${first.id}?from=/setlists/${setlistId}` : `/setlists/${setlistId}`)
+const stageHref = (setlistId: string, first?: PreviewSong) => (first ? `/songs/${first.id}?from=/setlists/${setlistId}&stage=1` : `/setlists/${setlistId}`)
 
 export function SetlistsBrowser({ setlists, countMap, previews, today }: Props) {
   const router = useRouter()

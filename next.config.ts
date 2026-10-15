@@ -9,6 +9,10 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname),
   },
+  // The old Workspaces page was replaced by the workspace picker.
+  async redirects() {
+    return [{ source: '/workspaces', destination: '/choose-workspace', permanent: true }]
+  },
 };
 
 export default nextConfig;
