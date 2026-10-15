@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { deleteSetlist } from '@/actions/setlists'
 import { LongPressMenu, type MenuItem } from '@/components/ui/LongPressMenu'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ArrowRight, ListMusic, Pencil, Play, Search, Trash2 } from 'lucide-react'
 import { Chip } from '@/components/ui/Chip'
 import { DateTile } from '@/components/ui/DateTile'
@@ -52,6 +53,7 @@ function longDate(dateStr: string) {
 const stageHref = (setlistId: string, first?: PreviewSong) => (first ? `/songs/${first.id}?from=/setlists/${setlistId}` : `/setlists/${setlistId}`)
 
 export function SetlistsBrowser({ setlists, countMap, previews, today }: Props) {
+  const router = useRouter()
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
 
@@ -145,7 +147,7 @@ export function SetlistsBrowser({ setlists, countMap, previews, today }: Props) 
                     { label: 'Open', href: `/setlists/${s.id}`, icon: ListMusic },
                     { label: 'Stage mode', href: stageHref(s.id, previews[s.id]?.[0]), icon: Play },
                     { label: 'Edit', href: `/setlists/${s.id}/edit`, icon: Pencil },
-                    { label: 'Delete', icon: Trash2, danger: true, onSelect: () => { if (window.confirm(`Delete "${s.title}"? This can’t be undone.`)) void deleteSetlist(s.id) } },
+                    { label: 'Delete', icon: Trash2, danger: true, onSelect: () => { if (window.confirm(`Delete "${s.title}"? This can’t be undone.`)) void deleteSetlist(s.id).then(r => { if (r.error) window.alert(r.error); else router.refresh() }) } },
                   ]
                   return (
                     <LongPressMenu key={s.id} title={s.title} items={menu}>

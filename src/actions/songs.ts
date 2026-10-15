@@ -74,14 +74,14 @@ export async function saveTranspose(
   return {}
 }
 
-export async function deleteSong(id: string) {
+export async function deleteSong(id: string): Promise<{ error?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Not authenticated')
+  if (!user) return { error: 'Not authenticated' }
 
   const { error } = await supabase.from('songs').delete().eq('id', id)
-  if (error) throw new Error(error.message)
+  if (error) return { error: error.message }
 
   revalidatePath('/songs')
-  redirect('/songs')
+  return {}
 }

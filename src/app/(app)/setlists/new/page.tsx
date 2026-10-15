@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { ChevronLeft, Plus, CalendarDays } from 'lucide-react'
 import { SetlistForm } from '@/components/setlists/SetlistForm'
 import { createSetlist, createSetlistFromShow } from '@/actions/setlists'
@@ -12,6 +13,10 @@ interface Props {
 export default async function NewSetlistPage({ searchParams }: Props) {
   const { showId, blank } = await searchParams
   const show = showId ? await getCachedShow(showId) : undefined
+  if (showId) {
+    const existing = (await getCachedSetlistsByShow()).find(sl => sl.show_id === showId)
+    if (existing) redirect(`/setlists/${existing.id}`)
+  }
 
   // No show picked yet and not explicitly starting from scratch — offer the
   // nearest upcoming shows so their title/date/venue don't need retyping

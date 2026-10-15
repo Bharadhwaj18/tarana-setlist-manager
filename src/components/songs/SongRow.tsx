@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Music2, Pencil, Trash2 } from 'lucide-react'
 import { LongPressMenu, type MenuItem } from '@/components/ui/LongPressMenu'
 import { deleteSong } from '@/actions/songs'
@@ -13,10 +14,11 @@ interface SongRowProps {
 }
 
 export function SongRow({ song, setlistCount }: SongRowProps) {
+  const router = useRouter()
   const menu: MenuItem[] = [
     { label: 'Open', href: `/songs/${song.id}`, icon: Music2 },
     { label: 'Edit', href: `/songs/${song.id}/edit`, icon: Pencil },
-    { label: 'Delete', icon: Trash2, danger: true, onSelect: () => { if (window.confirm(`Delete "${song.title}"? This can’t be undone.`)) void deleteSong(song.id) } },
+    { label: 'Delete', icon: Trash2, danger: true, onSelect: () => { if (window.confirm(`Delete "${song.title}"? This can’t be undone.`)) void deleteSong(song.id).then(r => { if (r.error) window.alert(r.error); else router.refresh() }) } },
   ]
   return (
     <LongPressMenu title={song.title} items={menu}>

@@ -14,6 +14,12 @@ export async function createSetlist(data: SetlistFormData) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
+  // A show has at most one setlist: if it already has one, open that instead of making a second.
+  if (data.show_id) {
+    const { data: existing } = await supabase.from('setlists').select('id').eq('show_id', data.show_id).limit(1).maybeSingle()
+    if (existing) redirect(`/setlists/${existing.id}`)
+  }
+
   const { data: setlist, error } = await supabase
     .from('setlists')
     .insert({ ...data, created_by: user.id, workspace_id: await requireWorkspaceId(), })
@@ -61,6 +67,11 @@ export async function updateSetlist(id: string, data: SetlistFormData) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
+  if (data.show_id) {
+    const { data: other } = await supabase.from('setlists').select('id').eq('show_id', data.show_id).neq('id', id).limit(1).maybeSingle()
+    if (other) throw new Error('That show already has a setlist')
+  }
+
   const { error } = await supabase.from('setlists').update({ ...data, updated_by: user.id }).eq('id', id)
   if (error) throw new Error(error.message)
 
@@ -69,16 +80,16 @@ export async function updateSetlist(id: string, data: SetlistFormData) {
   redirect(`/setlists/${id}`)
 }
 
-export async function deleteSetlist(id: string) {
+export async function deleteSetlist(id: string): Promise<{ error?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Not authenticated')
+  if (!user) return { error: 'Not authenticated' }
 
   const { error } = await supabase.from('setlists').delete().eq('id', id)
-  if (error) throw new Error(error.message)
+  if (error) return { error: error.message }
 
   revalidatePath('/setlists')
-  redirect('/setlists')
+  return {}
 }
 
 export async function addSongToSetlist(setlistId: string, songId: string, section?: string | null) {

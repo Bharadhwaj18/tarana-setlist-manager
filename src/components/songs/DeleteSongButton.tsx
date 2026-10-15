@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { deleteSong } from '@/actions/songs'
@@ -10,15 +11,17 @@ export function DeleteSongButton({ id }: { id: string }) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const toast = useToast()
+  const router = useRouter()
 
   const handleDelete = async () => {
     setLoading(true)
-    try {
-      await deleteSong(id)
-    } catch {
-      toast('Failed to delete song', 'error')
+    const result = await deleteSong(id)
+    if (result.error) {
+      toast(result.error, 'error')
       setLoading(false)
+      return
     }
+    router.push('/songs')
   }
 
   return (
