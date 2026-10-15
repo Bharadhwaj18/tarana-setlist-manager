@@ -30,22 +30,4 @@ export const KIND_BAR: Record<CalendarKind, string> = {
   else: 'bg-gray-300',
 }
 
-/** Dot under the number in the compact phone month. */
-export const KIND_DOT: Record<CalendarKind, string> = {
-  show: 'bg-brand-400',
-  task: 'bg-sky-600',
-  off: 'bg-gray-400',
-  event: 'bg-amber-500',
-  else: 'border border-gray-400 bg-white',
-}
-
-/** Same dots when the day is selected (dark forest background). */
-export const KIND_DOT_SELECTED: Record<CalendarKind, string> = {
-  show: 'bg-sidebar-accent',
-  task: 'bg-sky-300',
-  off: 'bg-gray-300',
-  event: 'bg-amber-400',
-  else: 'border border-sidebar-accent bg-transparent',
-}
-
 export const HATCH_ROW = HATCH

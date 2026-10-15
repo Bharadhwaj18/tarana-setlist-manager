@@ -7,7 +7,8 @@ import { buildMonthGrid, groupItemsByDate, externalLabel, type DayItems, type Ex
 import { parseISODate } from '@/lib/dates'
 import { cn } from '@/lib/utils'
 import { DayDetailPanel } from './DayDetailPanel'
-import { KIND_DOT, KIND_DOT_SELECTED, KIND_LABEL, KIND_PILL, type CalendarKind } from './calendarStyles'
+import { HATCH_ROW, KIND_LABEL, KIND_PILL, type CalendarKind } from './calendarStyles'
+import { SquareCheck } from 'lucide-react'
 import type { Show, Unavailability, CalendarEvent } from '@/types'
 import type { CalendarTask } from '@/types/tasks'
 
@@ -68,15 +69,26 @@ export function CalendarMonthView({
     return pills
   }
 
-  const kindsFor = (items: DayItems): CalendarKind[] => {
-    const present: Record<CalendarKind, boolean> = {
+  // Phone cells: markers for what kinds of thing are on, and the name of the most important one.
+  const phoneDay = (items: DayItems | undefined) => {
+    if (!items) return null
+    const count = items.shows.length + items.events.length + items.tasks.length + (items.unavailability.length > 0 ? 1 : 0) + items.external.length
+    if (count === 0) return null
+    const first: { kind: CalendarKind; label: string } | null =
+      items.shows[0] ? { kind: 'show', label: items.shows[0].title }
+        : items.events[0] ? { kind: 'event', label: items.events[0].title }
+          : items.tasks[0] ? { kind: 'task', label: items.tasks[0].title }
+            : items.unavailability.length > 0 ? { kind: 'off', label: 'Away' }
+              : items.external.length > 0 ? { kind: 'else', label: 'Busy' } : null
+    return {
       show: items.shows.length > 0,
-      task: items.tasks.length > 0,
-      off: items.unavailability.length > 0,
       event: items.events.length > 0,
-      else: items.external.length > 0,
+      task: items.tasks.some(t => !t.completed_at),
+      away: items.unavailability.length > 0,
+      elsewhere: items.external.length > 0,
+      first,
+      more: count - 1,
     }
-    return KINDS.filter(k => present[k])
   }
 
   // Which side the new month slides in from, and how far a finger is currently dragging the month.
@@ -231,34 +243,55 @@ export function CalendarMonthView({
               const items = byDate[day.date]
               const isToday = day.date === today
               const isSelected = day.date === selectedDate
-              const kinds = items ? kindsFor(items) : []
+              const d = phoneDay(items)
+              const pillTone: Record<CalendarKind, string> = {
+                show: 'bg-brand-100 text-brand-700',
+                event: 'bg-amber-100 text-amber-800',
+                task: 'bg-sky-100 text-sky-800',
+                off: 'bg-white text-gray-500',
+                else: 'bg-white text-gray-500',
+              }
               return (
                 <button
                   key={day.date}
                   type="button"
                   onClick={() => setSelectedDate(day.date)}
-                  aria-label={parseISODate(day.date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  aria-label={`${parseISODate(day.date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}${d?.first ? `: ${d.first.label}${d.more ? ` and ${d.more} more` : ''}` : ''}`}
                   aria-pressed={isSelected}
-                  className={cn(
-                    'm-px flex h-11 flex-col items-center justify-center gap-0.5 rounded-xl transition-colors',
-                    isSelected ? 'bg-hero text-hero-fg' : 'hover:bg-brand-50'
-                  )}
+                  className={cn('relative m-px flex h-[4.25rem] min-w-0 flex-col items-center rounded-xl pt-1 transition-colors', !isSelected && 'hover:bg-brand-50', !day.inCurrentMonth && 'opacity-40')}
                 >
-                  <span className={cn(
-                    'flex h-6 w-6 items-center justify-center rounded-full text-[13px] font-bold',
-                    isSelected ? 'text-hero-fg' : isToday ? 'bg-brand-400 text-white' : day.inCurrentMonth ? 'text-gray-700' : 'text-gray-300'
-                  )}>
+                  {/* Background: selected, someone away (striped) or busy in another workspace (dashed). */}
+                  <span aria-hidden="true" className={cn('absolute inset-0 rounded-xl',
+                    isSelected ? 'bg-hero' : d?.away ? HATCH_ROW : d?.elsewhere ? 'border-[1.5px] border-dashed border-gray-400' : '')} />
+                  <span className={cn('relative flex h-[26px] w-[26px] items-center justify-center rounded-lg text-[13px] font-extrabold',
+                    d?.show ? (isSelected ? 'bg-hero-fg text-hero' : 'bg-brand-400 text-white')
+                      : isSelected ? 'text-hero-fg' : d?.away ? 'text-gray-500' : 'text-gray-800',
+                    isToday && !d?.show && (isSelected ? 'ring-2 ring-hero-fg' : 'ring-2 ring-brand-400'))}>
                     {parseISODate(day.date).getDate()}
                   </span>
-                  <span className="flex h-[5px] gap-0.5">
-                    {kinds.slice(0, 4).map(k => (
-                      <span key={k} className={cn('h-[5px] w-[5px] rounded-full', isSelected ? KIND_DOT_SELECTED[k] : KIND_DOT[k], !day.inCurrentMonth && !isSelected && 'opacity-50')} />
-                    ))}
+                  <span aria-hidden="true" className="relative mt-0.5 flex h-2 items-center gap-[3px]">
+                    {d?.event && <span className={cn('h-[3px] w-3 rounded-full', isSelected ? 'bg-hero-fg' : 'bg-amber-500')} />}
+                    {d?.task && <SquareCheck className={cn('h-2.5 w-2.5', isSelected ? 'text-hero-fg' : 'text-sky-600')} strokeWidth={3} />}
                   </span>
+                  {d?.first && (
+                    <span aria-hidden="true" className="relative flex w-full min-w-0 items-center justify-center gap-px px-0.5 pt-px">
+                      <span className={cn('min-w-0 truncate rounded-full px-1 text-[9px] font-extrabold leading-[1.45]', isSelected ? 'bg-white/20 text-hero-fg' : pillTone[d.first.kind])}>
+                        {d.first.label}
+                      </span>
+                      {d.more > 0 && <span className={cn('shrink-0 text-[8px] font-extrabold', isSelected ? 'text-hero-fg' : 'text-gray-500')}>+{d.more}</span>}
+                    </span>
+                  )}
                 </button>
               )
             })}
           </div>
+          </div>
+          <div aria-hidden="true" className="mt-2 flex flex-wrap gap-x-3 gap-y-1 border-t border-brand-100 px-2 pt-2 text-[11px] font-bold text-gray-500">
+            <span className="inline-flex items-center gap-1.5"><span className="h-3.5 w-3.5 rounded bg-brand-400" />Show</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-[3px] w-3 rounded-full bg-amber-500" />Event</span>
+            <span className="inline-flex items-center gap-1.5"><SquareCheck className="h-3 w-3 text-sky-600" strokeWidth={3} />Task due</span>
+            <span className="inline-flex items-center gap-1.5"><span className={cn('h-3.5 w-3.5 rounded', HATCH_ROW)} />Away</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-3.5 w-3.5 rounded border-[1.5px] border-dashed border-gray-400" />Busy elsewhere</span>
           </div>
         </div>
 
