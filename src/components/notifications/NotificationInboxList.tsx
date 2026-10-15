@@ -40,7 +40,7 @@ export function NotificationInboxList({ items }: Props) {
             key={n.id}
             onClick={() => handleClick(n)}
             className={cn(
-              'flex w-full flex-col gap-1 rounded-xl border p-4 text-left shadow-sm transition-colors',
+              'animate-row-in flex w-full flex-col gap-1 rounded-xl border p-4 text-left shadow-sm transition-colors',
               n.read ? 'border-brand-200 bg-white hover:border-brand-400' : 'border-brand-400 bg-brand-50 hover:bg-brand-100'
             )}
           >

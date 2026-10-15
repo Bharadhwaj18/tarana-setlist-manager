@@ -189,7 +189,7 @@ export function CalendarMonthView({
                   aria-label={parseISODate(day.date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
                   aria-pressed={isSelected}
                   className={cn(
-                    'flex h-[5.5rem] min-w-0 flex-col items-stretch gap-1 overflow-hidden border-b border-r border-brand-100 p-1.5 text-left transition-colors hover:bg-brand-50 [&:nth-child(7n)]:border-r-0',
+                    'active:scale-[0.97] flex h-[5.5rem] min-w-0 flex-col items-stretch gap-1 overflow-hidden border-b border-r border-brand-100 p-1.5 text-left transition-colors hover:bg-brand-50 [&:nth-child(7n)]:border-r-0',
                     !day.inCurrentMonth && 'bg-gray-50/70',
                     isSelected && 'bg-brand-50 ring-2 ring-inset ring-brand-400'
                   )}

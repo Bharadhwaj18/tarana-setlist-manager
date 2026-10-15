@@ -76,7 +76,7 @@ export function KanbanPanel({ boards, buckets, tasks, members, nameById, today, 
             {menuOpen && (
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />
-                <div className="absolute right-0 z-40 mt-1 w-48 overflow-hidden rounded-2xl border border-brand-200 bg-white p-1 shadow-lg">
+                <div className="animate-menu-in absolute right-0 z-40 mt-1 w-48 overflow-hidden rounded-2xl border border-brand-200 bg-white p-1 shadow-lg">
                   <button type="button" onClick={rename} className="flex min-h-10 w-full items-center gap-2 rounded-xl px-3 text-left text-sm font-semibold text-gray-700 hover:bg-brand-50"><Pencil className="h-4 w-4" />Rename group</button>
                   <button type="button" onClick={remove} className="flex min-h-10 w-full items-center gap-2 rounded-xl px-3 text-left text-sm font-semibold text-red-700 hover:bg-red-50"><Trash2 className="h-4 w-4" />Delete group</button>
                 </div>

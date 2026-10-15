@@ -176,8 +176,8 @@ export function SaveOfflineButton({ setlistId, setlistTitle, showDate, venue, it
 
   if (saved) {
     return (
-      <div className="flex items-center gap-2 rounded-full bg-green-100 px-3 py-1.5 text-xs font-medium text-green-700 ring-1 ring-green-200">
-        <WifiOff className="h-3.5 w-3.5 shrink-0" />
+      <div className="animate-row-in flex items-center gap-2 rounded-full bg-green-100 px-3 py-1.5 text-xs font-medium text-green-700 ring-1 ring-green-200">
+        <WifiOff className="h-3.5 w-3.5 shrink-0 animate-check-pop" />
         <span>Saved offline</span>
         <button
           onClick={handleRemove}

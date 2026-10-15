@@ -54,7 +54,7 @@ export function MembersSettings({ workspaceName, members, isAdmin, isOwner, acti
         {members.map(m => {
           const manageable = isAdmin && m.role !== 'owner' && !m.isYou
           return (
-            <li key={m.userId} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
+            <li key={m.userId} className="animate-row-in flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
               <UserAvatar name={m.name} id={m.userId} avatarUrl={m.avatarUrl} size={40} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-bold text-gray-900">

@@ -16,7 +16,7 @@ import { AddColumnDialog } from './AddColumnDialog'
 import { FilterSheet } from './FilterSheet'
 import { TaskExtras } from './TaskExtras'
 import {
-  BucketCell, CustomCell, DateCell, DoneToggle, Faces, GroupCell, InlineText, PeopleCell, PriorityCell, StatusCell, shortDate,
+  BucketCell, CustomCell, DateCell, DoneToggle, Faces, GroupCell, InlineText, PeopleCell, PriorityCell, StatusCell, recentTick, shortDate,
   type CellContext,
 } from './cells'
 import { KanbanPanel } from './KanbanPanel'
@@ -250,11 +250,11 @@ export function TasksView(props: Props) {
               )}
               {!isCollapsed(s) && s.tasks.map(t => (
                 <Fragment key={t.id}>
-                  <div role="row" className={cn('grid items-center border-t border-brand-100', expanded === t.id && 'bg-brand-50/60')} style={{ gridTemplateColumns: gridTemplate }}>
+                  <div role="row" data-task-row className={cn('animate-row-in grid items-center border-t border-brand-100', expanded === t.id && 'bg-brand-50/60')} style={{ gridTemplateColumns: gridTemplate }}>
                     <span role="cell" className="flex justify-center"><DoneToggle task={t} c={c} /></span>
                     <span role="cell" className="min-w-0 px-1">
                       <InlineText value={t.title} label="Task name" readOnly={readOnly} onSave={v => v && onPatch(t, { title: v })}
-                        className={cn('text-sm font-bold', t.progress === 'completed' ? 'text-gray-400 line-through' : 'text-gray-900')} />
+                        className={cn('text-sm font-bold', t.progress === 'completed' ? cn('strike-draw text-gray-400', recentTick(t.id) && 'animate-strike-draw') : 'text-gray-900')} />
                     </span>
                     {visibleBuiltIns.map(col => (
                       <span key={col.key} role="cell" className="min-w-0 px-1">
@@ -342,12 +342,12 @@ function SectionHeader({ s, collapsed, onToggle, className }: { s: TaskSection; 
 function PhoneRow({ task: t, c, fields, open, onToggle, last, onPatch }: { task: Task; c: CellContext; fields: TaskField[]; open: boolean; onToggle: () => void; last: boolean; onPatch: CellContext['onPatch'] }) {
   const overdue = t.progress !== 'completed' && !!t.due_date && t.due_date < c.today
   return (
-    <div className={cn(!last && 'border-b border-brand-100', open && 'bg-brand-50/60')}>
+    <div data-task-row className={cn('animate-row-in', !last && 'border-b border-brand-100', open && 'bg-brand-50/60')}>
       <div className="flex min-h-[58px] items-center gap-1 py-1.5 pl-1.5 pr-1">
         <DoneToggle task={t} c={c} size={22} />
         <button type="button" onClick={onToggle} aria-expanded={open} className="flex min-w-0 flex-1 items-center gap-3 text-left">
           <span className="min-w-0 flex-1">
-            <span className={cn('block truncate text-[15px] font-bold', t.progress === 'completed' ? 'text-gray-400 line-through' : 'text-gray-900')}>{t.title}</span>
+            <span className={cn('block truncate text-[15px] font-bold', t.progress === 'completed' ? cn('strike-draw text-gray-400', recentTick(t.id) && 'animate-strike-draw') : 'text-gray-900')}>{t.title}</span>
             <span className={cn('block text-xs font-bold', overdue ? 'text-red-600' : t.due_date ? 'text-gray-500' : 'text-gray-400')}>
               {t.due_date ? `${overdue ? 'Overdue · ' : 'Due '}${shortDate(t.due_date)}` : 'No date'}
             </span>
@@ -357,7 +357,9 @@ function PhoneRow({ task: t, c, fields, open, onToggle, last, onPatch }: { task:
         </button>
       </div>
 
-      {open && (
+      {/* Always mounted, so closing can ease shut; inert while closed so nothing inside can be reached by Tab. */}
+      <div inert={!open} className={cn('grid transition-[grid-template-rows] duration-300 ease-out', open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}>
+        <div className="min-h-0 overflow-hidden">
         <div className="space-y-3 pb-4 pl-12 pr-3">
           {!c.readOnly && <InlineText value={t.title} label="Task name" onSave={v => v && onPatch(t, { title: v })} className="text-sm font-bold text-gray-900" />}
           <div className="flex flex-wrap items-center gap-1.5">
@@ -373,7 +375,8 @@ function PhoneRow({ task: t, c, fields, open, onToggle, last, onPatch }: { task:
           </div>
           <TaskExtras task={t} c={c} />
         </div>
-      )}
+        </div>
+      </div>
     </div>
   )
 }

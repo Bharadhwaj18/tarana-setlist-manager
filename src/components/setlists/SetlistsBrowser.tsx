@@ -138,7 +138,7 @@ export function SetlistsBrowser({ setlists, countMap, previews, today }: Props) 
             <p className="py-10 text-center text-sm text-gray-400">{query ? `No setlists matching "${query}"` : 'Nothing here'}</p>
           ) : (
             groups.map(group => (
-              <div key={group.label} className="flex flex-col gap-2">
+              <div key={group.label} className="animate-fade-in flex flex-col gap-2">
                 <SectionLabel className="mt-2">{group.label}</SectionLabel>
                 {group.items.map(s => {
                   const count = countMap[s.id] ?? 0

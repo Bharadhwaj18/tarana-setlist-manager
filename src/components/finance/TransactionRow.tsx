@@ -40,16 +40,18 @@ export function TransactionRow({ transaction: t, members, shows, budgets, payerN
   const { money: fmt, signed: fmtSigned, canChangeEntries } = useMoney()
   const [editOpen, setEditOpen] = useState(false)
   const [isDeleting, startDeleteTransition] = useTransition()
+  const [leaving, setLeaving] = useState(false)
   const toast = useToast()
   const isCredit = t.amount >= 0
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation()
     if (!window.confirm('Delete this entry? This can’t be undone.')) return
-    startDeleteTransition(async () => {
+    setLeaving(true)
+    window.setTimeout(() => startDeleteTransition(async () => {
       const result = await deleteTransaction(t.id)
-      if (result.error) toast(result.error, 'error')
-    })
+      if (result.error) { toast(result.error, 'error'); setLeaving(false) }
+    }), 200)
   }
 
   return (
@@ -63,7 +65,7 @@ export function TransactionRow({ transaction: t, members, shows, budgets, payerN
           setEditOpen(true)
         }
       }}
-      className={cn('flex items-center gap-3 px-4 py-3 text-left transition-colors', canChangeEntries && 'cursor-pointer hover:bg-brand-50')}
+      className={cn('animate-row-in flex items-center gap-3 px-4 py-3 text-left transition-colors', canChangeEntries && 'cursor-pointer hover:bg-brand-50', leaving && 'animate-row-out pointer-events-none')}
     >
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-bold text-gray-900">{t.description}</p>

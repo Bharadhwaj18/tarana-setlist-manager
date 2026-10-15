@@ -44,15 +44,32 @@ export function PriorityPill({ priority }: { priority: string }) {
   return <span className={cn('whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-extrabold', PRIORITY_CHIP[p])}>{PRIORITY_LABELS[p]}</span>
 }
 
+/** When each task was ticked this visit. A tick can move the row to another group and remount it, so this lives here, not in the row. */
+const tickedAt = new Map<string, number>()
+const TICK_WINDOW_MS = 1500
+
+/** True for a short while after a tick, so the tick's animations play on the row and the title. */
+export function recentTick(id: string) {
+  const at = tickedAt.get(id)
+  return at !== undefined && Date.now() - at < TICK_WINDOW_MS
+}
+
 /** The tick on the left of every row: done or not. */
 export function DoneToggle({ task, c, size = 20 }: { task: Task; c: CellContext; size?: number }) {
   const done = task.progress === 'completed'
+  // Only a fresh tick plays the pop and ring, so a finished list doesn't animate when it first loads.
+  const [ticks, setTicks] = useState(() => (recentTick(task.id) ? 1 : 0))
   const Icon = done ? CheckSquare2 : Square
   return (
     <button type="button" disabled={c.readOnly} aria-label={done ? `Mark “${task.title}” not done` : `Mark “${task.title}” done`} aria-pressed={done}
-      onClick={e => { e.stopPropagation(); c.onPatch(task, { progress: done ? 'not_started' : 'completed' }) }}
-      className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg disabled:cursor-default', done ? 'text-emerald-600' : 'text-gray-400 hover:text-gray-600')}>
-      <Icon style={{ width: size, height: size }} strokeWidth={2} />
+      onClick={e => {
+        e.stopPropagation()
+        if (!done) { tickedAt.set(task.id, Date.now()); setTicks(n => n + 1) }
+        c.onPatch(task, { progress: done ? 'not_started' : 'completed' })
+      }}
+      className={cn('relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg disabled:cursor-default', done ? 'text-emerald-600' : 'text-gray-400 hover:text-gray-600')}>
+      <Icon key={done ? 'done' : 'todo'} className={cn(done && ticks > 0 && 'animate-check-pop')} style={{ width: size, height: size }} strokeWidth={2} />
+      {done && ticks > 0 && <span key={ticks} aria-hidden className="animate-ring-burst pointer-events-none absolute inset-0 rounded-full border-2 border-emerald-500" />}
     </button>
   )
 }

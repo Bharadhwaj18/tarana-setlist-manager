@@ -21,14 +21,17 @@ export function TaskExtras({ task, c }: { task: Task; c: CellContext }) {
 
   const saveChecklist = (list: typeof checklist) => c.onPatch(task, { checklist: list })
 
-  const remove = () => {
+  const remove = (e: React.MouseEvent<HTMLElement>) => {
     if (!window.confirm(`Delete “${task.title}”? This can’t be undone.`)) return
-    startTransition(async () => {
+    // The row eases out first, then the delete runs and the list refreshes without it.
+    const row = e.currentTarget.closest('[data-task-row]')
+    row?.classList.add('animate-row-out')
+    window.setTimeout(() => startTransition(async () => {
       const res = await deleteTask(task.id)
-      if (res.error) { toast(res.error, 'error'); return }
+      if (res.error) { toast(res.error, 'error'); row?.classList.remove('animate-row-out'); return }
       toast('Task deleted', 'success')
       router.refresh()
-    })
+    }), 200)
   }
 
   return (

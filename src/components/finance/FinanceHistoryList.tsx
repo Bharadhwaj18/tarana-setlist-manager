@@ -7,6 +7,7 @@ import { Search, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AddTransactionModal } from './AddTransactionModal'
 import { Chip } from '@/components/ui/Chip'
+import { CountUp } from '@/components/ui/CountUp'
 import { StatusPill } from '@/components/ui/StatusPill'
 import { deleteTransaction } from '@/actions/finance'
 import { useToast } from '@/components/ui/Toaster'
@@ -43,6 +44,7 @@ function TransactionTableRow({ transaction: t, members, shows, budgets, payerNam
   const { money: fmt, signed: fmtSigned, canChangeEntries } = useMoney()
   const [editOpen, setEditOpen] = useState(false)
   const [isDeleting, startDeleteTransition] = useTransition()
+  const [leaving, setLeaving] = useState(false)
   const toast = useToast()
   const isCredit = t.amount >= 0
   const dateStr = new Date(t.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })
@@ -50,17 +52,21 @@ function TransactionTableRow({ transaction: t, members, shows, budgets, payerNam
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation()
     if (!window.confirm('Delete this entry? This can’t be undone.')) return
-    startDeleteTransition(async () => {
+    // The row fades out first, then the delete runs and the list refreshes without it.
+    setLeaving(true)
+    window.setTimeout(() => startDeleteTransition(async () => {
       const result = await deleteTransaction(t.id)
-      if (result.error) toast(result.error, 'error')
-    })
+      if (result.error) { toast(result.error, 'error'); setLeaving(false) }
+    }), 200)
   }
 
   return (
     <tr
       className={cn(
+        'animate-row-in',
         canChangeEntries && 'cursor-pointer transition-colors hover:bg-brand-50',
-        isDeleting && 'pointer-events-none opacity-40'
+        isDeleting && 'pointer-events-none opacity-40',
+        leaving && 'animate-row-out pointer-events-none'
       )}
       onClick={() => canChangeEntries && setEditOpen(true)}
     >
@@ -192,11 +198,11 @@ export function FinanceHistoryList({ transactions, members, shows, budgets, show
       <div className="grid grid-cols-3 divide-x divide-brand-200 rounded-2xl border border-brand-200 bg-white">
         <div className="px-4 py-3 sm:px-5">
           <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-gray-500">Money in</p>
-          <p className={cn('font-display text-lg font-bold tabular-nums sm:text-2xl', CREDIT_TEXT)}>{fmt(totalCredit)}</p>
+          <p className={cn('font-display text-lg font-bold tabular-nums sm:text-2xl', CREDIT_TEXT)}><CountUp value={totalCredit} format={fmt} /></p>
         </div>
         <div className="px-4 py-3 sm:px-5">
           <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-gray-500">Money out</p>
-          <p className={cn('font-display text-lg font-bold tabular-nums sm:text-2xl', DEBIT_TEXT)}>{fmt(totalDebit)}</p>
+          <p className={cn('font-display text-lg font-bold tabular-nums sm:text-2xl', DEBIT_TEXT)}><CountUp value={totalDebit} format={fmt} /></p>
         </div>
         <div className="px-4 py-3 sm:px-5">
           <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-gray-500">{isFiltered ? 'Net of these' : `${moneySettings.fundName} now`}</p>

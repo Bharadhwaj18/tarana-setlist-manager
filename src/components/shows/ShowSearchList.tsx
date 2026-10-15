@@ -70,7 +70,7 @@ function ShowRow({ s, net, setlist, today, agency, mode, strong }: {
   ]
 
   return (
-    <LongPressMenu title={s.title} items={menu} className="flex flex-col gap-2 rounded-2xl border border-brand-200 bg-white p-3 shadow-sm transition-colors hover:border-brand-300 sm:flex-row sm:items-center sm:gap-4 sm:px-4">
+    <LongPressMenu title={s.title} items={menu} className="animate-row-in flex flex-col gap-2 rounded-2xl border border-brand-200 bg-white p-3 shadow-sm transition-colors hover:border-brand-300 sm:flex-row sm:items-center sm:gap-4 sm:px-4">
       <Link href={`/shows/${s.id}`} className="flex min-w-0 flex-1 items-center gap-3.5">
         {s.show_date ? (
           <DateTile date={s.show_date} tone={strong ? 'strong' : 'soft'} />

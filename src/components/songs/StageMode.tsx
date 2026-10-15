@@ -84,6 +84,7 @@ export function StageMode({ songs: initialSongs, startSongId, setlistId, setlist
   const toast = useToast()
   const [mounted, setMounted] = useState(false)
   const [songs, setSongs] = useState(initialSongs)
+  const [dir, setDir] = useState(1)
   const [idx, setIdx] = useState(() => Math.max(0, initialSongs.findIndex(s => s.id === startSongId)))
   const [semitones, setSemitones] = useState(0)
   const [theme, setTheme] = useState<StageTheme>(() => readPref<StageTheme>(PREF_THEME, 'dark', v => (v === 'light' || v === 'dark' ? v : null)))
@@ -151,13 +152,14 @@ export function StageMode({ songs: initialSongs, startSongId, setlistId, setlist
 
   const goTo = useCallback((i: number) => {
     if (i < 0 || i >= songs.length) return
+    setDir(i > idx ? 1 : -1)
     setIdx(i)
     setSemitones(0)
     setAtEnd(false)
     resetScroll()
     setSheet(null)
     setBarsVisible(true)
-  }, [songs.length, resetScroll])
+  }, [songs.length, resetScroll, idx])
 
   const close = useCallback(async () => {
     await exit()
@@ -284,7 +286,7 @@ export function StageMode({ songs: initialSongs, startSongId, setlistId, setlist
       {/* The chart */}
       <div ref={scrollRef} onScroll={onScroll} {...swipe} className="stage-sheet relative flex-1 overflow-y-auto overscroll-contain">
         {song.chord_chart.trim() ? (
-          <div className="mx-auto max-w-4xl px-5 pb-48 pt-6 sm:px-10" dangerouslySetInnerHTML={{ __html: html }} />
+          <div key={idx} className={cn('mx-auto max-w-4xl px-5 pb-48 pt-6 sm:px-10', dir > 0 ? 'animate-step-in' : 'animate-step-back')} dangerouslySetInnerHTML={{ __html: html }} />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-[var(--stage-muted)]">
             <p className="text-lg">No chart for this song yet.</p>

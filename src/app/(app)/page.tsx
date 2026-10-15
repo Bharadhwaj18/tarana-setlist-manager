@@ -4,7 +4,7 @@ import {
   getCachedShows, getCachedSetlistsByShow, getCachedSetlistSongCounts, getCachedTaskData,
   getCachedPendingPayments, getCachedAllProfiles, getCachedUser, getCachedCalendarEvents, getCachedFinanceSettings,
 } from '@/lib/data'
-import { formatMoney } from '@/lib/finance/settings'
+import { MoneyCountUp } from '@/components/ui/MoneyCountUp'
 import { todayISO } from '@/lib/shows'
 import { daysUntil } from '@/lib/dates'
 import { compareOpenTasks } from '@/lib/tasks'
@@ -50,7 +50,6 @@ export default async function TodayPage() {
   const hidden: SectionKey[] = levels ? hiddenSectionsOf(levels) : []
   const calendarEvents = canSee('calendar') ? await getCachedCalendarEvents() : []
   const moneySettings = await getCachedFinanceSettings()
-  const money = (n: number) => formatMoney(n, moneySettings.currency)
 
   // Light head-count queries for the quick-access hints (no rows are transferred).
   const ws = workspaceCtx?.current.workspace.id
@@ -252,7 +251,7 @@ export default async function TodayPage() {
       node: (
         <Link href="/finance" className={cn(card, 'transition-colors hover:border-brand-300')}>
           <div className="flex items-center justify-between"><p className={eyebrow}>You are owed</p><SectionTag label="Finance" /></div>
-          <p className="font-display text-3xl font-bold text-gray-900">{money(owed)}</p>
+          <p className="font-display text-3xl font-bold text-gray-900"><MoneyCountUp value={owed} currency={moneySettings.currency} /></p>
         </Link>
       ),
     })
@@ -262,7 +261,7 @@ export default async function TodayPage() {
       node: (
         <Link href="/finance" className={cn(card, 'transition-colors hover:border-brand-300')}>
           <div className="flex items-center justify-between"><p className={eyebrow}>You owe</p><SectionTag label="Finance" /></div>
-          <p className="font-display text-3xl font-bold text-gray-900">{money(owe)}</p>
+          <p className="font-display text-3xl font-bold text-gray-900"><MoneyCountUp value={owe} currency={moneySettings.currency} /></p>
         </Link>
       ),
     })
@@ -307,8 +306,8 @@ export default async function TodayPage() {
       </header>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-        {placed.map(w => (
-          <div key={w.id} className={cn('min-w-0', spanClass(w.span))}>
+        {placed.map((w, i) => (
+          <div key={w.id} className={cn('animate-fade-up min-w-0', spanClass(w.span))} style={{ animationDelay: `${i * 70}ms` }}>
             {w.node}
           </div>
         ))}
@@ -317,7 +316,7 @@ export default async function TodayPage() {
       {quickActions.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {quickActions.map(a => (
-            <Link key={a.href} href={a.href} className="inline-flex items-center gap-2 rounded-lg border border-brand-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-brand-100">
+            <Link key={a.href} href={a.href} className="transition-lift inline-flex items-center gap-2 rounded-lg border border-brand-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-brand-100">
               <a.icon className="h-4 w-4" /> {a.label}
             </Link>
           ))}

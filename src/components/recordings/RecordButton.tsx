@@ -70,7 +70,7 @@ export function RecordButton({ userId }: { userId: string }) {
   if (status === 'recording') {
     return (
       <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
-        <span className="flex h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-red-500" />
+        <span className="flex h-2.5 w-2.5 shrink-0 animate-pulse-dot rounded-full bg-red-500" />
         <span className="flex-1 text-sm font-semibold tabular-nums text-red-700">Recording… {formatDuration(elapsedSeconds)}</span>
         <Button variant="danger" size="sm" onClick={handleStop} loading={saving}>
           <Square className="h-3.5 w-3.5" /> Stop

@@ -307,3 +307,138 @@ h1, h2 {
 @media (prefers-reduced-motion: reduce) {
   .cal-from-right, .cal-from-left { animation: none; }
 }
+
+/* Dialogs and toasts: the enter/exit classes Modal and Toaster already use (they were never defined, so nothing animated). */
+@keyframes ui-enter {
+  from { opacity: 0; transform: translateY(var(--tw-enter-y, 0)) scale(var(--tw-enter-scale, 1)); }
+}
+@keyframes ui-exit {
+  to { opacity: 0; transform: scale(var(--tw-exit-scale, 1)); }
+}
+@utility animate-in { animation: ui-enter 200ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+@utility animate-out { animation: ui-exit 160ms ease-in both; }
+@utility fade-in-0 { --tw-enter-scale: 1; }
+@utility fade-out-0 { --tw-exit-scale: 1; }
+@utility fade-out-80 { --tw-exit-scale: 1; }
+@utility zoom-in-95 { --tw-enter-scale: 0.95; }
+@utility zoom-out-95 { --tw-exit-scale: 0.95; }
+@utility slide-in-from-bottom-4 { --tw-enter-y: 1rem; }
+
+/* Small moments: a saved entry, a finished task, text settling in after a save. */
+@keyframes check-pop {
+  0% { transform: scale(0.4); }
+  55% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+@keyframes ring-burst {
+  from { transform: scale(1); opacity: 0.7; }
+  to { transform: scale(2.1); opacity: 0; }
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.animate-check-pop { animation: check-pop 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.animate-ring-burst { animation: ring-burst 520ms ease-out both; }
+.animate-fade-up { animation: fade-up 300ms ease-out 120ms both; }
+/* Motion kit: add these classes to an element; every one is switched off for reduced motion below. */
+@keyframes row-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes row-out {
+  to { opacity: 0; transform: translateX(18px); }
+}
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+@keyframes step-in {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes step-back {
+  from { opacity: 0; transform: translateX(-24px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes pop-tap {
+  0% { transform: scale(0.9); }
+  60% { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+@keyframes bar-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@keyframes badge-bounce {
+  0%, 100% { transform: scale(1); }
+  30% { transform: scale(1.35); }
+  60% { transform: scale(0.92); }
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.8); }
+}
+@keyframes strike-draw {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@keyframes ring-fill {
+  from { stroke-dashoffset: var(--ring-len, 100); }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes float-soft {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+/* "backwards", not "both": the end state must not hold, or it would override a drag transform on the same row. */
+.animate-row-in { animation: row-in 260ms cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+.animate-row-out { animation: row-out 200ms ease-in both; }
+.animate-sheet-up { animation: sheet-up 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-step-in { animation: step-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-step-back { animation: step-back 260ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-pop-tap { animation: pop-tap 240ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-bar-grow { transform-origin: left center; animation: bar-grow 700ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-badge-bounce { animation: badge-bounce 520ms ease-out both; }
+.animate-pulse-dot { animation: pulse-dot 1.2s ease-in-out infinite; }
+.animate-strike { transform-origin: left center; animation: strike-draw 320ms ease-out both; }
+.animate-ring-fill { stroke-dasharray: var(--ring-len, 100); animation: ring-fill 900ms ease-out both; }
+.animate-float { animation: float-soft 3.2s ease-in-out infinite; }
+.animate-fade-in { animation: fade-in 220ms ease-out both; }
+.animate-fade-in-delay { animation: fade-in 320ms ease-out 200ms both; }
+@keyframes menu-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.animate-menu-in { animation: menu-in 160ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.transition-lift { transition: transform 160ms ease, box-shadow 160ms ease; }
+.transition-lift:hover { transform: translateY(-2px); }
+.drag-lifted { transform: scale(1.03) rotate(-0.6deg); box-shadow: 0 14px 28px -10px rgb(0 0 0 / 0.35); }
+/* A strike-through drawn as a background line, so it can grow from left to right. */
+.strike-draw {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-size: 100% 2px;
+  background-position: 0 55%;
+}
+@keyframes strike-grow {
+  from { background-size: 0% 2px; }
+  to { background-size: 100% 2px; }
+}
+.animate-strike-draw { animation: strike-grow 360ms ease-out both; }
+/* Phone: every dialog rises from the bottom edge instead of appearing in the middle. */
+@media (max-width: 639px) {
+  [role="dialog"][data-state="open"] { animation: sheet-up 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-in, .animate-out, .animate-check-pop, .animate-ring-burst, .animate-fade-up, .animate-row-in, .animate-row-out,
+  .animate-sheet-up, .animate-step-in, .animate-step-back, .animate-pop-tap, .animate-bar-grow, .animate-badge-bounce,
+  .animate-pulse-dot, .animate-strike, .animate-ring-fill, .animate-float, .animate-fade-in, .animate-fade-in-delay,
+  .animate-strike-draw, .animate-menu-in, [role="dialog"][data-state="open"] { animation: none; }
+  .transition-lift, .drag-lifted { transition: none; }
+  .transition-lift:hover { transform: none; }
+}

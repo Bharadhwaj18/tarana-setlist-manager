@@ -448,11 +448,11 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
         <div className="lg:hidden">
           <div className="mb-1.5 flex items-center justify-between text-xs font-extrabold text-gray-900">
             <span>Step {shownStep} of 4</span>
-            <span className="font-semibold text-gray-500">{steps[shownStep - 1].label}</span>
+            <span key={shownStep} className="animate-fade-up font-semibold text-gray-500">{steps[shownStep - 1].label}</span>
           </div>
           <div className="flex gap-1">
             {steps.map((s, i) => (
-              <span key={s.id} className={cn('h-1.5 flex-1 rounded-full', i + 1 <= shownStep ? 'bg-brand-400' : 'bg-brand-200')} />
+              <span key={s.id} className={cn('h-1.5 flex-1 rounded-full transition-colors duration-300', i + 1 <= shownStep ? 'bg-brand-400' : 'bg-brand-200')} />
             ))}
           </div>
         </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { ArrowDownLeft, ArrowUpRight, ChevronDown, Plus, Pencil, X } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, Check, ChevronDown, Plus, Pencil, X } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Chip'
@@ -104,6 +104,8 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
   const [tagDraft, setTagDraft] = useState('')
   const [moreOpen, setMoreOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
+  // Set once the entry is saved: the form swaps for a tick, then the modal closes.
+  const [saved, setSaved] = useState<string | null>(null)
   const toast = useToast()
 
   const { category, showId, memberId, amount, dir, description, date, budgetId, tags, projectId } = fields
@@ -126,6 +128,7 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
       setMoreOpen(isEdit && !!(transaction?.tags?.length || transaction?.project_id || transaction?.budget_id))
       setNewShowTitle('')
       setTagDraft('')
+      setSaved(null)
     }
   }
 
@@ -196,8 +199,10 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
       if (result.error) {
         toast(result.error, 'error')
       } else {
-        toast(isEdit ? 'Entry updated' : 'pending' in result && result.pending ? 'Sent for approval' : 'Entry added', 'success')
-        setOpen(false)
+        const message = isEdit ? 'Entry updated' : 'pending' in result && result.pending ? 'Sent for approval' : 'Entry added'
+        toast(message, 'success')
+        setSaved(message)
+        window.setTimeout(() => setOpen(false), 900)
       }
     })
   }
@@ -237,6 +242,14 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
         title={isEdit ? 'Edit entry' : lockedShow ? `Add expense — ${lockedShow.title}` : 'Add money in or out'}
         className="max-w-[480px] rounded-2xl"
       >
+        {saved ? (
+          <div role="status" className="flex flex-col items-center gap-3 py-10">
+            <span className="animate-check-pop flex h-16 w-16 items-center justify-center rounded-full bg-brand-100 text-brand-600">
+              <Check className="h-8 w-8" strokeWidth={3} />
+            </span>
+            <p className="animate-fade-up text-base font-extrabold text-gray-900">{saved}</p>
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="space-y-5">
           {needsApproval && !isEdit && (
             <p className="rounded-xl bg-amber-50 px-3.5 py-2.5 text-sm font-semibold text-amber-900">An admin or treasurer will approve this before it counts.</p>
@@ -437,6 +450,7 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
             <Button type="submit" loading={isPending} disabled={!canSubmit}>{isEdit ? 'Save' : 'Save entry'}</Button>
           </div>
         </form>
+        )}
       </Modal>
     </>
   )

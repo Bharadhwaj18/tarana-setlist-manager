@@ -144,7 +144,7 @@ function BudgetCard({ p, isTreasurer, memberNames }: { p: BudgetProgress; isTrea
       </div>
 
       <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-100">
-        <div className={cn('h-full rounded-full', barColor[p.state])} style={{ width: `${Math.min(100, Math.round(p.pct))}%` }} />
+        <div className={cn('animate-bar-grow h-full rounded-full', barColor[p.state])} style={{ width: `${Math.min(100, Math.round(p.pct))}%` }} />
       </div>
       <div className="mt-1 flex justify-between text-xs tabular-nums text-gray-500">
         <span>{p.remaining < 0 ? 'Over' : 'Left'} <span className={cn('font-semibold', p.remaining < 0 ? 'text-red-700' : 'text-gray-800')}>{p.remaining < 0 ? '−' : ''}{fmt(p.remaining)}</span></span>

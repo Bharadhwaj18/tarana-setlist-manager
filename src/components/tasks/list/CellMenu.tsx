@@ -69,7 +69,7 @@ export function CellMenu<T extends string>({ trigger, label, options, value, mul
       {open && pos && createPortal(
         <div ref={menu} role="listbox" aria-label={label} aria-multiselectable={multiple || undefined}
           style={{ position: 'fixed', left: pos.left, top: pos.up ? undefined : pos.top, bottom: pos.up ? window.innerHeight - pos.top : undefined }}
-          className="z-[120] max-h-72 w-56 overflow-y-auto rounded-2xl border border-brand-200 bg-white p-1.5 shadow-xl">
+          className="animate-menu-in z-[120] max-h-72 w-56 overflow-y-auto rounded-2xl border border-brand-200 bg-white p-1.5 shadow-xl">
           {options.map(o => (
             <button key={o.value} type="button" role="option" aria-selected={selected(o.value)}
               onClick={() => { onChange(o.value); if (!multiple) setOpen(false) }}

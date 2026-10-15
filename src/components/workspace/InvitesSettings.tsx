@@ -55,7 +55,7 @@ function LinkReady({ token, workspaceName, onClose }: { token: string; workspace
       <input id={`invite-${token}`} readOnly value={url} onFocus={e => e.target.select()} aria-label="Invite link"
         className="mt-3 w-full rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 font-mono text-xs text-gray-800" />
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button onClick={copy}>{copied ? <><Check className="h-4 w-4" /> Copied</> : <><Copy className="h-4 w-4" /> Copy link</>}</Button>
+        <Button onClick={copy}>{copied ? <><Check className="animate-check-pop h-4 w-4" /> Copied</> : <><Copy className="h-4 w-4" /> Copy link</>}</Button>
         <Button asChild variant="secondary">
           <a href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer">Send on WhatsApp</a>
         </Button>
@@ -174,7 +174,7 @@ export function InvitesSettings({ invites, workspaceName }: { invites: InviteRow
         ) : (
           <ul className="divide-y divide-brand-100 overflow-hidden rounded-2xl border border-brand-200 bg-white shadow-sm">
             {invites.map(i => (
-              <li key={i.id} className="flex items-center gap-3 px-4 py-3">
+              <li key={i.id} className="animate-row-in flex items-center gap-3 px-4 py-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
                     <StatusPill tone={i.role === 'admin' ? 'amber' : 'gray'}>{i.role === 'admin' ? 'Admin' : 'Member'}</StatusPill>
@@ -186,7 +186,7 @@ export function InvitesSettings({ invites, workspaceName }: { invites: InviteRow
                   <Share2 className="h-4 w-4" />
                 </button>
                 <button type="button" onClick={() => copy(i.token)} aria-label="Copy invite link" title="Copy" className="rounded-lg p-2 text-gray-500 hover:bg-brand-100">
-                  {copied === i.token ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                  {copied === i.token ? <Check className="animate-check-pop h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
                 </button>
                 <button type="button" disabled={pending} onClick={() => revoke(i.id)} aria-label="Cancel invite link" title="Cancel link" className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600">
                   <Trash2 className="h-4 w-4" />

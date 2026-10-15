@@ -13,7 +13,7 @@ const TONES: Record<PillTone, string> = {
 /** Compact status / key / format tag. */
 export function StatusPill({ tone = 'gray', children, className }: { tone?: PillTone; children: ReactNode; className?: string }) {
   return (
-    <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold', TONES[tone], className)}>
+    <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold transition-colors duration-300', TONES[tone], className)}>
       {children}
     </span>
   )

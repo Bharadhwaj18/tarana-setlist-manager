@@ -31,8 +31,8 @@ export function SortableSongRow({ id, song, index, setlistId, onRemove }: Sortab
       ref={setNodeRef}
       style={style}
       className={cn(
-        'relative flex items-center gap-3 border-b border-brand-100 bg-white px-4 py-3 last:border-b-0',
-        isDragging && 'z-10 rounded-lg opacity-60 shadow-lg ring-2 ring-brand-400'
+        'animate-row-in relative flex items-center gap-3 border-b border-brand-100 bg-white px-4 py-3 last:border-b-0',
+        isDragging && 'drag-lifted z-10 rounded-lg opacity-80 ring-2 ring-brand-400'
       )}
     >
       {/* Drag handle */}

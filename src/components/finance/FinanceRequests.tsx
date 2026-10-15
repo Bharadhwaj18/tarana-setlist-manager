@@ -32,6 +32,7 @@ export function FinanceRequests({ requests, nameById, showTitleById, currentUser
   const [busy, setBusy] = useState<string | null>(null)
   const [rejecting, setRejecting] = useState<string | null>(null)
   const [reason, setReason] = useState('')
+  const [gone, setGone] = useState<Set<string>>(new Set())
   const [, startTransition] = useTransition()
 
   if (requests.length === 0) return null
@@ -45,7 +46,9 @@ export function FinanceRequests({ requests, nameById, showTitleById, currentUser
       setRejecting(null)
       setReason('')
       toast(done, 'success')
-      router.refresh()
+      // The card fades out, then the refreshed list drops it.
+      setGone(prev => new Set(prev).add(id))
+      window.setTimeout(() => router.refresh(), 220)
     })
   }
 
@@ -60,7 +63,7 @@ export function FinanceRequests({ requests, nameById, showTitleById, currentUser
           const isIn = r.amount > 0
           const mine = r.submitted_by === currentUserId
           return (
-            <li key={r.id} className={cn('rounded-xl border border-brand-200 bg-white p-3', busy === r.id && 'opacity-60')}>
+            <li key={r.id} className={cn('animate-row-in rounded-xl border border-brand-200 bg-white p-3', busy === r.id && 'opacity-60', gone.has(r.id) && 'animate-row-out')}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="truncate text-[15px] font-bold text-gray-900">{r.description}</p>

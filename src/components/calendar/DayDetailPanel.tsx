@@ -299,7 +299,7 @@ export function DayDetailPanel({ date, items, members, boards = [], nameById, re
   )
 
   return (
-    <div className={cn('space-y-4', layout === 'panel' && 'rounded-2xl border border-brand-200 bg-white p-4 shadow-sm', className)}>
+    <div className={cn('space-y-4', layout === 'panel' ? 'animate-fade-in rounded-2xl border border-brand-200 bg-white p-4 shadow-sm' : 'animate-fade-up', className)}>
       {header}
       {list}
 
