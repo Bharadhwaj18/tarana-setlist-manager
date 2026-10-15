@@ -14,3 +14,4 @@ export interface MemberBalance {
 
 export type FinanceProject = Database['public']['Tables']['finance_projects']['Row']
 export type FinanceRecurring = Database['public']['Tables']['finance_recurring']['Row']
+export type FinanceRequest = Database['public']['Tables']['finance_requests']['Row']

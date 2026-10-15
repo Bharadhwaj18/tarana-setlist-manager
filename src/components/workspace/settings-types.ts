@@ -7,6 +7,8 @@ export interface MemberRow {
   role: string
   treasurer: boolean
   isYou: boolean
+  /** Their profile photo, when they have one. */
+  avatarUrl?: string | null
 }
 
 export interface InviteRow {
@@ -29,11 +31,3 @@ export interface WorkspaceSummary {
   avatarUrl: string | null
 }
 
-export const SETTINGS_TABS = [
-  { key: 'general', label: 'General' },
-  { key: 'members', label: 'Members' },
-  { key: 'invites', label: 'Invites' },
-  { key: 'money', label: 'Money' },
-  { key: 'danger', label: 'Danger zone' },
-] as const
-export type SettingsTab = (typeof SETTINGS_TABS)[number]['key']

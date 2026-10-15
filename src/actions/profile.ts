@@ -33,3 +33,18 @@ export async function saveDisplayName(name: string): Promise<{ error?: string }>
   revalidatePath('/', 'layout')
   return {}
 }
+
+/** Sets (or, with null, removes) your photo after it has been uploaded to the profile-avatars bucket. */
+export async function setProfileAvatar(url: string | null): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+  if (url !== null && (url.length > 500 || !/^https?:\/\//.test(url))) return { error: 'That photo address isn’t valid.' }
+
+  const { error } = await supabase.from('profiles').update({ avatar_url: url }).eq('id', user.id)
+  if (error) {
+    return { error: /avatar_url/.test(error.message) ? 'Profile photos aren’t switched on yet. Run the profile photos SQL first.' : error.message }
+  }
+  revalidatePath('/', 'layout')
+  return {}
+}

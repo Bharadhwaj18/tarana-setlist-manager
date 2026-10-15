@@ -21,7 +21,7 @@ interface Props {
 const GROUPS = [
   { label: 'Perform', items: [{ href: '/shows', label: 'Shows' }, { href: '/songs', label: 'Songs' }, { href: '/recordings', label: 'Recordings' }] },
   { label: 'Organise', items: [{ href: '/tasks', label: 'Tasks' }, { href: '/notes', label: 'Notes' }, { href: '/calendar', label: 'Calendar' }, { href: '/event-management', label: 'Agencies' }] },
-  { label: 'Account', items: [{ href: '/choose-workspace', label: 'Workspaces' }, { href: '/workspace', label: 'Workspace & members' }, { href: '/settings', label: 'Settings' }] },
+  { label: 'Account', items: [{ href: '/choose-workspace', label: 'Workspaces' }, { href: '/settings', label: 'Settings' }] },
 ]
 
 export function MoreMenu({ email, workspaces, currentWorkspaceId, hiddenSections = [] }: Props) {

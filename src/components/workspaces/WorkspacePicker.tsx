@@ -116,7 +116,7 @@ export function WorkspacePicker({ options, lastUsedId, today, next }: Props) {
               </span>
             </span>
           </button>
-          <SettingsButton name={w.name} disabled={!!opening} onClick={() => open(w.id, '/workspace')} />
+          <SettingsButton name={w.name} disabled={!!opening} onClick={() => open(w.id, '/settings')} />
           </div>
         ))}
 
@@ -159,7 +159,7 @@ export function WorkspacePicker({ options, lastUsedId, today, next }: Props) {
                 </span>
               </span>
             </button>
-            <SettingsButton name={w.name} disabled={!!opening} onClick={() => open(w.id, '/workspace')} />
+            <SettingsButton name={w.name} disabled={!!opening} onClick={() => open(w.id, '/settings')} />
             </div>
           )
         })}
@@ -178,7 +178,7 @@ export function WorkspacePicker({ options, lastUsedId, today, next }: Props) {
               {opening === personal.id ? <><Spinner className="h-4 w-4" /> Opening…</> : <>Open <ArrowRight className="h-4 w-4" /></>}
             </span>
           </button>
-          <SettingsButton name="Personal space" disabled={!!opening} onClick={() => open(personal.id, '/workspace')} />
+          <SettingsButton name="Personal space" disabled={!!opening} onClick={() => open(personal.id, '/settings')} />
           </div>
         )}
 

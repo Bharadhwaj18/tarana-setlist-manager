@@ -4,19 +4,21 @@ import { createContext, useContext, type ReactNode } from 'react'
 import { DEFAULT_FINANCE_SETTINGS, currencySymbol, formatMoney, type FinanceSettings } from '@/lib/finance/settings'
 import type { FinanceProject } from '@/types/finance'
 
-const FinanceSettingsContext = createContext<FinanceSettings>(DEFAULT_FINANCE_SETTINGS)
+const FinanceSettingsContext = createContext<{ settings: FinanceSettings; canApprove: boolean }>({ settings: DEFAULT_FINANCE_SETTINGS, canApprove: false })
 
 /** Makes the current workspace's money settings available to every client component in the app. */
-export function FinanceSettingsProvider({ settings, children }: { settings: FinanceSettings; children: ReactNode }) {
-  return <FinanceSettingsContext.Provider value={settings}>{children}</FinanceSettingsContext.Provider>
+export function FinanceSettingsProvider({ settings, canApprove = false, children }: { settings: FinanceSettings; canApprove?: boolean; children: ReactNode }) {
+  return <FinanceSettingsContext.Provider value={{ settings, canApprove }}>{children}</FinanceSettingsContext.Provider>
 }
 
 /** The money settings plus formatters in the workspace's currency. */
 export function useMoney() {
-  const settings = useContext(FinanceSettingsContext)
+  const { settings, canApprove } = useContext(FinanceSettingsContext)
   const money = (n: number) => formatMoney(n, settings.currency)
   const signed = (n: number) => `${n < 0 ? '−' : ''}${money(n)}`
-  return { settings, money, signed, symbol: currencySymbol(settings.currency) }
+  // With approval on, only admins and treasurers can change entries that already count.
+  const canChangeEntries = !settings.features.approvals || canApprove
+  return { settings, money, signed, symbol: currencySymbol(settings.currency), canApprove, canChangeEntries, needsApproval: settings.features.approvals && !canApprove }
 }
 
 interface FinanceExtras {

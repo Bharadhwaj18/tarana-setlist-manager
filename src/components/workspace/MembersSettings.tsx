@@ -6,20 +6,13 @@ import { useRouter } from 'next/navigation'
 import { KeyRound, Link2, Trash2, UserPlus } from 'lucide-react'
 import { setMemberRole, setMemberTreasurer, removeMember } from '@/actions/workspace'
 import { StatusPill } from '@/components/ui/StatusPill'
+import { UserAvatar } from '@/components/ui/UserAvatar'
 import { cn } from '@/lib/utils'
 import type { MemberRow } from './settings-types'
 import { AccessDialog } from './AccessDialog'
 import { SECTIONS } from '@/lib/workspace-sections'
 
 const ROLE_LABEL: Record<string, string> = { owner: 'Owner', admin: 'Admin', member: 'Member' }
-
-function Initial({ name }: { name: string }) {
-  return (
-    <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-100 font-display text-base font-bold text-brand-700">
-      {name.trim().charAt(0).toUpperCase() || '?'}
-    </span>
-  )
-}
 
 interface Props {
   workspaceName: string
@@ -49,7 +42,7 @@ export function MembersSettings({ workspaceName, members, isAdmin, isOwner, acti
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-gray-500">{members.length} {members.length === 1 ? 'member' : 'members'}</p>
         {isAdmin && (
-          <Link href="/workspace?tab=invites" className="inline-flex items-center gap-2 rounded-lg bg-brand-400 px-3.5 py-2 text-sm font-bold text-white hover:bg-brand-500">
+          <Link href="/settings/invites" className="inline-flex items-center gap-2 rounded-lg bg-brand-400 px-3.5 py-2 text-sm font-bold text-white hover:bg-brand-500">
             <UserPlus className="h-4 w-4" /> Invite people
           </Link>
         )}
@@ -62,7 +55,7 @@ export function MembersSettings({ workspaceName, members, isAdmin, isOwner, acti
           const manageable = isAdmin && m.role !== 'owner' && !m.isYou
           return (
             <li key={m.userId} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
-              <Initial name={m.name} />
+              <UserAvatar name={m.name} id={m.userId} avatarUrl={m.avatarUrl} size={40} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-bold text-gray-900">
                   {m.name}{m.isYou && <span className="ml-2 rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-brand-700">You</span>}
@@ -121,7 +114,7 @@ export function MembersSettings({ workspaceName, members, isAdmin, isOwner, acti
       </ul>
 
       {isAdmin && activeInviteCount > 0 && (
-        <Link href="/workspace?tab=invites" className="flex items-center gap-3 rounded-2xl border border-dashed border-brand-200 bg-white px-4 py-3 text-sm text-gray-600 hover:bg-brand-50">
+        <Link href="/settings/invites" className="flex items-center gap-3 rounded-2xl border border-dashed border-brand-200 bg-white px-4 py-3 text-sm text-gray-600 hover:bg-brand-50">
           <Link2 className="h-4 w-4 text-gray-400" />
           <span className="flex-1">{activeInviteCount} active invite {activeInviteCount === 1 ? 'link' : 'links'}</span>
           <span className="font-bold text-brand-600">Manage</span>

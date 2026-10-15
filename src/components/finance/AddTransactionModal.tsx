@@ -82,7 +82,7 @@ function fieldsFrom(settings: FinanceSettings, transaction: FinanceTransaction |
 }
 
 export function AddTransactionModal({ members, shows, budgets = [], transaction, lockedShow, open: controlledOpen, onOpenChange, fab, projects: projectsProp, knownTags: knownTagsProp }: Props) {
-  const { settings, symbol } = useMoney()
+  const { settings, symbol, needsApproval } = useMoney()
   const extras = useFinanceExtras()
   const projects = projectsProp ?? extras.projects
   const knownTags = knownTagsProp ?? extras.knownTags
@@ -196,7 +196,7 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
       if (result.error) {
         toast(result.error, 'error')
       } else {
-        toast(isEdit ? 'Entry updated' : 'Entry added', 'success')
+        toast(isEdit ? 'Entry updated' : 'pending' in result && result.pending ? 'Sent for approval' : 'Entry added', 'success')
         setOpen(false)
       }
     })
@@ -238,6 +238,9 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
         className="max-w-[480px] rounded-2xl"
       >
         <form onSubmit={handleSubmit} className="space-y-5">
+          {needsApproval && !isEdit && (
+            <p className="rounded-xl bg-amber-50 px-3.5 py-2.5 text-sm font-semibold text-amber-900">An admin or treasurer will approve this before it counts.</p>
+          )}
           {/* 1. In or out — the one choice everything else follows from. */}
           <div className="grid grid-cols-2 gap-2">
             {([

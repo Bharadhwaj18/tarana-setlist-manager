@@ -31,6 +31,7 @@ const label = 'mb-1.5 block text-sm font-bold text-gray-800'
 const select = 'w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400 disabled:bg-gray-50'
 
 const FEATURES: { key: keyof FinanceFeatures; title: string; text: string }[] = [
+  { key: 'approvals', title: 'Treasurer approves new entries', text: 'Money added by members waits until an admin or treasurer approves it, and doesn’t count until then. Turning this off approves anything still waiting.' },
   { key: 'projects', title: 'Projects and tours', text: 'Group money under a tour, an album or any project, with its own budget and totals.' },
   { key: 'recurring', title: 'Repeating entries', text: 'Rent, retainers, subscriptions: set them once and they are added every week, month or year.' },
   { key: 'receivables', title: 'Waiting to be paid', text: 'A list of past shows whose fee hasn’t come in yet, so nothing slips.' },

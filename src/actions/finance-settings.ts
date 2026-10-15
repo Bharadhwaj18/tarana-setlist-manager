@@ -9,7 +9,7 @@ import type { Json } from '@/types/database'
 
 function revalidateFinance() {
   revalidatePath('/finance', 'layout')
-  revalidatePath('/workspace')
+  revalidatePath('/settings', 'layout')
   revalidatePath('/shows', 'layout')
   revalidatePath('/')
 }
@@ -23,8 +23,13 @@ export async function saveFinanceSettings(input: FinanceSettings): Promise<{ err
 
   const settings = normaliseFinanceSettings(input)
   const supabase = await createClient()
+  const raw = workspace.settings && typeof workspace.settings === 'object' && !Array.isArray(workspace.settings) ? (workspace.settings as Record<string, unknown>).finance : undefined
+  const wasApproving = normaliseFinanceSettings(raw).features.approvals
   const { error } = await supabase.rpc('set_finance_settings', { p_ws: workspace.id, p_settings: settings as unknown as Json })
   if (error) return { error: error.message }
+  if (wasApproving && !settings.features.approvals) {
+    await supabase.rpc('approve_all_finance_requests', { p_ws: workspace.id })
+  }
   revalidateFinance()
   return {}
 }

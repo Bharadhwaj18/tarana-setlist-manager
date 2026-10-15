@@ -59,10 +59,10 @@ export function CreateWorkspaceForm() {
     const steps = [
       { href: '/shows/new', icon: CalendarDays, title: 'Add your next event', hint: 'Date, venue and fee in one place' },
       { href: '/songs/new', icon: Music2, title: 'Add a few songs', hint: 'Chord charts and setlists build on these' },
-      { href: '/workspace?tab=invites', icon: UserPlus, title: 'Invite the rest of the workspace', hint: 'Send a link on WhatsApp' },
+      { href: '/settings/invites', icon: UserPlus, title: 'Invite the rest of the workspace', hint: 'Send a link on WhatsApp' },
     ]
     return (
-      <div className="space-y-5">
+      <div className="min-w-0 space-y-5">
         <div className="flex items-center gap-4">
           <WorkspaceAvatar name={created.name} color={tone} size="lg" />
           <div className="min-w-0">
@@ -72,10 +72,11 @@ export function CreateWorkspaceForm() {
         </div>
 
         {created.inviteUrl && (
-          <div className="rounded-xl border border-brand-200 bg-brand-50 p-3">
+          <div className="min-w-0 overflow-hidden rounded-xl border border-brand-200 bg-brand-50 p-3">
             <p className="mb-2 text-xs font-semibold text-gray-600">Invite link (works for 7 days)</p>
-            <div className="flex items-center gap-2">
-              <code className="min-w-0 flex-1 truncate rounded-md bg-white px-2.5 py-2 text-xs text-gray-700">{created.inviteUrl}</code>
+            <div className="flex min-w-0 items-start gap-2">
+              {/* The full link, wrapped onto as many lines as it needs, so the box never grows wider than the others. */}
+              <code className="min-w-0 flex-1 select-all break-all rounded-md bg-white px-2.5 py-2 text-xs leading-relaxed text-gray-700">{created.inviteUrl}</code>
               <Button type="button" size="sm" variant="secondary" onClick={copy}>
                 {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} {copied ? 'Copied' : 'Copy'}
               </Button>

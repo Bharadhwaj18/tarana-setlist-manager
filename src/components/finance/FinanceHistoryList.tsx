@@ -40,7 +40,7 @@ interface RowProps {
 }
 
 function TransactionTableRow({ transaction: t, members, shows, budgets, payerName, badge, afterFundTotal, afterMemberBalance }: RowProps) {
-  const { money: fmt, signed: fmtSigned } = useMoney()
+  const { money: fmt, signed: fmtSigned, canChangeEntries } = useMoney()
   const [editOpen, setEditOpen] = useState(false)
   const [isDeleting, startDeleteTransition] = useTransition()
   const toast = useToast()
@@ -59,10 +59,10 @@ function TransactionTableRow({ transaction: t, members, shows, budgets, payerNam
   return (
     <tr
       className={cn(
-        'cursor-pointer transition-colors hover:bg-brand-50',
+        canChangeEntries && 'cursor-pointer transition-colors hover:bg-brand-50',
         isDeleting && 'pointer-events-none opacity-40'
       )}
-      onClick={() => setEditOpen(true)}
+      onClick={() => canChangeEntries && setEditOpen(true)}
     >
       {/* Date: own column on sm+; hidden on mobile, shown in description subline */}
       <td className="hidden whitespace-nowrap py-3 pl-4 pr-3 text-[13px] text-gray-500 sm:table-cell">
@@ -115,7 +115,8 @@ function TransactionTableRow({ transaction: t, members, shows, budgets, payerNam
         <button
           type="button"
           onClick={handleDelete}
-          disabled={isDeleting}
+          disabled={isDeleting || !canChangeEntries}
+          hidden={!canChangeEntries}
           aria-label="Delete entry"
           className="rounded-md p-1 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
         >

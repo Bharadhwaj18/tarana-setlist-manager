@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Check, ChevronDown, Compass, Plus, User } from 'lucide-react'
+import { Check, ChevronDown, Compass, Plus, Settings, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { WorkspaceAvatar } from '@/components/ui/WorkspaceAvatar'
 import { todayISO } from '@/lib/shows'
@@ -28,7 +28,7 @@ function Tile({ w, size }: { w: WorkspaceOption; size: number }) {
   return <WorkspaceAvatar name={w.name} color={w.color} avatarUrl={w.avatarUrl} size={size} />
 }
 
-/** Phone-only header: the current workspace (tap for a bottom sheet to switch) on the left, notifications on the right. */
+/** Phone-only header: the current workspace (tap for a bottom sheet to switch) on the left; its settings and notifications on the right. */
 export function MobileTopBar({ workspaces, currentId, notifications }: Props) {
   const [open, setOpen] = useState(false)
   const { pending, switchTo } = useSwitchWorkspace(() => setOpen(false))
@@ -52,7 +52,15 @@ export function MobileTopBar({ workspaces, currentId, notifications }: Props) {
           </button>
         ) : <span />}
 
-        <NotificationBell notifications={notifications} tone="page" />
+        <div className="flex shrink-0 items-center gap-1">
+          {current && (
+            <Link href="/settings" aria-label="Settings" title="Settings"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-gray-600 hover:bg-brand-100">
+              <Settings className="h-5 w-5" />
+            </Link>
+          )}
+          <NotificationBell notifications={notifications} tone="page" />
+        </div>
       </header>
 
       <div className={cn('fixed inset-0 z-50 lg:hidden', open ? 'pointer-events-auto' : 'pointer-events-none')} aria-hidden={!open}>
@@ -79,11 +87,11 @@ export function MobileTopBar({ workspaces, currentId, notifications }: Props) {
               const isCurrent = w.id === currentId
               const badge = attentionBadge(w, today)
               return (
-                <li key={w.id}>
+                <li key={w.id} className="relative">
                   <button
                     type="button"
                     onClick={() => switchTo(w.id, currentId)}
-                    className={cn('flex min-h-14 w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left', isCurrent ? 'border-brand-300 bg-brand-100' : 'border-transparent hover:bg-brand-50')}
+                    className={cn('flex min-h-14 w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left', isCurrent ? 'border-brand-300 bg-brand-100 pr-28' : 'border-transparent hover:bg-brand-50')}
                   >
                     <Tile w={w} size={44} />
                     <span className="min-w-0 flex-1">
@@ -97,6 +105,12 @@ export function MobileTopBar({ workspaces, currentId, notifications }: Props) {
                     </span>
                     {isCurrent && <Check className="h-5 w-5 shrink-0 text-brand-600" />}
                   </button>
+                  {isCurrent && (
+                    <Link href="/settings" onClick={() => setOpen(false)}
+                      className="absolute right-11 top-1/2 flex -translate-y-1/2 items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-extrabold text-gray-800 shadow-sm">
+                      <Settings className="h-3.5 w-3.5" /> Settings
+                    </Link>
+                  )}
                 </li>
               )
             })}

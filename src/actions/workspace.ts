@@ -137,7 +137,7 @@ export async function createInvite(input: CreateInviteInput): Promise<{ error?: 
     .select('token')
     .single()
   if (error) return { error: error.message }
-  revalidatePath('/workspace')
+  revalidatePath('/settings', 'layout')
   return { token: data.token }
 }
 
@@ -145,7 +145,7 @@ export async function revokeInvite(inviteId: string): Promise<{ error?: string }
   const supabase = await createClient()
   const { error } = await supabase.rpc('revoke_workspace_invite', { p_invite: inviteId })
   if (error) return { error: error.message }
-  revalidatePath('/workspace')
+  revalidatePath('/settings', 'layout')
   return {}
 }
 
@@ -198,7 +198,7 @@ export async function setMemberRole(userId: string, role: 'admin' | 'member'): P
     .eq('workspace_id', auth.workspaceId)
     .eq('user_id', userId)
   if (error) return { error: error.message }
-  revalidatePath('/workspace')
+  revalidatePath('/settings', 'layout')
   return {}
 }
 

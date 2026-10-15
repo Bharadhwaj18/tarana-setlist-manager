@@ -11,7 +11,7 @@ import { OfflineUserSync } from '@/components/OfflineUserSync'
 import { IdentifyUser } from '@/components/analytics/IdentifyUser'
 import type { ReactNode } from 'react'
 import { hiddenSectionsOf } from '@/lib/workspace-sections'
-import { getWorkspaceContext } from '@/lib/workspace'
+import { getWorkspaceContext, isFinanceApprover } from '@/lib/workspace'
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const supabase = await createClient()
@@ -73,7 +73,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         currentWorkspaceId={currentWorkspaceId} hiddenSections={hiddenSections} />
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-5xl px-4 pb-28 pt-16 sm:px-6 lg:px-8 lg:pb-8 lg:pt-8">
-          <FinanceSettingsProvider settings={financeSettings}>{children}</FinanceSettingsProvider>
+          <FinanceSettingsProvider settings={financeSettings} canApprove={!!ctx && isFinanceApprover(ctx.current)}>{children}</FinanceSettingsProvider>
         </div>
       </main>
     </div>

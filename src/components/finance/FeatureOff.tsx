@@ -7,7 +7,7 @@ export function FeatureOff({ title, isAdmin }: { title: string; isAdmin: boolean
     <EmptyState
       title={`${title} is turned off`}
       description={isAdmin ? 'Turn it on under Extra tools in Money settings.' : 'Ask a workspace admin to turn it on in Money settings.'}
-      action={isAdmin ? <Link href="/workspace?tab=money" className="rounded-lg bg-brand-400 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-500">Open Money settings</Link> : undefined}
+      action={isAdmin ? <Link href="/settings/money" className="rounded-lg bg-brand-400 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-500">Open Money settings</Link> : undefined}
     />
   )
 }

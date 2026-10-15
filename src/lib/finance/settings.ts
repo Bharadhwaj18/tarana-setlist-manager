@@ -28,6 +28,8 @@ export interface FinanceFeatures {
   recurring: boolean
   receivables: boolean
   tds: boolean
+  /** Entries from anyone but admins and treasurers wait for one of them to approve. */
+  approvals: boolean
 }
 
 export type ShareMode = 'equal' | 'percent' | 'ratio' | 'fixed'
@@ -90,7 +92,7 @@ export const DEFAULT_FINANCE_SETTINGS: FinanceSettings = {
   fixedAmounts: {},
   cuts: [],
   tags: [],
-  features: { projects: true, recurring: true, receivables: true, tds: true },
+  features: { projects: true, recurring: true, receivables: true, tds: true, approvals: false },
 }
 
 export function isLockedCategory(c: Pick<FinanceCategory, 'key'>) {
@@ -218,7 +220,7 @@ export function normaliseFinanceSettings(raw: unknown): FinanceSettings {
     fixedAmounts,
     cuts,
     tags,
-    features: { projects: flag('projects'), recurring: flag('recurring'), receivables: flag('receivables'), tds: flag('tds') },
+    features: { projects: flag('projects'), recurring: flag('recurring'), receivables: flag('receivables'), tds: flag('tds'), approvals: flag('approvals') },
   }
 }
 

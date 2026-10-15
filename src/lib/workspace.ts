@@ -55,6 +55,11 @@ export function hasPermission(membership: WorkspaceMembership, permission: strin
   return membership.permissions[permission] === true
 }
 
+/** Can approve finance entries (and change them while approval is on): owners, admins and treasurers. */
+export function isFinanceApprover(membership: WorkspaceMembership): boolean {
+  return membership.role === 'owner' || membership.role === 'admin' || hasPermission(membership, 'treasurer')
+}
+
 /** Treasurer in the currently selected workspace. */
 export async function isCurrentTreasurer(): Promise<boolean> {
   const ctx = await getWorkspaceContext()

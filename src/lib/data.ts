@@ -249,3 +249,20 @@ export const getCachedFinanceProjects = cache(() =>
 export const getCachedRecurring = cache(() =>
   inWorkspace((supabase, ws) => supabase.from('finance_recurring').select('*').eq('workspace_id', ws).order('created_at'))
 )
+
+// Photos for the people in the current workspace, by id. Kept apart from getCachedAllProfiles so a
+// database without the avatar_url column yet just shows initials instead of breaking every list.
+export const getCachedProfileAvatars = cache(async (): Promise<Record<string, string>> => {
+  const profiles = await getCachedAllProfiles()
+  const ctx = await getWorkspaceContext()
+  const ids = [...new Set([...profiles.map(p => p.id), ...(ctx ? [ctx.userId] : [])])]
+  if (!ids.length) return {}
+  const supabase = await createClient()
+  const { data, error } = await supabase.from('profiles').select('id, avatar_url').in('id', ids)
+  if (error || !data) return {}
+  return Object.fromEntries(data.filter(p => p.avatar_url).map(p => [p.id, p.avatar_url as string]))
+})
+
+export const getCachedFinanceRequests = cache(() =>
+  inWorkspace((supabase, ws) => supabase.from('finance_requests').select('*').eq('workspace_id', ws).order('created_at', { ascending: false }))
+)

@@ -37,7 +37,7 @@ interface Props {
  * accidental safety net.
  */
 export function TransactionRow({ transaction: t, members, shows, budgets, payerName, badge, afterFundTotal, afterMemberBalance }: Props) {
-  const { money: fmt, signed: fmtSigned } = useMoney()
+  const { money: fmt, signed: fmtSigned, canChangeEntries } = useMoney()
   const [editOpen, setEditOpen] = useState(false)
   const [isDeleting, startDeleteTransition] = useTransition()
   const toast = useToast()
@@ -54,16 +54,16 @@ export function TransactionRow({ transaction: t, members, shows, budgets, payerN
 
   return (
     <div
-      role="button"
-      tabIndex={0}
-      onClick={() => setEditOpen(true)}
+      role={canChangeEntries ? 'button' : undefined}
+      tabIndex={canChangeEntries ? 0 : undefined}
+      onClick={() => canChangeEntries && setEditOpen(true)}
       onKeyDown={e => {
-        if (e.key === 'Enter' || e.key === ' ') {
+        if (canChangeEntries && (e.key === 'Enter' || e.key === ' ')) {
           e.preventDefault()
           setEditOpen(true)
         }
       }}
-      className="flex cursor-pointer items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-brand-50"
+      className={cn('flex items-center gap-3 px-4 py-3 text-left transition-colors', canChangeEntries && 'cursor-pointer hover:bg-brand-50')}
     >
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-bold text-gray-900">{t.description}</p>
@@ -95,15 +95,17 @@ export function TransactionRow({ transaction: t, members, shows, budgets, payerN
       <span className={cn('shrink-0 text-sm font-extrabold tabular-nums', isCredit ? CREDIT_TEXT : DEBIT_TEXT)}>
         {isCredit ? '+' : '−'}{fmt(t.amount)}
       </span>
-      <button
-        type="button"
-        onClick={handleDelete}
-        disabled={isDeleting}
-        aria-label="Delete entry"
-        className="shrink-0 rounded-md p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-      >
-        <Trash2 className="h-4 w-4" />
-      </button>
+      {canChangeEntries && (
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={isDeleting}
+          aria-label="Delete entry"
+          className="shrink-0 rounded-md p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      )}
 
       {/* React portals still bubble clicks up the *React* tree (Radix's
           dialog included), not just the DOM tree — without this stopgap, a

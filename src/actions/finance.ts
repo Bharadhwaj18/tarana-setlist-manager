@@ -6,7 +6,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { todayISO } from '@/lib/shows'
 import { getCachedAllProfiles, getCachedFinanceSettings } from '@/lib/data'
-import { isCurrentTreasurer, requireWorkspaceId } from '@/lib/workspace'
+import { getWorkspaceContext, isCurrentTreasurer, isFinanceApprover, requireWorkspaceId } from '@/lib/workspace'
 import { sendNotification, sendNotificationToAll } from '@/actions/notifications'
 import type { Json } from '@/types/database'
 import type { SplitRunReport, SplitRunPayment, SplitRunShow } from '@/types/split-run'
@@ -66,7 +66,15 @@ async function validateTransactionWrite(
   return null
 }
 
-export async function addTransaction(data: TransactionInput): Promise<{ error?: string }> {
+/** With approval on, is this person's entry going to wait for an admin or treasurer? */
+async function needsApproval(): Promise<boolean> {
+  const [ctx, settings] = await Promise.all([getWorkspaceContext(), getCachedFinanceSettings()])
+  return !!ctx && settings.features.approvals && !isFinanceApprover(ctx.current)
+}
+
+const APPROVAL_ONLY = 'While treasurer approval is on, only an admin or treasurer can change or delete entries.'
+
+export async function addTransaction(data: TransactionInput): Promise<{ error?: string; pending?: boolean }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
@@ -78,6 +86,8 @@ export async function addTransaction(data: TransactionInput): Promise<{ error?: 
 
   const validationError = await validateTransactionWrite(supabase, data)
   if (validationError) return { error: validationError }
+
+  if (await needsApproval()) return submitForApproval(supabase, user.id, data)
 
   const { error } = await supabase.from('finance_transactions').insert({
     ...data,
@@ -109,6 +119,7 @@ export async function updateTransaction(id: string, data: TransactionInput): Pro
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
+  if (await needsApproval()) return { error: APPROVAL_ONLY }
 
   data = { ...data, member_id: data.member_id ?? user.id }
 
@@ -127,6 +138,7 @@ export async function updateTransaction(id: string, data: TransactionInput): Pro
 }
 
 export async function deleteTransaction(id: string): Promise<{ error?: string }> {
+  if (await needsApproval()) return { error: APPROVAL_ONLY }
   const supabase = await createClient()
   const { error } = await supabase.from('finance_transactions').delete().eq('id', id)
   if (error) return { error: error.message }
@@ -330,4 +342,92 @@ export async function exportTransactions(filters: {
   }))
 
   return { data: rows }
+}
+
+// ---- Treasurer approval ------------------------------------------------------------------
+
+async function approverIds(supabase: Awaited<ReturnType<typeof createClient>>, workspaceId: string): Promise<string[]> {
+  const { data } = await supabase.from('workspace_members').select('user_id, role, permissions').eq('workspace_id', workspaceId)
+  return (data ?? [])
+    .filter(m => m.role === 'owner' || m.role === 'admin' || (m.permissions && typeof m.permissions === 'object' && !Array.isArray(m.permissions) && (m.permissions as Record<string, unknown>).treasurer === true))
+    .map(m => m.user_id)
+}
+
+async function submitForApproval(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, data: TransactionInput): Promise<{ error?: string; pending?: boolean }> {
+  const workspaceId = await requireWorkspaceId()
+  const { error } = await supabase.from('finance_requests').insert({
+    workspace_id: workspaceId,
+    submitted_by: userId,
+    member_id: data.member_id,
+    amount: data.amount,
+    description: data.description,
+    category: data.category ?? null,
+    show_id: data.show_id ?? null,
+    budget_id: data.budget_id ?? null,
+    project_id: data.project_id ?? null,
+    tags: data.tags ?? [],
+    date: data.date ?? todayISO(),
+  })
+  if (error) return { error: /finance_requests/.test(error.message) ? 'Approvals aren’t switched on in the database yet. Run the finance approvals SQL first.' : error.message }
+
+  const { data: actor } = await supabase.from('profiles').select('display_name').eq('id', userId).maybeSingle()
+  const who = actor?.display_name ?? 'Someone'
+  for (const id of await approverIds(supabase, workspaceId)) {
+    if (id === userId) continue
+    await sendNotification({
+      recipientId: id,
+      title: `${who} added ${await moneyText(data.amount)} for approval`,
+      body: data.description,
+      link: '/finance',
+      type: 'finance_request',
+    })
+  }
+  revalidatePath('/finance')
+  return { pending: true }
+}
+
+/** An admin or treasurer approves a waiting entry: it becomes a normal entry and starts counting. */
+export async function approveFinanceRequest(id: string): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: request } = await supabase.from('finance_requests').select('submitted_by, amount, description').eq('id', id).maybeSingle()
+  const { error } = await supabase.rpc('approve_finance_request', { p_id: id })
+  if (error) return { error: error.message }
+  if (request) {
+    await sendNotification({
+      recipientId: request.submitted_by,
+      title: `Approved: ${await moneyText(request.amount)}`,
+      body: request.description,
+      link: '/finance',
+      type: 'finance_request_decided',
+    })
+  }
+  revalidatePath('/finance', 'layout')
+  return {}
+}
+
+/** An admin or treasurer turns a waiting entry down. The person who added it is told why. */
+export async function rejectFinanceRequest(id: string, reason: string): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: request } = await supabase.from('finance_requests').select('submitted_by, amount, description').eq('id', id).maybeSingle()
+  if (!request) return { error: 'That entry is no longer waiting.' }
+  const { error } = await supabase.from('finance_requests').delete().eq('id', id)
+  if (error) return { error: error.message }
+  await sendNotification({
+    recipientId: request.submitted_by,
+    title: `Not approved: ${await moneyText(request.amount)} · ${request.description}`,
+    body: reason.trim() || 'An admin or treasurer turned this entry down.',
+    link: '/finance',
+    type: 'finance_request_decided',
+  })
+  revalidatePath('/finance')
+  return {}
+}
+
+/** Take back an entry you sent that hasn't been approved yet. */
+export async function withdrawFinanceRequest(id: string): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { error } = await supabase.from('finance_requests').delete().eq('id', id)
+  if (error) return { error: error.message }
+  revalidatePath('/finance')
+  return {}
 }

@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { sectionGuard } from '@/lib/section-guard'
 import { createClient } from '@/lib/supabase/server'
-import { getCachedAllProfiles, getCachedUser, getCachedPendingPayments, getCachedFinanceSettings, getCachedFinanceProjects, getCachedRecurring } from '@/lib/data'
+import { getCachedAllProfiles, getCachedUser, getCachedPendingPayments, getCachedFinanceSettings, getCachedFinanceProjects, getCachedRecurring, getCachedFinanceRequests } from '@/lib/data'
+import { FinanceRequests } from '@/components/finance/FinanceRequests'
 import { catchUpRecurring } from '@/lib/finance/recurring-server'
 import { categoryLabel, REIMBURSEMENT_KEY } from '@/lib/finance/settings'
 import { FinanceExtrasProvider } from '@/components/finance/FinanceSettingsContext'
@@ -35,13 +36,14 @@ export default async function FinancePage() {
   const currency = settings.currency
   const canEditSettings = ctx?.current.role === 'owner' || ctx?.current.role === 'admin'
 
-  const [{ data: { user } }, profiles, { data: txns }, { data: shows }, pendingPayments, { data: budgets }] = await Promise.all([
+  const [{ data: { user } }, profiles, { data: txns }, { data: shows }, pendingPayments, { data: budgets }, requests] = await Promise.all([
     getCachedUser(),
     getCachedAllProfiles(),
     supabase.from('finance_transactions').select('*').eq('workspace_id', ws).order('created_at', { ascending: false }),
     supabase.from('shows').select('*').eq('workspace_id', ws).order('show_date', { ascending: false }),
     getCachedPendingPayments(),
     supabase.from('budgets').select('*').eq('workspace_id', ws).order('created_at', { ascending: true }),
+    getCachedFinanceRequests(),
   ])
 
   // Balance per member. There's no separate Band Fund bucket — whatever a
@@ -118,7 +120,7 @@ export default async function FinancePage() {
             </Link>
             <ExportModal members={profiles.map(p => ({ id: p.id, name: p.display_name ?? 'Member' }))} />
             {canEditSettings && (
-              <Link href="/workspace?tab=money" aria-label="Money settings" title="Money settings" className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-brand-200 bg-white text-gray-600 hover:bg-brand-50">
+              <Link href="/settings/money" aria-label="Money settings" title="Money settings" className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-brand-200 bg-white text-gray-600 hover:bg-brand-50">
                 <Settings2 className="h-4 w-4" />
               </Link>
             )}
@@ -132,6 +134,10 @@ export default async function FinancePage() {
 
       {/* Pending payments — a standing reminder until marked paid */}
       <PendingPaymentsBanner payments={myPendingPayments} profiles={profiles} />
+
+      <FinanceRequests requests={requests} currentUserId={user?.id ?? ''}
+        nameById={Object.fromEntries(profiles.map(p => [p.id, p.display_name ?? 'Member']))}
+        showTitleById={Object.fromEntries((shows ?? []).map(s => [s.id, s.title]))} />
 
       <nav aria-label="Money tools" className="flex flex-wrap gap-2">
         {tools.map(t => (

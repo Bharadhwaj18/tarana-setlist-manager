@@ -18,18 +18,21 @@ export type Database = {
           display_name: string | null
           role: string
           created_at: string
+          avatar_url: string | null
         }
         Insert: {
           id: string
           display_name?: string | null
           role?: string
           created_at?: string
+          avatar_url?: string | null
         }
         Update: {
           id?: string
           display_name?: string | null
           role?: string
           created_at?: string
+          avatar_url?: string | null
         }
         Relationships: []
       }
@@ -634,6 +637,54 @@ export type Database = {
         }
         Relationships: []
       }
+      finance_requests: {
+        Row: {
+          id: string
+          workspace_id: string
+          submitted_by: string
+          member_id: string | null
+          amount: number
+          description: string
+          category: string | null
+          show_id: string | null
+          budget_id: string | null
+          project_id: string | null
+          tags: string[]
+          date: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          submitted_by?: string
+          member_id?: string | null
+          amount: number
+          description: string
+          category?: string | null
+          show_id?: string | null
+          budget_id?: string | null
+          project_id?: string | null
+          tags?: string[]
+          date?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          submitted_by?: string
+          member_id?: string | null
+          amount?: number
+          description?: string
+          category?: string | null
+          show_id?: string | null
+          budget_id?: string | null
+          project_id?: string | null
+          tags?: string[]
+          date?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       finance_transactions: {
         Row: {
           workspace_id: string | null
@@ -1225,6 +1276,8 @@ export type Database = {
       }
       set_finance_settings: { Args: { p_ws: string; p_settings: Json }; Returns: undefined }
       rename_finance_tag: { Args: { p_ws: string; p_old: string; p_new?: string | null }; Returns: undefined }
+      approve_finance_request: { Args: { p_id: string }; Returns: string }
+      approve_all_finance_requests: { Args: { p_ws: string }; Returns: number }
       transfer_workspace_ownership: { Args: { p_ws: string; p_new_owner: string }; Returns: undefined }
       workspace_attention: {
         Args: Record<string, never>
