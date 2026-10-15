@@ -105,6 +105,8 @@ export interface CreateInviteInput {
   role: 'member' | 'admin'
   expiresInDays: number
   maxUses: number | null
+  /** What a member who joins with this link can open. Ignored for admins, who always get everything. */
+  sections?: Partial<Record<SectionKey, SectionLevel>>
 }
 
 export async function createInvite(input: CreateInviteInput): Promise<{ error?: string; token?: string }> {
@@ -116,12 +118,17 @@ export async function createInvite(input: CreateInviteInput): Promise<{ error?: 
   if (input.maxUses !== null && (!Number.isInteger(input.maxUses) || input.maxUses < 1)) {
     return { error: 'Max uses must be at least 1.' }
   }
+  const allowed = new Set<string>(SECTIONS.map(s => s.key))
+  const sections = input.role === 'member' && input.sections
+    ? Object.fromEntries(Object.entries(input.sections).filter(([k, v]) => allowed.has(k) && (v === 'edit' || v === 'view' || v === 'none')))
+    : null
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('workspace_invites')
     .insert({
       workspace_id: auth.workspaceId,
       role: input.role,
+      permissions: sections ? { sections } : {},
       max_uses: input.maxUses,
       expires_at: new Date(Date.now() + input.expiresInDays * 86_400_000).toISOString(),
     })
@@ -142,8 +149,10 @@ export async function revokeInvite(inviteId: string): Promise<{ error?: string }
 
 export async function acceptInvite(token: string): Promise<{ error?: string }> {
   const supabase = await createClient()
-  const { data, error } = await supabase.rpc('accept_workspace_invite', { p_token: token })
-  if (error) return { error: error.message }
+  // join_with_invite also applies the access chosen on the invite. Until its SQL has been run, fall back to the plain join.
+  let { data, error } = await supabase.rpc('join_with_invite', { p_token: token })
+  if (error?.code === 'PGRST202') ({ data, error } = await supabase.rpc('accept_workspace_invite', { p_token: token }))
+  if (error || !data) return { error: error?.message ?? 'Couldn’t join this workspace.' }
   await selectWorkspace(data)
   return {}
 }

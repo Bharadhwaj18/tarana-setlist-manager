@@ -1234,6 +1234,8 @@ export type Database = {
       rename_workspace: { Args: { p_ws: string; p_name: string }; Returns: undefined }
       revoke_workspace_invite: { Args: { p_invite: string }; Returns: undefined }
       accept_workspace_invite: { Args: { p_token: string }; Returns: string }
+      join_with_invite: { Args: { p_token: string }; Returns: string }
+      invite_sections: { Args: { p_token: string }; Returns: Json }
       invite_preview: {
         Args: { p_token: string }
         Returns: {

@@ -7,6 +7,7 @@ import { AcceptInviteButton } from '@/components/workspace/AcceptInviteButton'
 import { BrandMark } from '@/components/ui/BrandMark'
 import { Wordmark } from '@/components/ui/Wordmark'
 import { WorkspaceAvatar } from '@/components/ui/WorkspaceAvatar'
+import { SECTIONS, sectionLevelsFrom } from '@/lib/workspace-sections'
 
 const STATE_MESSAGES: Record<string, string> = {
   revoked: 'This invite link was cancelled. Ask whoever invited you for a new one.',
@@ -23,6 +24,10 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
   const supabase = await createClient()
   const { data } = await supabase.rpc('invite_preview', { p_token: token })
   const invite = data?.[0]
+  // What a member joining with this link can open (null = everything, or the function isn't set up yet).
+  const { data: rawSections } = await supabase.rpc('invite_sections', { p_token: token })
+  const levels = rawSections && typeof rawSections === 'object' && !Array.isArray(rawSections) ? sectionLevelsFrom({ sections: rawSections }, 'member') : null
+  const canOpen = levels ? SECTIONS.filter(sec => levels[sec.key] !== 'none').map(sec => (levels[sec.key] === 'view' ? `${sec.label} (view only)` : sec.label)) : null
   const { data: { user } } = await getCachedUser()
   const loginHref = `/login?next=${encodeURIComponent(`/invite/${token}`)}`
 
@@ -61,6 +66,11 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
             <span className="mt-4 inline-flex rounded-full bg-brand-100 px-3 py-1 text-xs font-bold text-brand-700">
               You’ll join as {invite.invite_role === 'admin' ? 'an Admin' : 'a Member'}
             </span>
+            {canOpen && (
+              <p className="mt-3 text-sm text-gray-600">
+                {canOpen.length === 0 ? 'An admin will choose what you can open after you join.' : <>You’ll be able to open: <span className="font-semibold text-gray-800">{canOpen.join(', ')}</span></>}
+              </p>
+            )}
 
             {user ? (
               <div className="mt-6 space-y-2">

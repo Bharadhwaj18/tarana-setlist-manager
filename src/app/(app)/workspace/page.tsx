@@ -86,7 +86,7 @@ export default async function WorkspacePage({ searchParams }: Props) {
     isAdmin
       ? supabase
           .from('workspace_invites')
-          .select('id, token, role, expires_at, max_uses, use_count')
+          .select('id, token, role, permissions, expires_at, max_uses, use_count')
           .eq('workspace_id', workspace.id)
           .is('revoked_at', null)
           .gt('expires_at', new Date().toISOString())
@@ -107,7 +107,10 @@ export default async function WorkspacePage({ searchParams }: Props) {
 
   const invites: InviteRow[] = (inviteRows ?? [])
     .filter(i => i.max_uses === null || i.use_count < i.max_uses)
-    .map(i => ({ id: i.id, token: i.token, role: i.role, expiresAt: i.expires_at, maxUses: i.max_uses, useCount: i.use_count }))
+    .map(i => ({
+      id: i.id, token: i.token, role: i.role, expiresAt: i.expires_at, maxUses: i.max_uses, useCount: i.use_count,
+      sections: i.permissions && typeof i.permissions === 'object' && !Array.isArray(i.permissions) && 'sections' in i.permissions ? sectionLevelsFrom(i.permissions, 'member') : null,
+    }))
 
   const summary = {
     id: workspace.id,
@@ -150,7 +153,7 @@ export default async function WorkspacePage({ searchParams }: Props) {
           <SectionLabel className="mb-3">{visibleTabs.find(t => t.key === activeTab)?.label}</SectionLabel>
           {activeTab === 'general' && <GeneralSettings workspace={summary} canEdit={isAdmin} />}
           {activeTab === 'members' && <MembersSettings workspaceName={workspace.name} members={members} isAdmin={isAdmin} isOwner={isOwner} activeInviteCount={invites.length} />}
-          {activeTab === 'invites' && isAdmin && <InvitesSettings invites={invites} />}
+          {activeTab === 'invites' && isAdmin && <InvitesSettings invites={invites} workspaceName={workspace.name} />}
           {activeTab === 'money' && <MoneySettings initial={financeSettings} members={members.map(m => ({ id: m.userId, name: m.name }))} canEdit={isAdmin} usedTags={tagsInUse} />}
           {activeTab === 'danger' && <DangerSettings workspaceName={workspace.name} members={members} isAdmin={isAdmin} isOwner={isOwner} />}
         </div>

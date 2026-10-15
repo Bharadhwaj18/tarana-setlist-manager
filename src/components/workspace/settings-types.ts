@@ -16,6 +16,8 @@ export interface InviteRow {
   expiresAt: string
   maxUses: number | null
   useCount: number
+  /** Access a member joining with this link gets; null means everything. */
+  sections: SectionLevels | null
 }
 
 export interface WorkspaceSummary {
