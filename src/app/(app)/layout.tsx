@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { getCachedUser, getCachedPendingPayments, getCachedNotifications, getCachedAllProfiles } from '@/lib/data'
+import { getCachedUser, getCachedPendingPayments, getCachedNotifications, getCachedAllProfiles, getCachedFinanceSettings } from '@/lib/data'
+import { FinanceSettingsProvider } from '@/components/finance/FinanceSettingsContext'
 import { resolveNotificationItems } from '@/lib/notifications'
 import { getWorkspaceOptions } from '@/lib/workspace-options-server'
 import { Sidebar } from '@/components/layout/Sidebar'
@@ -45,6 +46,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   const ctx = await getWorkspaceContext()
   const hiddenSections = ctx ? hiddenSectionsOf(ctx.current.sections) : []
+  const financeSettings = await getCachedFinanceSettings()
 
   return (
     <div className="flex h-screen">
@@ -55,7 +57,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         currentWorkspaceId={currentWorkspaceId} hiddenSections={hiddenSections} />
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-5xl px-4 pb-28 pt-16 sm:px-6 lg:px-8 lg:pb-8 lg:pt-8">
-          {children}
+          <FinanceSettingsProvider settings={financeSettings}>{children}</FinanceSettingsProvider>
         </div>
       </main>
     </div>

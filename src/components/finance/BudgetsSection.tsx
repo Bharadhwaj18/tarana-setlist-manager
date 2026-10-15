@@ -1,5 +1,6 @@
 'use client'
 
+import { useMoney } from '@/components/finance/FinanceSettingsContext'
 import { useState, useTransition } from 'react'
 import { Plus, ChevronDown, AlertTriangle } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
@@ -9,7 +10,7 @@ import { useToast } from '@/components/ui/Toaster'
 import { createBudget, updateBudget, adjustBudgetAllocation, setBudgetStatus, deleteBudget } from '@/actions/budgets'
 import { cn } from '@/lib/utils'
 import { todayISO } from '@/lib/shows'
-import { fmt, BAR_FILL } from './money'
+import { BAR_FILL } from './money'
 import type { BudgetProgress } from '@/types/budget'
 
 interface Props {
@@ -35,6 +36,7 @@ function periodLabel(p: BudgetProgress) {
 const barColor = { ok: BAR_FILL, warning: 'bg-amber-400', over: 'bg-red-500' } as const
 
 function BudgetForm({ existing, onDone }: { existing?: BudgetProgress; onDone: () => void }) {
+  const { symbol } = useMoney()
   const b = existing?.budget
   const [name, setName] = useState(b?.name ?? '')
   const [amount, setAmount] = useState(b ? String(b.allocated_amount) : '')
@@ -64,7 +66,7 @@ function BudgetForm({ existing, onDone }: { existing?: BudgetProgress; onDone: (
       </div>
       {!b && (
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Allocated (₹) *</label>
+          <label className="mb-1 block text-sm font-medium text-gray-700">Allocated ({symbol}) *</label>
           <input type="number" min="0" step="any" value={amount} onChange={e => setAmount(e.target.value)} className={inputCls} required />
         </div>
       )}
@@ -99,6 +101,7 @@ function BudgetForm({ existing, onDone }: { existing?: BudgetProgress; onDone: (
 }
 
 function BudgetCard({ p, isTreasurer, memberNames }: { p: BudgetProgress; isTreasurer: boolean; memberNames: Record<string, string> }) {
+  const { money: fmt, symbol } = useMoney()
   const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
   const [adjusting, setAdjusting] = useState(false)
@@ -173,7 +176,7 @@ function BudgetCard({ p, isTreasurer, memberNames }: { p: BudgetProgress; isTrea
 
       {adjusting && (
         <div className="mt-2.5 flex items-center gap-2">
-          <input type="number" min="0" step="any" value={delta} onChange={e => setDelta(e.target.value)} placeholder="₹ amount"
+          <input type="number" min="0" step="any" value={delta} onChange={e => setDelta(e.target.value)} placeholder={`${symbol} amount`}
             className="compact-field min-w-0 flex-1 rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-[11px]" />
           <Button size="sm" loading={isPending} disabled={!delta} onClick={() => applyDelta(1)}>Top up</Button>
           <Button size="sm" variant="secondary" loading={isPending} disabled={!delta} onClick={() => applyDelta(-1)}>Reduce</Button>
@@ -203,6 +206,7 @@ function BudgetCard({ p, isTreasurer, memberNames }: { p: BudgetProgress; isTrea
 }
 
 export function BudgetsSection({ progress, unallocated, isTreasurer, memberNames }: Props) {
+  const { money: fmt, settings: moneySettings } = useMoney()
   const [creating, setCreating] = useState(false)
   const active = progress.filter(p => p.budget.status === 'active')
   const closed = progress.filter(p => p.budget.status === 'closed')
@@ -221,7 +225,7 @@ export function BudgetsSection({ progress, unallocated, isTreasurer, memberNames
       </div>
 
       {progress.length === 0 ? (
-        <p className="py-4 text-center text-sm text-gray-500">No budgets yet. Create one to track spending from the band fund.</p>
+        <p className="py-4 text-center text-sm text-gray-500">No budgets yet. Create one to track spending from the {moneySettings.fundName}.</p>
       ) : (
         <div className="divide-y divide-brand-100">
           {active.map(p => <BudgetCard key={p.budget.id} p={p} isTreasurer={isTreasurer} memberNames={memberNames} />)}

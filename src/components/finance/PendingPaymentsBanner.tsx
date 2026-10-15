@@ -1,10 +1,10 @@
 'use client'
 
+import { useMoney } from '@/components/finance/FinanceSettingsContext'
 import { useTransition } from 'react'
 import { Button } from '@/components/ui/Button'
 import { markPendingPaymentPaid } from '@/actions/pending-payments'
 import { useToast } from '@/components/ui/Toaster'
-import { fmt } from './money'
 import type { PendingPayment } from '@/types'
 
 interface Props {
@@ -22,6 +22,7 @@ interface Props {
  * with.
  */
 export function PendingPaymentsBanner({ payments, profiles }: Props) {
+  const { money: fmt } = useMoney()
   const [isPending, startTransition] = useTransition()
   const toast = useToast()
 

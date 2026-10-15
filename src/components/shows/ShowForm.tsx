@@ -1,5 +1,6 @@
 'use client'
 
+import { useMoney } from '@/components/finance/FinanceSettingsContext'
 import { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -25,9 +26,6 @@ interface ShowFormProps {
 
 const DIRECT_BOOKING = 'direct'
 
-function fmt(n: number) {
-  return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
-}
 
 function fieldsFrom(show: Show | undefined, initialDate: string | undefined) {
   return {
@@ -73,6 +71,7 @@ const card = 'scroll-mt-4 space-y-4 rounded-2xl border border-brand-200 bg-white
 const selectClass = 'mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm transition-colors focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400'
 
 export function ShowForm({ show, eventManagementCompanies = [], onSubmit, initialDate }: ShowFormProps) {
+  const { money: fmt, symbol, settings: moneySettings } = useMoney()
   const [fields, setFields] = useState(() => fieldsFrom(show, initialDate))
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -100,6 +99,7 @@ export function ShowForm({ show, eventManagementCompanies = [], onSubmit, initia
 
   const feeNum = parseFloat(fields.fee) || 0
   const tdsPercentageNum = parseFloat(fields.tds_percentage) || 0
+  const showTds = moneySettings.features.tds || fields.tds_applicable
   const { tdsAmount, grossFee } = computeTds(feeNum, tdsPercentageNum)
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -138,7 +138,7 @@ export function ShowForm({ show, eventManagementCompanies = [], onSubmit, initia
   const sections = [
     { id: 'gig', label: 'The gig' },
     { id: 'booking', label: 'Booking & contact' },
-    ...(showFinance ? [{ id: 'money', label: 'Money & TDS' }] : []),
+    ...(showFinance ? [{ id: 'money', label: showTds ? 'Money & TDS' : 'Money' }] : []),
     { id: 'notes', label: 'Notes & media' },
   ]
 
@@ -229,7 +229,7 @@ export function ShowForm({ show, eventManagementCompanies = [], onSubmit, initia
             <SectionLabel>Fee &amp; Payment</SectionLabel>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <Label htmlFor="fee">{fields.tds_applicable ? 'Amount received (₹)' : 'Quoted fee (₹)'}</Label>
+                <Label htmlFor="fee">{fields.tds_applicable ? `Amount received (${symbol})` : `Quoted fee (${symbol})`}</Label>
                 <Input id="fee" type="number" min="0" step="any" placeholder="0" className="mt-1" value={fields.fee}
                   onChange={e => set('fee', e.target.value)} />
                 {fields.tds_applicable && (
@@ -251,8 +251,8 @@ export function ShowForm({ show, eventManagementCompanies = [], onSubmit, initia
             </div>
           </section>
 
-          {/* TDS */}
-          <section className={card}>
+          {/* TDS — hidden when the workspace turns it off, unless this show already uses it */}
+          {showTds && <section className={card}>
             <SectionLabel>TDS</SectionLabel>
             <div>
               <Label>Is TDS applicable for this show?</Label>
@@ -293,7 +293,7 @@ export function ShowForm({ show, eventManagementCompanies = [], onSubmit, initia
                 </div>
               </>
             )}
-          </section>
+          </section>}
         </div>
       )}
 

@@ -17,38 +17,71 @@ export function settlementMemberIds(involvedMemberIds: string[], transactionMemb
 }
 
 export interface EntitlementResult {
-  /** memberId -> their share of this show's net */
+  /** memberId -> their share of this show's net, including any off-the-top cut they're paid */
   memberShares: Record<string, number>
   bandFundAmount: number
+  /** memberId -> the off-the-top part of their share (empty when there are no cuts) */
+  cutShares: Record<string, number>
+}
+
+export interface SplitRules {
+  /** memberId -> number of shares; anyone missing has 1. All 1s is the plain equal split. */
+  weights?: Record<string, number>
+  /** Percentages of a profitable show's net paid to a member before anything else. */
+  cuts?: { memberId: string; percent: number }[]
 }
 
 /**
  * Splits one show's net amount into member shares + the Band Fund cut.
- * Equal by default among the involved members; any member id present in
- * `overrides` gets that exact amount instead, and the equal share is
- * recomputed over whoever's left so the pool still balances.
+ * Off-the-top cuts come out first (only when the show made money), then the
+ * Band Fund % of what's left, then the rest among the involved members by
+ * shares (equal when nobody has more than one). Any member id present in
+ * `overrides` gets that exact amount instead, and the rest is recomputed
+ * over whoever's left so the pool still balances.
  */
 export function computeEntitlements(
   netAmount: number,
   involvedMemberIds: string[],
   bandFundPct: number,
-  overrides: Record<string, number> = {}
+  overrides: Record<string, number> = {},
+  rules: SplitRules = {}
 ): EntitlementResult {
-  const bandFundAmount = round2((netAmount * bandFundPct) / 100)
-  const memberPool = round2(netAmount - bandFundAmount)
+  const cutShares: Record<string, number> = {}
+  let cutTotal = 0
+  if (netAmount > 0) {
+    for (const cut of rules.cuts ?? []) {
+      const amount = round2((netAmount * cut.percent) / 100)
+      if (amount <= 0) continue
+      cutShares[cut.memberId] = round2((cutShares[cut.memberId] ?? 0) + amount)
+      cutTotal = round2(cutTotal + amount)
+    }
+  }
+  const afterCuts = round2(netAmount - cutTotal)
 
+  const bandFundAmount = round2((afterCuts * bandFundPct) / 100)
+  const memberPool = round2(afterCuts - bandFundAmount)
+
+  const weightOf = (id: string) => {
+    const w = rules.weights?.[id]
+    return w !== undefined && Number.isFinite(w) && w >= 0 ? w : 1
+  }
   const overriddenIds = involvedMemberIds.filter(id => overrides[id] !== undefined)
   const overriddenTotal = overriddenIds.reduce((sum, id) => sum + overrides[id], 0)
   const remainingIds = involvedMemberIds.filter(id => overrides[id] === undefined)
   const remainingPool = round2(memberPool - overriddenTotal)
-  const equalShare = remainingIds.length > 0 ? round2(remainingPool / remainingIds.length) : 0
+  const totalWeight = remainingIds.reduce((sum, id) => sum + weightOf(id), 0)
 
   const memberShares: Record<string, number> = {}
   for (const id of involvedMemberIds) {
-    memberShares[id] = overrides[id] !== undefined ? overrides[id] : equalShare
+    memberShares[id] = overrides[id] !== undefined
+      ? overrides[id]
+      : totalWeight > 0 ? round2((remainingPool * weightOf(id)) / totalWeight) : 0
+  }
+  for (const [id, amount] of Object.entries(cutShares)) {
+    memberShares[id] = round2((memberShares[id] ?? 0) + amount)
   }
 
-  return { memberShares, bandFundAmount }
+  return { memberShares, bandFundAmount, cutShares }
 }
 
 /**

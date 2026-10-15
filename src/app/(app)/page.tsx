@@ -2,8 +2,9 @@ import Link from 'next/link'
 import { ArrowRight, CalendarDays, ListMusic, Music2, Plus } from 'lucide-react'
 import {
   getCachedShows, getCachedSetlistsByShow, getCachedSetlistSongCounts, getCachedTaskData,
-  getCachedPendingPayments, getCachedAllProfiles, getCachedUser, getCachedCalendarEvents,
+  getCachedPendingPayments, getCachedAllProfiles, getCachedUser, getCachedCalendarEvents, getCachedFinanceSettings,
 } from '@/lib/data'
+import { formatMoney } from '@/lib/finance/settings'
 import { todayISO } from '@/lib/shows'
 import { daysUntil } from '@/lib/dates'
 import { compareOpenTasks } from '@/lib/tasks'
@@ -19,10 +20,6 @@ const IST = 'Asia/Kolkata'
 
 function shortDate(dateStr: string) {
   return new Intl.DateTimeFormat('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(dateStr + 'T00:00:00Z'))
-}
-
-function rupees(n: number) {
-  return `₹${Math.round(n).toLocaleString('en-IN')}`
 }
 
 function headline(days: number) {
@@ -52,6 +49,8 @@ export default async function TodayPage() {
   const canSee = (key: SectionKey) => !levels || levels[key] !== 'none'
   const hidden: SectionKey[] = levels ? hiddenSectionsOf(levels) : []
   const calendarEvents = canSee('calendar') ? await getCachedCalendarEvents() : []
+  const moneySettings = await getCachedFinanceSettings()
+  const money = (n: number) => formatMoney(n, moneySettings.currency)
 
   // Light head-count queries for the quick-access hints (no rows are transferred).
   const ws = workspaceCtx?.current.workspace.id
@@ -277,7 +276,7 @@ export default async function TodayPage() {
       node: (
         <Link href="/finance" className={cn(card, 'transition-colors hover:border-brand-300')}>
           <div className="flex items-center justify-between"><p className={eyebrow}>You are owed</p><SectionTag label="Finance" /></div>
-          <p className="font-display text-3xl font-bold text-gray-900">{rupees(owed)}</p>
+          <p className="font-display text-3xl font-bold text-gray-900">{money(owed)}</p>
         </Link>
       ),
     })
@@ -287,7 +286,7 @@ export default async function TodayPage() {
       node: (
         <Link href="/finance" className={cn(card, 'transition-colors hover:border-brand-300')}>
           <div className="flex items-center justify-between"><p className={eyebrow}>You owe</p><SectionTag label="Finance" /></div>
-          <p className="font-display text-3xl font-bold text-gray-900">{rupees(owe)}</p>
+          <p className="font-display text-3xl font-bold text-gray-900">{money(owe)}</p>
         </Link>
       ),
     })

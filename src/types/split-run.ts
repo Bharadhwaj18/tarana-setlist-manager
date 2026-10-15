@@ -25,6 +25,11 @@ export interface SplitRunReport {
   totalNet: number
   totalBandFund: number
   allBalances: BandFundBalance[]
+  /** The workspace's money settings at split time. Missing on older runs, which were rupees and "Band Fund". */
+  currency?: string
+  fundName?: string
+  /** The sharing rule in words, e.g. "10% to Asha (Manager) first, then 20% to the Band Fund, then the rest equally". */
+  ruleText?: string
   /** How the split was set up — not part of the PDF, kept so the run is fully reproducible. */
   meta?: {
     mode: 'manual' | 'auto'

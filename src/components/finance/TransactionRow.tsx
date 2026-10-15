@@ -1,5 +1,6 @@
 'use client'
 
+import { useMoney } from '@/components/finance/FinanceSettingsContext'
 import { useState, useTransition } from 'react'
 import { Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -7,7 +8,7 @@ import { AddTransactionModal } from './AddTransactionModal'
 import { StatusPill } from '@/components/ui/StatusPill'
 import { deleteTransaction } from '@/actions/finance'
 import { useToast } from '@/components/ui/Toaster'
-import { fmt, fmtSigned, CREDIT_TEXT, DEBIT_TEXT } from './money'
+import { CREDIT_TEXT, DEBIT_TEXT } from './money'
 import type { FinanceTransaction } from '@/types/finance'
 import type { Show } from '@/types/shows'
 import type { Budget } from '@/types/budget'
@@ -36,6 +37,7 @@ interface Props {
  * accidental safety net.
  */
 export function TransactionRow({ transaction: t, members, shows, budgets, payerName, badge, afterFundTotal, afterMemberBalance }: Props) {
+  const { money: fmt, signed: fmtSigned } = useMoney()
   const [editOpen, setEditOpen] = useState(false)
   const [isDeleting, startDeleteTransition] = useTransition()
   const toast = useToast()
@@ -43,7 +45,7 @@ export function TransactionRow({ transaction: t, members, shows, budgets, payerN
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!window.confirm('Delete this transaction? This can’t be undone.')) return
+    if (!window.confirm('Delete this entry? This can’t be undone.')) return
     startDeleteTransition(async () => {
       const result = await deleteTransaction(t.id)
       if (result.error) toast(result.error, 'error')
@@ -69,6 +71,9 @@ export function TransactionRow({ transaction: t, members, shows, budgets, payerN
           <span>{new Date(t.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}</span>
           <span>·</span>
           <span>{payerName}</span>
+          {t.tags?.length > 0 && t.tags.map(tag => (
+            <span key={tag} className="rounded-full bg-brand-100 px-1.5 py-0.5 text-[10px] font-bold text-brand-700">#{tag}</span>
+          ))}
           {afterMemberBalance !== undefined && (
             <span className={cn('font-medium tabular-nums', afterMemberBalance < 0 ? 'text-red-700' : 'text-gray-500')}>
               {fmtSigned(afterMemberBalance)}
@@ -94,7 +99,7 @@ export function TransactionRow({ transaction: t, members, shows, budgets, payerN
         type="button"
         onClick={handleDelete}
         disabled={isDeleting}
-        aria-label="Delete transaction"
+        aria-label="Delete entry"
         className="shrink-0 rounded-md p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
       >
         <Trash2 className="h-4 w-4" />

@@ -1,5 +1,6 @@
 'use client'
 
+import { useMoney } from '@/components/finance/FinanceSettingsContext'
 import { useState } from 'react'
 import { Search, ChevronDown, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -17,9 +18,6 @@ interface Props {
 
 type Filter = 'all' | 'pending' | 'paid'
 
-function fmt(n: number) {
-  return `₹${Math.abs(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
-}
 
 /** YYYY-MM-DD in IST, for the date tile. */
 function istDate(iso: string) {
@@ -27,6 +25,7 @@ function istDate(iso: string) {
 }
 
 export function SplitHistoryList({ runs, unpaidPendingIds }: Props) {
+  const { money: fmt, settings: moneySettings } = useMoney()
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
   const [open, setOpen] = useState<Set<string>>(new Set())
@@ -59,7 +58,7 @@ export function SplitHistoryList({ runs, unpaidPendingIds }: Props) {
   const downloadReport = (run: SplitRun) => {
     const r = run.report
     if (!r) return
-    buildSplitReportPdf(r.showTitles, r.bandPct, r.shows, r.rows, r.totalNet, r.totalBandFund, r.allBalances)
+    buildSplitReportPdf(r.showTitles, r.bandPct, r.shows, r.rows, r.totalNet, r.totalBandFund, r.allBalances, { currency: r.currency ?? 'INR', fundName: r.fundName ?? 'Band Fund', ruleText: r.ruleText })
   }
 
   return (
@@ -94,7 +93,7 @@ export function SplitHistoryList({ runs, unpaidPendingIds }: Props) {
             const pendingCount = pendingFor(run)
             const subtitle = [
               `${fmt(run.total_net)} total`,
-              run.band_pct !== null ? `${run.band_pct}% band fund${run.total_band_fund !== null ? ` (${fmt(run.total_band_fund)})` : ''}` : null,
+              run.band_pct !== null ? `${run.band_pct}% ${moneySettings.fundName}${run.total_band_fund !== null ? ` (${fmt(run.total_band_fund)})` : ''}` : null,
               `${transfers.length} transfer${transfers.length !== 1 ? 's' : ''}`,
             ].filter(Boolean).join(' · ')
 
@@ -176,7 +175,7 @@ export function SplitHistoryList({ runs, unpaidPendingIds }: Props) {
                                   </div>
                                 ))}
                                 <div className="flex justify-between gap-3 border-t border-brand-100 pt-0.5">
-                                  <span>Band Fund ({detail.bandFundHolderName})</span>
+                                  <span>{moneySettings.fundName} ({detail.bandFundHolderName})</span>
                                   <span className="tabular-nums">{fmt(detail.bandFundAmount)}</span>
                                 </div>
                               </div>

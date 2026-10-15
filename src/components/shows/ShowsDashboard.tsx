@@ -1,4 +1,7 @@
+'use client'
+
 import { SectionLabel } from '@/components/ui/SectionLabel'
+import { useMoney } from '@/components/finance/FinanceSettingsContext'
 import { EmptyState } from '@/components/ui/EmptyState'
 
 export interface CountRow { label: string; count: number }
@@ -9,10 +12,6 @@ export interface ShowsInsights {
   revenueByFormat: RevenueRow[]
   showsPerYear: CountRow[]
   topCities: CountRow[]
-}
-
-export function fmt(n: number) {
-  return `₹${Math.abs(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
 }
 
 /** One green, stepping down in strength by rank, so charts stay calm and on-palette. */
@@ -52,6 +51,7 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
 }
 
 export function ShowsDashboard({ formatBreakdown, revenueByFormat, showsPerYear, topCities }: ShowsInsights) {
+  const { money: fmt } = useMoney()
   if (formatBreakdown.length === 0) {
     return <EmptyState title="No insights yet" description="Charts appear once you have played shows." />
   }

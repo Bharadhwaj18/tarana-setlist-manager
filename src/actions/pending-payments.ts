@@ -1,5 +1,7 @@
 'use server'
 
+import { getCachedFinanceSettings } from '@/lib/data'
+import { formatMoney } from '@/lib/finance/settings'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { todayISO } from '@/lib/shows'
@@ -14,6 +16,11 @@ const BALANCE_REIMBURSEMENT = 'balance_reimbursement'
  * same payer already has an unpaid balance reimbursement to this member, the
  * amount is added onto it instead of creating a second row.
  */
+/** An amount in the workspace's currency, for notification text. */
+async function moneyText(n: number) {
+  return formatMoney(n, (await getCachedFinanceSettings()).currency)
+}
+
 export async function requestBalanceReimbursement(memberId: string, payerId: string): Promise<{ error?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -66,7 +73,7 @@ export async function requestBalanceReimbursement(memberId: string, payerId: str
   if (payerId !== user.id) {
     await sendNotification({
       recipientId: payerId,
-      title: `You owe ₹${amount.toLocaleString('en-IN')}`,
+      title: `You owe ${await moneyText(amount)}`,
       body: 'Balance reimbursement',
       link: '/finance',
       type: 'payment_owed',
@@ -145,7 +152,7 @@ export async function markPendingPaymentPaid(id: string): Promise<{ error?: stri
     const { data: actor } = await supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle()
     await sendNotification({
       recipientId: pending.to_member,
-      title: `${actor?.display_name ?? 'Someone'} paid you ₹${pending.amount.toLocaleString('en-IN')}`,
+      title: `${actor?.display_name ?? 'Someone'} paid you ${await moneyText(pending.amount)}`,
       body: pending.description,
       link: '/finance/history',
       type: 'payment_received',

@@ -2,13 +2,26 @@ import autoTable from 'jspdf-autotable'
 import { PdfDoc, TABLE_THEME, COLORS, MARGIN, CONTENT_W } from './pdfDoc'
 import { todayISO, IST_TIME_ZONE } from '@/lib/shows'
 import { APP_NAME, APP_SLUG } from '@/lib/brand'
+import { formatMoneyPdf } from '@/lib/finance/settings'
+
+/** How a workspace names and formats its money in reports. Missing values keep the old defaults. */
+export interface ReportMoney { currency?: string; fundName?: string; ruleText?: string }
+
+function applyReportMoney(m?: ReportMoney) {
+  currency = m?.currency ?? 'INR'
+  fund = m?.fundName ?? 'Band Fund'
+}
 
 // jsPDF's built-in Helvetica only covers the Windows-1252 repertoire — the
 // Rupee sign (₹), the true minus sign (−), and arrows (→/←) all fall
 // outside it and render as garbage glyphs. Stick to "Rs." and a plain
 // ASCII hyphen everywhere text is drawn into the PDF.
+// Set at the start of each report. Building a PDF is synchronous, so one report never sees another's.
+let currency = 'INR'
+let fund = 'Band Fund'
+
 function fmt(n: number) {
-  return `Rs. ${Math.abs(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+  return formatMoneyPdf(n, currency)
 }
 function signed(n: number) {
   return `${n >= 0 ? '+' : '-'} ${fmt(n)}`
@@ -20,7 +33,8 @@ function today() {
 export interface StatementRow { date: string; member: string; description: string; amount: number }
 
 /** The Finance page's "Export" — a plain, clean statement table. */
-export function buildTransactionStatementPdf(rows: StatementRow[], rangeLabel: string, memberLabel: string) {
+export function buildTransactionStatementPdf(rows: StatementRow[], rangeLabel: string, memberLabel: string, money?: ReportMoney) {
+  applyReportMoney(money)
   const total = rows.reduce((s, r) => s + r.amount, 0)
 
   const pdf = new PdfDoc({
@@ -106,25 +120,29 @@ export function buildSplitReportPdf(
   rows: SplitReportRow[],
   totalNet: number,
   totalBandFund: number,
-  allBalances: BandFundBalance[]
+  allBalances: BandFundBalance[],
+  money?: ReportMoney
 ) {
+  applyReportMoney(money)
+  const rule = money?.ruleText ?? `${bandPct}% to the ${fund}, then the rest equally among everyone who played`
+  const zero = fmt(0)
   const pdf = new PdfDoc({
     title: `${APP_NAME} Split Report`,
-    subtitleLines: [showTitles.join(', '), `Band Fund ${bandPct}% · Generated ${today()}`],
+    subtitleLines: [showTitles.join(', '), `${fund} ${bandPct}% · Generated ${today()}`],
     footerNote: `${APP_NAME} Split Report`,
   })
 
   pdf.paragraph(
-    `This report covers ${shows.length} show${shows.length === 1 ? '' : 's'}. Each show's money is split ${bandPct}% ` +
-    `to the Band Fund and the rest equally among everyone who played it. A guaranteed expense (fuel, parking — ` +
+    `This report covers ${shows.length} show${shows.length === 1 ? '' : 's'}. Each show's money is split: ${rule}. ` +
+    `A guaranteed expense (fuel, parking — ` +
     `logged as a reimbursement) is always paid back in full, on top of the cut, for that show. Anyone else who ` +
     `spent their own money on a show is made whole separately: if fronting it anywhere in this split still leaves ` +
-    `their real Band Fund balance below Rs. 0 once every show here is netted together, they're topped up back to ` +
-    `exactly Rs. 0 — shown as its own "Balance Top-up" column below, since it isn't any one show's expense to ` +
-    `attribute. Every payment (including someone covering their own share from their own Band Fund) is a ` +
+    `their real ${fund} balance below ${zero} once every show here is netted together, they're topped up back to ` +
+    `exactly ${zero} — shown as its own "Balance Top-up" column below, since it isn't any one show's expense to ` +
+    `attribute. Every payment (including someone covering their own share from their own ${fund}) is a ` +
     `straightforward payer-to-recipient debit — nobody is ever credited: money paid out becomes personal the ` +
     `moment it's paid. Each show below is broken down on its own; the overall settlement and everyone's combined ` +
-    `Band Fund appear at the end.`,
+    `${fund} appear at the end.`,
     { gap: 6 }
   )
 
@@ -155,7 +173,7 @@ export function buildSplitReportPdf(
       c.reimbursement > 0.01 ? `${c.name} (incl. ${fmt(c.reimbursement)} reimbursement)` : c.name,
       fmt(c.cut + c.reimbursement),
     ])
-    whoRows.push([`Band Fund (${bandPct}%) — kept by ${s.bandFundHolderName}`, fmt(s.bandFundAmount)])
+    whoRows.push([`${fund} (${bandPct}%) — kept by ${s.bandFundHolderName}`, fmt(s.bandFundAmount)])
     autoTable(pdf.doc, {
       ...TABLE_THEME,
       startY: pdf.y,
@@ -220,7 +238,7 @@ export function buildSplitReportPdf(
         lines.push({ label: `${r.name} collected cash for the show — goes back`, value: `- ${fmt(line.cashPosition)}`, indent: true, valueColor: COLORS.negative })
       }
       if (line.isBandFundHolder) {
-        lines.push({ label: `${r.name} is holding this show’s Band Fund cut`, value: `+ ${fmt(line.bandFundAmount)}`, indent: true, valueColor: COLORS.accentDark })
+        lines.push({ label: `${r.name} is holding this show’s ${fund} share`, value: `+ ${fmt(line.bandFundAmount)}`, indent: true, valueColor: COLORS.accentDark })
       }
       pdf.card({
         title: r.name,
@@ -231,7 +249,7 @@ export function buildSplitReportPdf(
 
     pdf.divider(2, 4)
     pdf.keyValueRow('Total from this show', signed(s.net), { bold: true, size: 10 })
-    pdf.keyValueRow('Band Fund', fmt(s.bandFundAmount), { valueColor: COLORS.accentDark })
+    pdf.keyValueRow(fund, fmt(s.bandFundAmount), { valueColor: COLORS.accentDark })
     pdf.keyValueRow('To artists', fmt(s.net - s.bandFundAmount))
     pdf.y += 5
   }
@@ -244,7 +262,7 @@ export function buildSplitReportPdf(
     pdf.subHeading('Settlement — who pays whom')
     const settleRows: string[][] = []
     for (const r of rows) {
-      if (r.selfPaid > 0) settleRows.push([r.name, `${r.name} (self, from Band Fund)`, fmt(r.selfPaid)])
+      if (r.selfPaid > 0) settleRows.push([r.name, `${r.name} (self, from ${fund})`, fmt(r.selfPaid)])
       for (const p of r.outgoing) settleRows.push([r.name, p.to, fmt(p.amount)])
     }
     autoTable(pdf.doc, {
@@ -286,12 +304,12 @@ export function buildSplitReportPdf(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   pdf.syncAfterAutoTable((pdf.doc as any).lastAutoTable.finalY + 8)
 
-  pdf.subHeading('Band Fund balances — everyone')
-  pdf.paragraph('Every band member\'s Band Fund after this split, whether or not they played these shows.', { size: 8.5, gap: 3 })
+  pdf.subHeading(`${fund} balances — everyone`)
+  pdf.paragraph(`Every member's ${fund} after this split, whether or not they played these shows.`, { size: 8.5, gap: 3 })
   autoTable(pdf.doc, {
     ...TABLE_THEME,
     startY: pdf.y,
-    head: [['Member', 'Band Fund']],
+    head: [['Member', fund]],
     body: allBalances.map(b => [b.name, b.balance < 0 ? `- ${fmt(b.balance)}` : fmt(b.balance)]),
     columnStyles: {
       0: { cellWidth: 'auto' },
@@ -310,8 +328,62 @@ export function buildSplitReportPdf(
 
   pdf.divider(2, 5)
   pdf.keyValueRow('Total from these shows', signed(totalNet), { bold: true, size: 10.5 })
-  pdf.keyValueRow('Band Fund', fmt(totalBandFund), { valueColor: COLORS.accentDark })
+  pdf.keyValueRow(fund, fmt(totalBandFund), { valueColor: COLORS.accentDark })
   pdf.keyValueRow('To artists', fmt(totalNet - totalBandFund))
 
   pdf.save(`${APP_SLUG}-split-${todayISO()}.pdf`)
+}
+
+// ---- Grouped report (Finance → Reports) ---------------------------------
+
+export interface GroupedReportRow { label: string; moneyIn: number; moneyOut: number; net: number }
+
+/** Money in, out and net per group (category, tag, project...) for a period. */
+export function buildGroupedReportPdf(input: {
+  periodLabel: string
+  groupLabel: string
+  rows: GroupedReportRow[]
+  totals: { moneyIn: number; moneyOut: number; net: number; payouts: number }
+  note?: string
+  money?: ReportMoney
+}) {
+  applyReportMoney(input.money)
+  const pdf = new PdfDoc({
+    title: `${APP_NAME} Money Report`,
+    subtitleLines: [`${input.periodLabel} · by ${input.groupLabel.toLowerCase()}`, `Generated ${today()}`],
+    footerNote: `${APP_NAME} Money Report`,
+  })
+
+  autoTable(pdf.doc, {
+    ...TABLE_THEME,
+    startY: pdf.y + 2,
+    head: [[input.groupLabel, 'Money in', 'Money out', 'Net']],
+    body: input.rows.map(r => [r.label, fmt(r.moneyIn), fmt(r.moneyOut), signed(r.net)]),
+    columnStyles: {
+      0: { cellWidth: 'auto' },
+      1: { cellWidth: 'wrap', halign: 'right' },
+      2: { cellWidth: 'wrap', halign: 'right' },
+      3: { cellWidth: 'wrap', halign: 'right' },
+    },
+    didParseCell: data => {
+      if (data.section === 'body' && data.column.index === 3) {
+        data.cell.styles.textColor = input.rows[data.row.index].net >= 0 ? COLORS.positive : COLORS.negative
+        data.cell.styles.fontStyle = 'bold'
+      }
+    },
+    didDrawPage: pdf.onAutoTablePageDrawn,
+  })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  pdf.syncAfterAutoTable((pdf.doc as any).lastAutoTable.finalY)
+
+  pdf.divider(4, 5)
+  pdf.keyValueRow('Money in', fmt(input.totals.moneyIn), { valueColor: COLORS.positive })
+  pdf.keyValueRow('Money out', fmt(input.totals.moneyOut), { valueColor: COLORS.negative })
+  pdf.keyValueRow('Net', signed(input.totals.net), { bold: true, size: 10.5, valueColor: input.totals.net >= 0 ? COLORS.positive : COLORS.negative })
+  if (input.totals.payouts > 0) {
+    pdf.keyValueRow('Paid out to members (splits)', fmt(input.totals.payouts))
+  }
+  if (input.note) pdf.paragraph(input.note, { size: 8, gap: 2 })
+
+  pdf.save(`${APP_SLUG}-report-${todayISO()}.pdf`)
 }

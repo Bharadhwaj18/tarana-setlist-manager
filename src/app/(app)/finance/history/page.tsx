@@ -3,7 +3,8 @@ import { sectionGuard } from '@/lib/section-guard'
 import { ChevronLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { requireWorkspaceId } from '@/lib/workspace'
-import { getCachedAllProfiles, getCachedUser } from '@/lib/data'
+import { getCachedAllProfiles, getCachedUser, getCachedFinanceProjects } from '@/lib/data'
+import { FinanceExtrasProvider } from '@/components/finance/FinanceSettingsContext'
 import { FinanceHistoryList } from '@/components/finance/FinanceHistoryList'
 import { ExportModal } from '@/components/finance/ExportModal'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -14,7 +15,7 @@ export default async function FinanceHistoryPage() {
   const supabase = await createClient()
   const ws = await requireWorkspaceId()
 
-  const [{ data: { user } }, profiles, { data: txns }, { data: shows }, { data: budgets }] = await Promise.all([
+  const [{ data: { user } }, profiles, { data: txns }, { data: shows }, { data: budgets }, projects] = await Promise.all([
     getCachedUser(),
     getCachedAllProfiles(),
     // Sorted by when it was actually recorded, not the (user-editable, can
@@ -23,6 +24,7 @@ export default async function FinanceHistoryPage() {
     supabase.from('finance_transactions').select('*').eq('workspace_id', ws).order('created_at', { ascending: false }),
     supabase.from('shows').select('*').eq('workspace_id', ws),
     supabase.from('budgets').select('*').eq('workspace_id', ws).order('created_at', { ascending: false }),
+    getCachedFinanceProjects(),
   ])
 
   const members = profiles.map(p => ({
@@ -56,13 +58,14 @@ export default async function FinanceHistoryPage() {
   }
 
   return (
+    <FinanceExtrasProvider projects={projects} knownTags={[...new Set(historyTxns.flatMap(t => t.tags ?? []))]}>
     <div>
       <Link href="/finance" className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-gray-500 hover:text-gray-700">
         <ChevronLeft className="h-4 w-4" /> Finance
       </Link>
       <PageHeader
         title="History"
-        subtitle="Every transaction — Misc, show income, expenses, and splits."
+        subtitle="Every entry: general money, show income, expenses and splits."
         action={
           <div className="flex items-center gap-3">
             <Link href="/finance/split-history" className="hidden text-sm font-extrabold text-brand-400 hover:underline dark:text-emerald-400 sm:inline">
@@ -82,5 +85,6 @@ export default async function FinanceHistoryPage() {
         runningBalances={runningBalances}
       />
     </div>
+    </FinanceExtrasProvider>
   )
 }

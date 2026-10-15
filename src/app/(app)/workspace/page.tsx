@@ -1,8 +1,8 @@
 import Link from 'next/link'
-import { CalendarRange, Link2, Plus } from 'lucide-react'
+import { CalendarRange, Link2, Plus, Wallet } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getWorkspaceContext } from '@/lib/workspace'
-import { getCachedAllProfiles } from '@/lib/data'
+import { getCachedAllProfiles, getCachedFinanceSettings } from '@/lib/data'
 import { normalisePermissions } from '@/lib/workspace-shared'
 import { cn } from '@/lib/utils'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -15,6 +15,14 @@ import { InvitesSettings } from '@/components/workspace/InvitesSettings'
 import { DangerSettings } from '@/components/workspace/DangerSettings'
 import { SETTINGS_TABS, type InviteRow, type MemberRow, type SettingsTab } from '@/components/workspace/settings-types'
 import { sectionLevelsFrom } from '@/lib/workspace-sections'
+import { MoneySettings } from '@/components/finance/MoneySettings'
+
+/** Tags already on entries in this workspace, so settings can list and rename them. */
+async function usedTags(workspaceId: string) {
+  const supabase = await createClient()
+  const { data } = await supabase.from('finance_transactions').select('tags').eq('workspace_id', workspaceId)
+  return [...new Set((data ?? []).flatMap(r => r.tags ?? []))]
+}
 
 interface Props {
   searchParams: Promise<{ tab?: string }>
@@ -27,6 +35,15 @@ export default async function WorkspacePage({ searchParams }: Props) {
   const { workspace, role } = ctx.current
 
   if (workspace.type === 'personal') {
+    if (tabParam === 'money') {
+      const [financeSettings, profiles, tagsInUse] = await Promise.all([getCachedFinanceSettings(), getCachedAllProfiles(), usedTags(workspace.id)])
+      return (
+        <div className="max-w-3xl">
+          <PageHeader title="Money settings" subtitle="Personal space" />
+          <MoneySettings initial={financeSettings} members={profiles.map(p => ({ id: p.id, name: p.display_name?.trim() || 'You' }))} canEdit usedTags={tagsInUse} />
+        </div>
+      )
+    }
     return (
       <div className="max-w-3xl">
         <PageHeader title="Personal space" subtitle="This space is just for you: your own songs, notes and tasks. Nobody else can see it." />
@@ -44,6 +61,11 @@ export default async function WorkspacePage({ searchParams }: Props) {
             <JoinByLink />
           </section>
         </div>
+        <Link href="/workspace?tab=money" className="mt-4 flex items-center gap-3 rounded-2xl border border-dashed border-brand-200 bg-white px-4 py-3 text-sm text-gray-600 hover:bg-brand-50">
+          <Wallet className="h-4 w-4 text-gray-400" />
+          <span className="flex-1">Set up categories, currency and how money is tracked in this space.</span>
+          <span className="font-bold text-brand-600">Money settings</span>
+        </Link>
         <Link href="/calendar" className="mt-4 flex items-center gap-3 rounded-2xl border border-dashed border-brand-200 bg-white px-4 py-3 text-sm text-gray-600 hover:bg-brand-50">
           <CalendarRange className="h-4 w-4 text-gray-400" />
           <span className="flex-1">See everything you’re booked for across all your workspaces in one calendar.</span>
@@ -58,7 +80,7 @@ export default async function WorkspacePage({ searchParams }: Props) {
   const tab: SettingsTab = SETTINGS_TABS.some(t => t.key === tabParam) ? (tabParam as SettingsTab) : 'general'
   const supabase = await createClient()
 
-  const [{ data: memberRows }, profiles, { data: inviteRows }] = await Promise.all([
+  const [{ data: memberRows }, profiles, { data: inviteRows }, financeSettings, tagsInUse] = await Promise.all([
     supabase.from('workspace_members').select('user_id, role, permissions, created_at').eq('workspace_id', workspace.id).order('created_at'),
     getCachedAllProfiles(),
     isAdmin
@@ -70,6 +92,8 @@ export default async function WorkspacePage({ searchParams }: Props) {
           .gt('expires_at', new Date().toISOString())
           .order('created_at', { ascending: false })
       : Promise.resolve({ data: [] }),
+    getCachedFinanceSettings(),
+    tabParam === 'money' ? usedTags(workspace.id) : Promise.resolve([] as string[]),
   ])
 
   const members: MemberRow[] = (memberRows ?? []).map(m => ({
@@ -94,7 +118,7 @@ export default async function WorkspacePage({ searchParams }: Props) {
     avatarUrl: workspace.avatar_url ?? null,
   }
 
-  const visibleTabs = SETTINGS_TABS.filter(t => t.key !== 'invites' || isAdmin)
+  const visibleTabs = SETTINGS_TABS.filter(t => (t.key !== 'invites' || isAdmin) && (t.key !== 'money' || ctx.current.sections.finance !== 'none'))
   const activeTab: SettingsTab = visibleTabs.some(t => t.key === tab) ? tab : 'general'
 
   return (
@@ -127,6 +151,7 @@ export default async function WorkspacePage({ searchParams }: Props) {
           {activeTab === 'general' && <GeneralSettings workspace={summary} canEdit={isAdmin} />}
           {activeTab === 'members' && <MembersSettings workspaceName={workspace.name} members={members} isAdmin={isAdmin} isOwner={isOwner} activeInviteCount={invites.length} />}
           {activeTab === 'invites' && isAdmin && <InvitesSettings invites={invites} />}
+          {activeTab === 'money' && <MoneySettings initial={financeSettings} members={members.map(m => ({ id: m.userId, name: m.name }))} canEdit={isAdmin} usedTags={tagsInUse} />}
           {activeTab === 'danger' && <DangerSettings workspaceName={workspace.name} members={members} isAdmin={isAdmin} isOwner={isOwner} />}
         </div>
       </div>

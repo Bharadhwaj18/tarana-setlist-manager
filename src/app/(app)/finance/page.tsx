@@ -1,7 +1,13 @@
 import Link from 'next/link'
 import { sectionGuard } from '@/lib/section-guard'
 import { createClient } from '@/lib/supabase/server'
-import { getCachedAllProfiles, getCachedUser, getCachedPendingPayments } from '@/lib/data'
+import { getCachedAllProfiles, getCachedUser, getCachedPendingPayments, getCachedFinanceSettings, getCachedFinanceProjects, getCachedRecurring } from '@/lib/data'
+import { catchUpRecurring } from '@/lib/finance/recurring-server'
+import { categoryLabel, REIMBURSEMENT_KEY } from '@/lib/finance/settings'
+import { FinanceExtrasProvider } from '@/components/finance/FinanceSettingsContext'
+import { WaitingToBePaid } from '@/components/finance/WaitingToBePaid'
+import { FolderKanban, PieChart, Repeat, Settings2 } from 'lucide-react'
+import { getWorkspaceContext } from '@/lib/workspace'
 import { todayISO, isUpcoming } from '@/lib/shows'
 import { AddTransactionModal } from '@/components/finance/AddTransactionModal'
 import { TransactionRow } from '@/components/finance/TransactionRow'
@@ -13,7 +19,6 @@ import { fmt, fmtSigned, BAR_FILL, DEBIT_TEXT } from '@/components/finance/money
 import { PageHeader } from '@/components/ui/PageHeader'
 import { SectionLabel } from '@/components/ui/SectionLabel'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { CREDIT_CATEGORY_LABELS, type CreditCategory } from '@/types/finance'
 import { computeBudgetProgress, unallocatedFund } from '@/lib/finance/budgets'
 import { isCurrentTreasurer, requireWorkspaceId } from '@/lib/workspace'
 import { cn } from '@/lib/utils'
@@ -23,6 +28,12 @@ export default async function FinancePage() {
   if (denied) return denied
   const supabase = await createClient()
   const ws = await requireWorkspaceId()
+
+  // Add any repeating entries that have come due since Finance was last opened, before reading.
+  const [settings, projects, recurring, ctx] = await Promise.all([getCachedFinanceSettings(), getCachedFinanceProjects(), getCachedRecurring(), getWorkspaceContext()])
+  if (settings.features.recurring) await catchUpRecurring(recurring)
+  const currency = settings.currency
+  const canEditSettings = ctx?.current.role === 'owner' || ctx?.current.role === 'admin'
 
   const [{ data: { user } }, profiles, { data: txns }, { data: shows }, pendingPayments, { data: budgets }] = await Promise.all([
     getCachedUser(),
@@ -43,7 +54,7 @@ export default async function FinancePage() {
   // moment it's paid.
   const balanceMap: Record<string, number> = {}
   for (const t of txns ?? []) {
-    if (!t.member_id || t.category === 'reimbursement') continue
+    if (!t.member_id || t.category === REIMBURSEMENT_KEY) continue
     balanceMap[t.member_id] = (balanceMap[t.member_id] ?? 0) + t.amount
   }
 
@@ -69,7 +80,22 @@ export default async function FinancePage() {
     id === null ? 'Unattributed' : id === user?.id ? 'You' : (profiles.find(p => p.id === id)?.display_name ?? 'Member')
 
   const showTitleById = Object.fromEntries((shows ?? []).map(s => [s.id, s.title]))
-  const categoryText = (c: string) => CREDIT_CATEGORY_LABELS[c as CreditCategory] ?? c.charAt(0).toUpperCase() + c.slice(1)
+  const categoryText = (c: string) => categoryLabel(settings, c)
+  const knownTags = [...new Set((txns ?? []).flatMap(t => t.tags ?? []))]
+
+  // Past shows with a fee that hasn't been marked received yet.
+  const waiting = settings.features.receivables
+    ? (shows ?? [])
+        .filter(s => s.fee != null && s.fee > 0 && !s.fee_received && s.show_date && s.show_date <= today)
+        .sort((a, b) => (a.show_date ?? '').localeCompare(b.show_date ?? ''))
+        .map(s => ({ id: s.id, title: s.title, date: s.show_date!, fee: s.fee!, received: Math.max(0, (txns ?? []).filter(t => t.show_id === s.id && t.amount > 0).reduce((sum, t) => sum + t.amount, 0)) }))
+    : []
+
+  const tools = [
+    settings.features.projects && { href: '/finance/projects', label: 'Projects', icon: FolderKanban },
+    settings.features.recurring && { href: '/finance/recurring', label: 'Repeating', icon: Repeat },
+    { href: '/finance/reports', label: 'Reports', icon: PieChart },
+  ].filter(Boolean) as { href: string; label: string; icon: typeof PieChart }[]
 
   const budgetProgress = (budgets ?? []).map(b => computeBudgetProgress(b, txns ?? [], today))
   const unallocated = unallocatedFund(memberTotal, budgetProgress)
@@ -80,16 +106,22 @@ export default async function FinancePage() {
   const myPendingPayments = user ? pendingPayments.filter(p => p.from_member === user.id) : []
 
   return (
+    <FinanceExtrasProvider projects={projects} knownTags={knownTags}>
     <div className="space-y-5">
       <PageHeader
         title="Finance"
-        subtitle={<>Band fund <b className="text-gray-900">{fmtSigned(memberTotal)}</b> · {members.length} member{members.length !== 1 ? 's' : ''}</>}
+        subtitle={<>{settings.fundName} <b className="text-gray-900">{fmtSigned(memberTotal, currency)}</b> · {members.length} member{members.length !== 1 ? 's' : ''}</>}
         action={
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Link href="/finance/history" className="inline-flex items-center rounded-md border border-brand-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-brand-50 lg:hidden">
               History
             </Link>
             <ExportModal members={profiles.map(p => ({ id: p.id, name: p.display_name ?? 'Member' }))} />
+            {canEditSettings && (
+              <Link href="/workspace?tab=money" aria-label="Money settings" title="Money settings" className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-brand-200 bg-white text-gray-600 hover:bg-brand-50">
+                <Settings2 className="h-4 w-4" />
+              </Link>
+            )}
             <div className="hidden lg:block">
               <AddTransactionModal members={memberOptions} shows={shows ?? []} budgets={budgets ?? []} />
             </div>
@@ -101,6 +133,16 @@ export default async function FinancePage() {
       {/* Pending payments — a standing reminder until marked paid */}
       <PendingPaymentsBanner payments={myPendingPayments} profiles={profiles} />
 
+      <nav aria-label="Money tools" className="flex flex-wrap gap-2">
+        {tools.map(t => (
+          <Link key={t.href} href={t.href} className="inline-flex items-center gap-2 rounded-full border border-brand-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 hover:bg-brand-50">
+            <t.icon className="h-4 w-4 text-brand-600" /> {t.label}
+          </Link>
+        ))}
+      </nav>
+
+      {waiting.length > 0 && <WaitingToBePaid shows={waiting} />}
+
       <div className="grid items-start gap-4 lg:grid-cols-[1.1fr_1fr]">
         {/* Balances */}
         <section className="rounded-2xl border border-brand-200 bg-white p-5 shadow-sm">
@@ -111,7 +153,7 @@ export default async function FinancePage() {
                 <div className="mb-1 flex items-center justify-between gap-2">
                   <span className="truncate text-sm font-semibold text-gray-800">{m.name}</span>
                   <span className={cn('shrink-0 text-sm font-extrabold tabular-nums', m.balance < 0 ? DEBIT_TEXT : 'text-gray-900')}>
-                    {fmtSigned(m.balance)}
+                    {fmtSigned(m.balance, currency)}
                   </span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-gray-100">
@@ -127,7 +169,7 @@ export default async function FinancePage() {
                     <div className="mt-1">
                       <p className="text-[11px] font-bold text-red-700">
                         {incoming.length > 0
-                          ? `${fmt(covered)} assigned: ${incoming.map(p => nameOf(p.from_member)).join(', ')}`
+                          ? `${fmt(covered, currency)} assigned: ${incoming.map(p => nameOf(p.from_member)).join(', ')}`
                           : 'Reimbursement pending'}
                       </p>
                       {-m.balance - covered > 0.005 && <ReimburseButton memberId={m.id} payers={memberOptions} />}
@@ -162,7 +204,7 @@ export default async function FinancePage() {
                   <div className="flex shrink-0 items-center gap-4">
                     {s.show_date && <span className="text-amber-700">{new Date(s.show_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>}
                     <span className={cn('font-extrabold tabular-nums', net < 0 && DEBIT_TEXT)}>
-                      {fmtSigned(net)}
+                      {fmtSigned(net, currency)}
                     </span>
                   </div>
                 </div>
@@ -175,14 +217,14 @@ export default async function FinancePage() {
       {/* Recent transactions */}
       <section>
         <div className="mb-3 flex items-baseline justify-between gap-3">
-          <SectionLabel>Recent transactions</SectionLabel>
+          <SectionLabel>Recent entries</SectionLabel>
           <div className="flex gap-4 text-sm font-extrabold text-brand-400 dark:text-emerald-400">
             <Link href="/finance/history" className="hover:underline">History →</Link>
             <Link href="/finance/split-history" className="hover:underline">Split history →</Link>
           </div>
         </div>
         {recentTxns.length === 0 ? (
-          <EmptyState title="No transactions yet" description="Add one with the Add transaction button." />
+          <EmptyState title="Nothing recorded yet" description="Add money in or out with the Add entry button." />
         ) : (
           <div className="divide-y divide-brand-100 overflow-hidden rounded-2xl border border-brand-200 bg-white">
             {recentTxns.map(t => (
@@ -204,5 +246,6 @@ export default async function FinancePage() {
         )}
       </section>
     </div>
+    </FinanceExtrasProvider>
   )
 }

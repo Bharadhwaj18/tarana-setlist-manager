@@ -1,5 +1,6 @@
 'use client'
 
+import { useMoney } from '@/components/finance/FinanceSettingsContext'
 import { useState } from 'react'
 import { deleteShow } from '@/actions/shows'
 import { LongPressMenu, type MenuItem } from '@/components/ui/LongPressMenu'
@@ -33,9 +34,6 @@ type Tab = 'upcoming' | 'played' | 'insights'
 const BOOKED = ['Confirmed', 'Advance Received', 'Completed']
 const statusTone = (status: string): PillTone => (BOOKED.includes(status) ? 'green' : 'amber')
 
-function fmt(n: number) {
-  return `₹${Math.abs(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
-}
 
 const monthLabel = (d: string) =>
   new Intl.DateTimeFormat('en-IN', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(d + 'T00:00:00Z'))
@@ -60,6 +58,7 @@ function ShowRow({ s, net, setlist, today, agency, mode, strong }: {
   mode: 'upcoming' | 'played'
   strong?: boolean
 }) {
+  const { money: fmt } = useMoney()
   const router = useRouter()
   const isSplit = !!s.split_at
   const meta = [s.venue, agency ? `via ${agency}` : null].filter(Boolean).join(' · ')

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useMoney } from '@/components/finance/FinanceSettingsContext'
 import { APP_SLUG } from '@/lib/brand'
 import { Download } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
@@ -26,6 +27,7 @@ type Preset = typeof PRESETS[number]['label']
 const inputCls = 'w-full rounded-xl border border-brand-200 bg-white px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400'
 
 export function ExportModal({ members }: { members: Member[] }) {
+  const { settings } = useMoney()
   const [open, setOpen] = useState(false)
   const [preset, setPreset] = useState<Preset>('Last 30 days')
   const [dateFrom, setDateFrom] = useState('')
@@ -46,7 +48,7 @@ export function ExportModal({ members }: { members: Member[] }) {
   }
 
   const memberLabel = (id: string) =>
-    id === 'all' ? 'All members' : id === 'fund' ? 'Band fund' : (members.find(m => m.id === id)?.name ?? id)
+    id === 'all' ? 'All members' : id === 'fund' ? settings.fundName : (members.find(m => m.id === id)?.name ?? id)
 
   const handleExport = () => {
     startTransition(async () => {
@@ -79,7 +81,7 @@ export function ExportModal({ members }: { members: Member[] }) {
         toast('CSV downloaded', 'success')
         setOpen(false)
       } else {
-        buildTransactionStatementPdf(rows, preset, memberLabel(memberId))
+        buildTransactionStatementPdf(rows, preset, memberLabel(memberId), { currency: settings.currency, fundName: settings.fundName })
         toast('PDF downloaded', 'success')
         setOpen(false)
       }
@@ -129,7 +131,7 @@ export function ExportModal({ members }: { members: Member[] }) {
             <label className="mb-1.5 block text-sm font-medium text-gray-700">Member</label>
             <select value={memberId} onChange={e => setMemberId(e.target.value)} className={inputCls}>
               <option value="all">All members</option>
-              <option value="fund">Band fund only</option>
+              <option value="fund">{settings.fundName} only</option>
               {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
           </div>

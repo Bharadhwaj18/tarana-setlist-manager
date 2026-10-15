@@ -1,5 +1,7 @@
 'use client'
 
+import { useFinanceExtras, useMoney } from '@/components/finance/FinanceSettingsContext'
+import { categoryLabel } from '@/lib/finance/settings'
 import { Fragment, useMemo, useState, useTransition } from 'react'
 import { Search, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -8,7 +10,7 @@ import { Chip } from '@/components/ui/Chip'
 import { StatusPill } from '@/components/ui/StatusPill'
 import { deleteTransaction } from '@/actions/finance'
 import { useToast } from '@/components/ui/Toaster'
-import { fmt, fmtSigned, CREDIT_TEXT, DEBIT_TEXT } from './money'
+import { CREDIT_TEXT, DEBIT_TEXT } from './money'
 import type { FinanceTransaction } from '@/types/finance'
 import type { Show } from '@/types/shows'
 import type { Budget } from '@/types/budget'
@@ -38,6 +40,7 @@ interface RowProps {
 }
 
 function TransactionTableRow({ transaction: t, members, shows, budgets, payerName, badge, afterFundTotal, afterMemberBalance }: RowProps) {
+  const { money: fmt, signed: fmtSigned } = useMoney()
   const [editOpen, setEditOpen] = useState(false)
   const [isDeleting, startDeleteTransition] = useTransition()
   const toast = useToast()
@@ -46,7 +49,7 @@ function TransactionTableRow({ transaction: t, members, shows, budgets, payerNam
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!window.confirm('Delete this transaction? This cannot be undone.')) return
+    if (!window.confirm('Delete this entry? This can’t be undone.')) return
     startDeleteTransition(async () => {
       const result = await deleteTransaction(t.id)
       if (result.error) toast(result.error, 'error')
@@ -81,7 +84,15 @@ function TransactionTableRow({ transaction: t, members, shows, budgets, payerNam
           <span>&middot;</span>
           <span>{payerName}</span>
           {badge && <span className="rounded bg-gray-100 px-1 py-0.5 font-semibold text-gray-600">{badge.label}</span>}
+          {t.tags?.length > 0 && t.tags.map(tag => (
+            <span key={tag} className="rounded-full bg-brand-100 px-1.5 py-0.5 text-[10px] font-bold text-brand-700">#{tag}</span>
+          ))}
         </p>
+        {t.tags?.length > 0 && (
+          <p className="mt-1 hidden flex-wrap gap-1 sm:flex">
+            {t.tags.map(tag => <span key={tag} className="rounded-full bg-brand-100 px-1.5 py-0.5 text-[10px] font-bold text-brand-700">#{tag}</span>)}
+          </p>
+        )}
       </td>
       {/* Member: own column on sm+; hidden on mobile, in subline above */}
       <td className="hidden whitespace-nowrap py-3 pr-3 text-[13px] text-gray-700 sm:table-cell">{payerName}</td>
@@ -105,7 +116,7 @@ function TransactionTableRow({ transaction: t, members, shows, budgets, payerNam
           type="button"
           onClick={handleDelete}
           disabled={isDeleting}
-          aria-label="Delete transaction"
+          aria-label="Delete entry"
           className="rounded-md p-1 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
         >
           <Trash2 className="h-3.5 w-3.5" />
@@ -129,10 +140,21 @@ const monthKey = (iso: string) => iso.slice(0, 7)
 const monthLabel = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
 
 export function FinanceHistoryList({ transactions, members, shows, budgets, showTitleById, runningBalances }: Props) {
+  const { money: fmt, signed: fmtSigned, settings: moneySettings } = useMoney()
   const [memberFilter, setMemberFilter] = useState<string>('all')
   const [typeFilter, setTypeFilter] = useState<'all' | 'misc' | 'show'>('all')
   const [dirFilter, setDirFilter] = useState<'all' | 'credit' | 'debit'>('all')
   const [query, setQuery] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [tagFilter, setTagFilter] = useState('all')
+  const [projectFilter, setProjectFilter] = useState('all')
+  const { projects } = useFinanceExtras()
+
+  // Only offer filters for categories and tags that actually appear in this list.
+  const categoryKeys = [...new Set(transactions.map(t => t.category).filter((c): c is string => !!c))]
+    .sort((a, b) => categoryLabel(moneySettings, a).localeCompare(categoryLabel(moneySettings, b)))
+  const usedTags = [...new Set(transactions.flatMap(t => t.tags ?? []))].sort((a, b) => a.localeCompare(b))
+  const usedProjects = projects.filter(p => transactions.some(t => t.project_id === p.id))
 
   const nameOf = (id: string | null) => id === null ? 'Unattributed' : (members.find(m => m.id === id)?.name ?? 'Unknown')
 
@@ -145,20 +167,23 @@ export function FinanceHistoryList({ transactions, members, shows, budgets, show
       if (typeFilter === 'show' && !t.show_id) return false
       if (dirFilter === 'credit' && t.amount < 0) return false
       if (dirFilter === 'debit' && t.amount >= 0) return false
+      if (categoryFilter !== 'all' && t.category !== categoryFilter) return false
+      if (tagFilter !== 'all' && !(t.tags ?? []).includes(tagFilter)) return false
+      if (projectFilter !== 'all' && t.project_id !== projectFilter) return false
       if (q) {
         const showTitle = t.show_id ? (showTitleById[t.show_id] ?? '') : ''
-        const haystack = `${t.description} ${showTitle} ${t.category ?? ''}`.toLowerCase()
+        const haystack = `${t.description} ${showTitle} ${categoryLabel(moneySettings, t.category)} ${(t.tags ?? []).join(' ')}`.toLowerCase()
         if (!haystack.includes(q)) return false
       }
       return true
     })
-  }, [transactions, memberFilter, typeFilter, dirFilter, query, showTitleById])
+  }, [transactions, memberFilter, typeFilter, dirFilter, categoryFilter, tagFilter, projectFilter, query, showTitleById, moneySettings])
 
   const bandFundRows = filtered.filter(t => t.category !== 'reimbursement' && t.member_id)
   const total = bandFundRows.reduce((s, t) => s + t.amount, 0)
   const totalCredit = bandFundRows.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0)
   const totalDebit = bandFundRows.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0)
-  const isFiltered = memberFilter !== 'all' || typeFilter !== 'all' || dirFilter !== 'all' || query.trim() !== ''
+  const isFiltered = memberFilter !== 'all' || typeFilter !== 'all' || dirFilter !== 'all' || categoryFilter !== 'all' || tagFilter !== 'all' || projectFilter !== 'all' || query.trim() !== ''
 
   return (
     <div className="space-y-4">
@@ -173,7 +198,7 @@ export function FinanceHistoryList({ transactions, members, shows, budgets, show
           <p className={cn('font-display text-lg font-bold tabular-nums sm:text-2xl', DEBIT_TEXT)}>{fmt(totalDebit)}</p>
         </div>
         <div className="px-4 py-3 sm:px-5">
-          <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-gray-500">{isFiltered ? 'Net of these' : 'Band fund now'}</p>
+          <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-gray-500">{isFiltered ? 'Net of these' : `${moneySettings.fundName} now`}</p>
           <p className={cn('font-display text-lg font-bold tabular-nums sm:text-2xl', total < 0 ? DEBIT_TEXT : 'text-gray-900')}>{fmtSigned(total)}</p>
         </div>
       </div>
@@ -181,8 +206,8 @@ export function FinanceHistoryList({ transactions, members, shows, budgets, show
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex gap-1.5">
           <Chip active={dirFilter === 'all'} onClick={() => setDirFilter('all')}>All</Chip>
-          <Chip active={dirFilter === 'credit'} onClick={() => setDirFilter('credit')}>Credits</Chip>
-          <Chip active={dirFilter === 'debit'} onClick={() => setDirFilter('debit')}>Debits</Chip>
+          <Chip active={dirFilter === 'credit'} onClick={() => setDirFilter('credit')}>Money in</Chip>
+          <Chip active={dirFilter === 'debit'} onClick={() => setDirFilter('debit')}>Money out</Chip>
         </div>
         <select value={memberFilter} onChange={e => setMemberFilter(e.target.value)} className={cn(fieldCls, 'shrink-0')} aria-label="Member">
           <option value="all">Everyone</option>
@@ -191,16 +216,34 @@ export function FinanceHistoryList({ transactions, members, shows, budgets, show
         </select>
         <select value={typeFilter} onChange={e => setTypeFilter(e.target.value as typeof typeFilter)} className={cn(fieldCls, 'shrink-0')} aria-label="Type">
           <option value="all">All types</option>
-          <option value="misc">Misc</option>
-          <option value="show">Show</option>
+          <option value="misc">General</option>
+          <option value="show">Shows</option>
         </select>
+        {categoryKeys.length > 0 && (
+          <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className={cn(fieldCls, 'shrink-0')} aria-label="Category">
+            <option value="all">All categories</option>
+            {categoryKeys.map(c => <option key={c} value={c}>{categoryLabel(moneySettings, c)}</option>)}
+          </select>
+        )}
+        {usedTags.length > 0 && (
+          <select value={tagFilter} onChange={e => setTagFilter(e.target.value)} className={cn(fieldCls, 'shrink-0')} aria-label="Tag">
+            <option value="all">All tags</option>
+            {usedTags.map(t => <option key={t} value={t}>#{t}</option>)}
+          </select>
+        )}
+        {moneySettings.features.projects && usedProjects.length > 0 && (
+          <select value={projectFilter} onChange={e => setProjectFilter(e.target.value)} className={cn(fieldCls, 'shrink-0')} aria-label="Project">
+            <option value="all">All projects</option>
+            {usedProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        )}
         <div className="relative order-first min-w-0 basis-full sm:order-none sm:ml-auto sm:basis-56">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-brand-300" />
           <input
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="Search transactions…"
+            placeholder="Search entries…"
             className={cn(fieldCls, 'w-full pl-9')}
           />
         </div>
@@ -208,7 +251,7 @@ export function FinanceHistoryList({ transactions, members, shows, budgets, show
 
       {filtered.length === 0 ? (
         <div className="rounded-2xl border-2 border-dashed border-brand-200 py-16 text-center text-sm text-gray-500">
-          No transactions match these filters.
+          No entries match these filters.
         </div>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-brand-200 bg-white">
@@ -230,7 +273,7 @@ export function FinanceHistoryList({ transactions, members, shows, budgets, show
                 const badge = showTitle
                   ? { label: showTitle, kind: 'show' as const }
                   : t.category
-                    ? { label: t.category, kind: 'category' as const }
+                    ? { label: categoryLabel(moneySettings, t.category), kind: 'category' as const }
                     : undefined
                 const rb = runningBalances?.[t.id]
                 const startsMonth = i === 0 || monthKey(filtered[i - 1].date) !== monthKey(t.date)

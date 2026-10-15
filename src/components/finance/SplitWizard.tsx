@@ -1,8 +1,10 @@
 'use client'
 
+import { useMoney } from '@/components/finance/FinanceSettingsContext'
 import { useState, useTransition, useMemo } from 'react'
 import { Check, ArrowRight, Download, X, Plus } from 'lucide-react'
 import { splitShows, type ShowSplitInput, type SplitPayment } from '@/actions/finance'
+import { describeSplitRule } from '@/lib/finance/settings'
 import { computeEntitlements, computeBalanceTopUp, computeShowSettlement, poolShowSettlements, routeSettlement, settlementMemberIds, type Payment } from '@/lib/finance/settlement'
 import { Button } from '@/components/ui/Button'
 import { SectionLabel } from '@/components/ui/SectionLabel'
@@ -28,7 +30,6 @@ interface Props {
 }
 
 function round2(n: number) { return Math.round(n * 100) / 100 }
-function fmt(n: number) { return `₹${Math.abs(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}` }
 
 /** Sum of a show's own transactions, per member — credits positive, debits negative. */
 function cashPositionsFor(txns: FinanceTransaction[]): Record<string, number> {
@@ -48,20 +49,28 @@ function holderFor(txns: FinanceTransaction[], fallback: string): string {
 }
 
 /** The transaction description for one payment — used both when confirming and previewing. */
-function descriptionFor(payment: Payment, nameOf: (id: string) => string, showTitles: string): string {
+function descriptionFor(payment: Payment, nameOf: (id: string) => string, showTitles: string, fundName: string): string {
   return payment.from === payment.to
-    ? `Covered own share from Band Fund — ${showTitles}`
+    ? `Covered own share from ${fundName} — ${showTitles}`
     : `Paid ${nameOf(payment.to)}'s share — ${showTitles}`
 }
 
 export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalances, memberFundBalances }: Props) {
+  const { money: fmt, settings: moneySettings } = useMoney()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => {
     if (shows.length !== 1) return new Set()
     const txns = txnsByShow[shows[0].id] ?? []
     const net = txns.reduce((s, t) => s + t.amount, 0)
     return net > 0 ? new Set([shows[0].id]) : new Set()
   })
-  const [bandPct, setBandPct] = useState(20)
+  const [bandPct, setBandPct] = useState(moneySettings.fundPercent)
+  // The workspace's sharing rules: shares per member and anything taken off the top first.
+  const memberIds = new Set(members.map(m => m.id))
+  const rules = {
+    weights: moneySettings.shareMode === 'shares' ? moneySettings.shares : {},
+    cuts: moneySettings.cuts.filter(c => memberIds.has(c.memberId)),
+  }
+  const cutMemberIds = rules.cuts.map(c => c.memberId)
   const [involvedByShow, setInvolvedByShow] = useState<Record<string, Set<string>>>(
     Object.fromEntries(shows.map(s => [s.id, new Set(members.map(m => m.id))]))
   )
@@ -94,8 +103,10 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
       // Everything below that computes cash positions/reimbursements runs
       // over this wider set; only the equal-split cut itself (memberShares,
       // via computeEntitlements) stays scoped to `involved`.
+      const net = netForShow(show.id)
       const txnMemberIds = [...new Set(showTxns.filter(t => t.member_id).map(t => t.member_id as string))]
-      const settlementIds = settlementMemberIds(involved, txnMemberIds)
+      // Anyone paid a cut off the top is owed money from this show too, played or not.
+      const settlementIds = settlementMemberIds(involved, [...txnMemberIds, ...(net > 0 ? cutMemberIds : [])])
 
       // A `category: 'reimbursement'` expense (fuel, parking, a personal
       // cost for the show) is a debit like any other for the purposes of
@@ -107,8 +118,7 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
       // reimbursed per show at all — if it ever leaves someone's overall
       // balance negative, that's handled once, batch-wide, as a Balance
       // Top-up (see below), not here.
-      const net = netForShow(show.id)
-      const { memberShares, bandFundAmount } = computeEntitlements(net, involved, bandPct)
+      const { memberShares, bandFundAmount } = computeEntitlements(net, involved, bandPct, {}, rules)
       const cashPositions = cashPositionsFor(showTxns)
       const bandFundHolderId = holderFor(showTxns, members[0]?.id ?? '')
 
@@ -136,7 +146,7 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
     // `members` only supplies a fallback id — listing the function itself
     // would just churn on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedShows, involvedByShow, bandPct, txnsByShow])
+  }, [selectedShows, involvedByShow, bandPct, txnsByShow, moneySettings])
 
   // Anyone who fronted general (non-guaranteed) money somewhere in this
   // batch gets made whole once, using their real current Band Fund balance
@@ -387,7 +397,10 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
         balancesBefore: realNames.map(m => ({ name: m.name, balance: round2(memberBalances[m.id] ?? 0) })),
         involvedByShow: perShow.map(p => ({ showTitle: p.show.title, names: p.involved.map(realNameOf) })),
       }
-      return { showTitles: selectedShows.map(s => s.title), bandPct, shows: showDetails, rows, totalNet, totalBandFund, allBalances, meta }
+      return {
+        showTitles: selectedShows.map(s => s.title), bandPct, shows: showDetails, rows, totalNet, totalBandFund, allBalances, meta,
+        currency: moneySettings.currency, fundName: moneySettings.fundName, ruleText: describeSplitRule(moneySettings, bandPct, realNameOf),
+      }
   }
 
   const handleSplit = () => {
@@ -397,7 +410,7 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
     const activePayments = mode === 'auto' ? payments : manualPayments
     const splitPayments: SplitPayment[] = activePayments
       .filter(p => p.amount > 0)
-      .map(p => ({ from: p.from, to: p.to, amount: round2(p.amount), description: descriptionFor(p, realNameOf, showTitles) }))
+      .map(p => ({ from: p.from, to: p.to, amount: round2(p.amount), description: descriptionFor(p, realNameOf, showTitles, moneySettings.fundName) }))
     startTransition(async () => {
       const result = await splitShows(shows_, splitPayments, buildReport())
       if (result && 'error' in result && result.error) toast(result.error, 'error')
@@ -408,7 +421,7 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
     setIsDownloading(true)
     try {
       const r = buildReport()
-      buildSplitReportPdf(r.showTitles, r.bandPct, r.shows, r.rows, r.totalNet, r.totalBandFund, r.allBalances)
+      buildSplitReportPdf(r.showTitles, r.bandPct, r.shows, r.rows, r.totalNet, r.totalBandFund, r.allBalances, { currency: r.currency, fundName: r.fundName, ruleText: r.ruleText })
       toast('Report downloaded', 'success')
     } finally {
       setIsDownloading(false)
@@ -424,7 +437,7 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
   const shownStep = selectedShows.length === 0 ? 1 : !canConfirm ? 3 : 4
   const steps: { id: string; label: string; done: boolean }[] = [
     { id: 'split-shows', label: 'Select shows', done: selectedShows.length > 0 },
-    { id: 'split-fund', label: 'Band fund cut', done: selectedShows.length > 0 },
+    { id: 'split-fund', label: `${moneySettings.fundName} share`, done: selectedShows.length > 0 },
     { id: 'split-who', label: 'Who gets what', done: canConfirm },
     { id: 'split-review', label: 'Review & confirm', done: false },
   ]
@@ -567,7 +580,7 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
                               )
                             })}
                             <div className="flex items-center justify-between pt-1 text-brand-600">
-                              <span>Band Fund ({bandPct}%) <span className="text-gray-400">(kept by {nameOf(showData.bandFundHolderId)})</span></span>
+                              <span>{moneySettings.fundName} ({bandPct}%) <span className="text-gray-400">(kept by {nameOf(showData.bandFundHolderId)})</span></span>
                               <span className="font-semibold tabular-nums">{fmt(showData.bandFundAmount)}</span>
                             </div>
                           </div>
@@ -587,18 +600,21 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
           {/* 2 · Band fund slider */}
           <section id="split-fund" className={cn(card, 'scroll-mt-6')}>
             <div className="mb-3 flex items-baseline justify-between gap-3">
-              <SectionLabel>Band fund cut</SectionLabel>
+              <SectionLabel>{moneySettings.fundName} share</SectionLabel>
               <span className="font-display text-2xl font-bold text-gray-900">{bandPct}%</span>
             </div>
             <div className="mb-2 flex items-center justify-between gap-3 text-sm text-gray-500">
-              <span>Band fund <span className="font-bold text-brand-600">{bandPct}%</span> = {fmt(totalBandFund)}</span>
-              <span>Artists <span className="font-bold text-emerald-700">{100 - bandPct}%</span> (equal split)</span>
+              <span>{moneySettings.fundName} <span className="font-bold text-brand-600">{bandPct}%</span> = {fmt(totalBandFund)}</span>
+              <span>Artists <span className="font-bold text-emerald-700">{100 - bandPct}%</span> ({moneySettings.shareMode === 'shares' ? 'by shares' : 'equal split'})</span>
             </div>
-            <input type="range" min={0} max={50} step={5} value={bandPct}
+            <input type="range" min={0} max={100} step={5} value={bandPct}
               onChange={e => setBandPct(Number(e.target.value))}
-              aria-label="Band fund cut percentage"
+              aria-label={`${moneySettings.fundName} percentage`}
               className="w-full cursor-pointer accent-brand-400" />
-            <div className="mt-1 flex justify-between text-xs font-semibold text-gray-400"><span>0%</span><span>50%</span></div>
+            <div className="mt-1 flex justify-between text-xs font-semibold text-gray-400"><span>0%</span><span>100%</span></div>
+            <p className="mt-3 rounded-lg bg-brand-50 px-3 py-2 text-xs text-gray-600">
+              How it&apos;s shared: {describeSplitRule(moneySettings, bandPct, nameOf)}. An admin can change this in Workspace settings → Money.
+            </p>
           </section>
 
           {/* 3 · Who gets what — Manual / Auto mode switch */}
@@ -654,7 +670,7 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
                             >
                               <option value="">Paid by…</option>
                               {members.map(m => (
-                                <option key={m.id} value={m.id}>{m.id === id ? `${m.name} (self, from Band Fund)` : m.name}</option>
+                                <option key={m.id} value={m.id}>{m.id === id ? `${m.name} (self, from ${moneySettings.fundName})` : m.name}</option>
                               ))}
                             </select>
                             <input
@@ -687,7 +703,7 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
                 })}
               </div>
 
-              <SectionLabel className="mb-2 mt-6">Band Fund balances</SectionLabel>
+              <SectionLabel className="mb-2 mt-6">{moneySettings.fundName} balances</SectionLabel>
               <div className="divide-y divide-brand-100 rounded-xl border border-brand-100">
                 {members.map(m => {
                   const starting = memberBalances[m.id] ?? 0
@@ -709,7 +725,7 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
               </div>
 
               <p className="mt-4 text-xs text-gray-400">
-                Assign who pays whom above — Band Fund balances update as you go. Switch to Auto mode for the algorithm&apos;s own suggestion.
+                Assign who pays whom above — {moneySettings.fundName} balances update as you go. Switch to Auto mode for the algorithm&apos;s own suggestion.
               </p>
             </section>
           )}
@@ -726,7 +742,7 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
                 {payments.map((p, i) => (
                   <div key={i} className="flex items-center gap-2 py-2.5 first:pt-0 last:pb-0">
                     {p.from === p.to ? (
-                      <span className="text-sm font-medium text-gray-800">{nameOf(p.from)} keeps their own share (Band Fund)</span>
+                      <span className="text-sm font-medium text-gray-800">{nameOf(p.from)} keeps their own share ({moneySettings.fundName})</span>
                     ) : (
                       <>
                         <span className="text-sm font-medium text-gray-800">{nameOf(p.from)}</span>
@@ -794,7 +810,7 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
                               )}
                               {line.isBandFundHolder && (
                                 <div className="flex items-center justify-between text-brand-600">
-                                  <span>+ Band Fund cut (you keep it)</span>
+                                  <span>+ {moneySettings.fundName} share (you keep it)</span>
                                   <span className="tabular-nums">+{fmt(line.bandFundAmount)}</span>
                                 </div>
                               )}
@@ -808,7 +824,7 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
                       </div>
                       {topUp > 0.01 && (
                         <div className="flex items-center justify-between pt-2.5 text-xs">
-                          <span className="text-gray-500">Balance top-up <span className="text-gray-400">(brings their real balance back to ₹0)</span></span>
+                          <span className="text-gray-500">Balance top-up <span className="text-gray-400">(brings their real balance back to {fmt(0)})</span></span>
                           <span className="tabular-nums font-medium text-emerald-700">+{fmt(topUp)}</span>
                         </div>
                       )}
@@ -824,7 +840,7 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
                       )}
                       <div className="mt-1.5 space-y-1">
                         {self && (
-                          <p className="text-xs text-gray-500">Keeps {fmt(self.amount)} of their own share from Band Fund</p>
+                          <p className="text-xs text-gray-500">Keeps {fmt(self.amount)} of their own share from {moneySettings.fundName}</p>
                         )}
                         {outgoing.map((p, i) => (
                           <p key={`out-${i}`} className="text-xs text-gray-500">
@@ -851,7 +867,7 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
             <SectionLabel className="mb-3">Review</SectionLabel>
             <dl className="space-y-1.5 text-sm">
               <div className="flex justify-between"><dt className="text-gray-500">Net from {selectedShows.length} show{selectedShows.length !== 1 ? 's' : ''}</dt><dd className="font-bold tabular-nums">{fmt(totalNet)}</dd></div>
-              <div className="flex justify-between"><dt className="text-gray-500">Band fund cut ({bandPct}%)</dt><dd className="font-bold tabular-nums">{fmt(totalBandFund)}</dd></div>
+              <div className="flex justify-between"><dt className="text-gray-500">{moneySettings.fundName} ({bandPct}%)</dt><dd className="font-bold tabular-nums">{fmt(totalBandFund)}</dd></div>
               <div className="flex justify-between"><dt className="text-gray-500">To artists</dt><dd className="font-bold tabular-nums">{fmt(artistsTotal)}</dd></div>
               <div className="flex justify-between"><dt className="text-gray-500">Transfers</dt><dd className="font-bold tabular-nums">{transferCount}</dd></div>
             </dl>
@@ -872,7 +888,7 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
             <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-sidebar-accent">Summary</p>
             <dl className="mt-3 space-y-2 text-sm">
               <div className="flex justify-between gap-3"><dt className="text-hero-muted">Total from {selectedShows.length} show{selectedShows.length !== 1 ? 's' : ''}</dt><dd className="font-bold tabular-nums">{fmt(totalNet)}</dd></div>
-              <div className="flex justify-between gap-3"><dt className="text-hero-muted">Band fund cut ({bandPct}%)</dt><dd className="font-bold tabular-nums">−{fmt(totalBandFund)}</dd></div>
+              <div className="flex justify-between gap-3"><dt className="text-hero-muted">{moneySettings.fundName} ({bandPct}%)</dt><dd className="font-bold tabular-nums">−{fmt(totalBandFund)}</dd></div>
               <div className="h-px bg-hero-line" />
               <div className="flex justify-between gap-3"><dt className="text-hero-muted">Shared by artists</dt><dd className="font-bold tabular-nums">{fmt(artistsTotal)}</dd></div>
               <div className="flex justify-between gap-3"><dt className="text-hero-muted">Transfers</dt><dd className="font-bold tabular-nums">{transferCount}</dd></div>

@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { sectionGuard } from '@/lib/section-guard'
 import { Plus, CalendarDays } from 'lucide-react'
-import { getCachedShows, getCachedShowTransactions, getCachedSetlistsByShow, getCachedEventManagementCompanies } from '@/lib/data'
+import { getCachedShows, getCachedShowTransactions, getCachedSetlistsByShow, getCachedEventManagementCompanies, getCachedFinanceSettings } from '@/lib/data'
+import { formatMoney } from '@/lib/finance/settings'
 import { todayISO, isUpcoming, canonicalCity } from '@/lib/shows'
 import { Button } from '@/components/ui/Button'
 import { ShowSearchList } from '@/components/shows/ShowSearchList'
@@ -86,7 +87,7 @@ export default async function ShowsPage() {
 
   const stats = [
     { label: 'This year', value: `${playedThisYear} show${playedThisYear === 1 ? '' : 's'}` },
-    { label: 'Earned, all time', value: `₹${Math.round(totalRevenue).toLocaleString('en-IN')}` },
+    { label: 'Earned, all time', value: formatMoney(totalRevenue, (await getCachedFinanceSettings()).currency) },
     { label: 'Waiting to split', value: `${waitingToSplit} show${waitingToSplit === 1 ? '' : 's'}`, alert: waitingToSplit > 0 },
   ]
 

@@ -9,7 +9,7 @@ const budget = (o: Partial<Budget> = {}): Budget => ({
 })
 const txn = (o: Partial<FinanceTransaction>): FinanceTransaction => ({
   id: Math.random().toString(), member_id: 'u', amount: -100, description: '', category: 'misc',
-  show_id: null, budget_id: 'b1', date: '2026-09-10', recorded_by: 'u', created_at: '', workspace_id: null, ...o,
+  show_id: null, budget_id: 'b1', date: '2026-09-10', recorded_by: 'u', created_at: '', workspace_id: null, tags: [], project_id: null, recurring_id: null, ...o,
 })
 
 describe('computeBudgetProgress', () => {

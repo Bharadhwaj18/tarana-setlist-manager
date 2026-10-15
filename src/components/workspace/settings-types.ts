@@ -31,6 +31,7 @@ export const SETTINGS_TABS = [
   { key: 'general', label: 'General' },
   { key: 'members', label: 'Members' },
   { key: 'invites', label: 'Invites' },
+  { key: 'money', label: 'Money' },
   { key: 'danger', label: 'Danger zone' },
 ] as const
 export type SettingsTab = (typeof SETTINGS_TABS)[number]['key']

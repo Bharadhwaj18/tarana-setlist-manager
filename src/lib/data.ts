@@ -2,6 +2,7 @@ import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { getWorkspaceContext } from '@/lib/workspace'
 import type { TaskData } from '@/types/tasks'
+import { normaliseFinanceSettings } from '@/lib/finance/settings'
 
 export { getCachedUser } from '@/lib/auth-cache'
 
@@ -232,3 +233,19 @@ export const getWorkspaceAttention = cache(async (): Promise<Record<string, Work
     (data ?? []).map(r => [r.workspace_id, { memberCount: r.member_count, nextShowDate: r.next_show_date, tasksDue: r.tasks_due }])
   )
 })
+
+// The current workspace's money settings, with every missing field filled from the defaults.
+export const getCachedFinanceSettings = cache(async () => {
+  const ctx = await getWorkspaceContext()
+  const raw = ctx?.current.workspace.settings
+  const finance = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>).finance : undefined
+  return normaliseFinanceSettings(finance)
+})
+
+export const getCachedFinanceProjects = cache(() =>
+  inWorkspace((supabase, ws) => supabase.from('finance_projects').select('*').eq('workspace_id', ws).order('created_at', { ascending: false }))
+)
+
+export const getCachedRecurring = cache(() =>
+  inWorkspace((supabase, ws) => supabase.from('finance_recurring').select('*').eq('workspace_id', ws).order('created_at'))
+)

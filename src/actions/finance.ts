@@ -1,14 +1,20 @@
 'use server'
 
+import { formatMoney } from '@/lib/finance/settings'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { todayISO } from '@/lib/shows'
-import { getCachedAllProfiles } from '@/lib/data'
+import { getCachedAllProfiles, getCachedFinanceSettings } from '@/lib/data'
 import { isCurrentTreasurer, requireWorkspaceId } from '@/lib/workspace'
 import { sendNotification, sendNotificationToAll } from '@/actions/notifications'
 import type { Json } from '@/types/database'
 import type { SplitRunReport, SplitRunPayment, SplitRunShow } from '@/types/split-run'
+
+/** An amount in the workspace's currency, for notification text. */
+async function moneyText(n: number) {
+  return formatMoney(n, (await getCachedFinanceSettings()).currency)
+}
 
 async function requireTreasurer(): Promise<string | null> {
   if (!(await isCurrentTreasurer())) return 'Only a treasurer can do this.'
@@ -23,6 +29,8 @@ interface TransactionInput {
   show_id?: string | null
   budget_id?: string | null
   date?: string
+  tags?: string[]
+  project_id?: string | null
 }
 
 /**
@@ -37,6 +45,10 @@ async function validateTransactionWrite(
   supabase: Awaited<ReturnType<typeof createClient>>,
   data: TransactionInput
 ): Promise<string | null> {
+  if (data.tags && (data.tags.length > 10 || data.tags.some(t => typeof t !== 'string' || !t.trim() || t.length > 40))) {
+    return 'Use up to 10 tags, each under 40 characters.'
+  }
+
   // A budget only ever tracks Misc spending: a debit with no show attached.
   if (data.budget_id && (data.amount >= 0 || data.show_id || data.category === 'reimbursement')) {
     return 'Only Misc expenses (not show-related, not a credit) can be tagged to a budget.'
@@ -80,7 +92,7 @@ export async function addTransaction(data: TransactionInput): Promise<{ error?: 
   if (data.amount > 0) {
     const { data: actor } = await supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle()
     await sendNotificationToAll({
-      title: `${actor?.display_name ?? 'Someone'} logged a credit of ₹${data.amount.toLocaleString('en-IN')}`,
+      title: `${actor?.display_name ?? 'Someone'} logged a credit of ${await moneyText(data.amount)}`,
       body: data.description,
       link: '/finance',
       type: 'transaction_credit',
@@ -235,7 +247,7 @@ export async function splitShows(shows: ShowSplitInput[], payments: SplitPayment
       if (p.from === user.id) continue // don't ping yourself about your own debt
       await sendNotification({
         recipientId: p.from,
-        title: `You owe ₹${p.amount.toLocaleString('en-IN')}`,
+        title: `You owe ${await moneyText(p.amount)}`,
         body: p.description,
         link: '/finance',
         type: 'payment_owed',

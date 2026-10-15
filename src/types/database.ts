@@ -550,6 +550,90 @@ export type Database = {
         }
         Relationships: []
       }
+      finance_projects: {
+        Row: {
+          id: string
+          workspace_id: string
+          name: string
+          start_date: string | null
+          end_date: string | null
+          budget: number | null
+          archived_at: string | null
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          name: string
+          start_date?: string | null
+          end_date?: string | null
+          budget?: number | null
+          archived_at?: string | null
+          created_by?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          name?: string
+          start_date?: string | null
+          end_date?: string | null
+          budget?: number | null
+          archived_at?: string | null
+          created_by?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      finance_recurring: {
+        Row: {
+          id: string
+          workspace_id: string
+          description: string
+          amount: number
+          category: string | null
+          member_id: string | null
+          project_id: string | null
+          frequency: string
+          start_date: string
+          end_date: string | null
+          paused: boolean
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          description: string
+          amount: number
+          category?: string | null
+          member_id?: string | null
+          project_id?: string | null
+          frequency: string
+          start_date: string
+          end_date?: string | null
+          paused?: boolean
+          created_by?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          description?: string
+          amount?: number
+          category?: string | null
+          member_id?: string | null
+          project_id?: string | null
+          frequency?: string
+          start_date?: string
+          end_date?: string | null
+          paused?: boolean
+          created_by?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       finance_transactions: {
         Row: {
           workspace_id: string | null
@@ -563,6 +647,9 @@ export type Database = {
           date: string
           recorded_by: string
           created_at: string
+          tags: string[]
+          project_id: string | null
+          recurring_id: string | null
         }
         Insert: {
           workspace_id?: string | null
@@ -576,6 +663,9 @@ export type Database = {
           date?: string
           recorded_by: string
           created_at?: string
+          tags?: string[]
+          project_id?: string | null
+          recurring_id?: string | null
         }
         Update: {
           workspace_id?: string | null
@@ -589,6 +679,9 @@ export type Database = {
           date?: string
           recorded_by?: string
           created_at?: string
+          tags?: string[]
+          project_id?: string | null
+          recurring_id?: string | null
         }
         Relationships: []
       }
@@ -1130,6 +1223,8 @@ export type Database = {
         }
         Returns: undefined
       }
+      set_finance_settings: { Args: { p_ws: string; p_settings: Json }; Returns: undefined }
+      rename_finance_tag: { Args: { p_ws: string; p_old: string; p_new?: string | null }; Returns: undefined }
       transfer_workspace_ownership: { Args: { p_ws: string; p_new_owner: string }; Returns: undefined }
       workspace_attention: {
         Args: Record<string, never>

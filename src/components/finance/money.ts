@@ -1,9 +1,12 @@
-export function fmt(n: number) {
-  return `₹${Math.abs(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+import { formatMoney } from '@/lib/finance/settings'
+
+/** Whole-unit amount in the workspace currency (rupees when none is given). Client components use useMoney() instead. */
+export function fmt(n: number, currency: string = 'INR') {
+  return formatMoney(n, currency)
 }
 
-export function fmtSigned(n: number) {
-  return `${n < 0 ? '−' : ''}${fmt(n)}`
+export function fmtSigned(n: number, currency: string = 'INR') {
+  return `${n < 0 ? '−' : ''}${fmt(n, currency)}`
 }
 
 /** Money in is the forest green in light mode and the small green accent in dark; money out is red. */

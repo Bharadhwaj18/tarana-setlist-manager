@@ -4,7 +4,8 @@ import { LinkedNotes } from '@/components/notes/LinkedNotes'
 import Link from 'next/link'
 import { ChevronLeft, Pencil, MapPin, ListMusic, Wallet, Plus, Building2, User, Phone, Mail, Film, Check } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
-import { getCachedShow, getCachedAllProfiles, getCachedUser, getCachedEventManagementCompany } from '@/lib/data'
+import { getCachedShow, getCachedAllProfiles, getCachedUser, getCachedEventManagementCompany, getCachedFinanceSettings } from '@/lib/data'
+import { formatMoney } from '@/lib/finance/settings'
 import { Button } from '@/components/ui/Button'
 import { SectionLabel } from '@/components/ui/SectionLabel'
 import { StatusPill, type PillTone } from '@/components/ui/StatusPill'
@@ -17,9 +18,6 @@ import { todayISO } from '@/lib/shows'
 import { countdownLabel } from '@/lib/dates'
 import { cn } from '@/lib/utils'
 
-function fmt(n: number) {
-  return `₹${Math.abs(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
-}
 
 const BOOKED = ['Confirmed', 'Advance Received', 'Completed']
 const card = 'rounded-2xl border border-brand-200 bg-white p-5 shadow-sm'
@@ -42,6 +40,8 @@ function Row({ label, children }: { label: React.ReactNode; children: React.Reac
 export default async function ShowDetailPage({ params }: Props) {
   const denied = await sectionGuard('shows')
   if (denied) return denied
+  const moneySettings = await getCachedFinanceSettings()
+  const fmt = (n: number) => formatMoney(n, moneySettings.currency)
   const { id } = await params
   const supabase = await createClient()
 
@@ -246,8 +246,8 @@ export default async function ShowDetailPage({ params }: Props) {
             )}
           </section>
 
-          {/* TDS */}
-          <section className={card}>
+          {/* TDS — hidden when the workspace turns it off, unless this show already uses it */}
+          {(moneySettings.features.tds || show.tds_applicable) && <section className={card}>
             <SectionLabel className="mb-3">TDS{show.tds_applicable && show.tds_percentage != null ? ` · ${show.tds_percentage}%` : ''}</SectionLabel>
             {show.tds_applicable ? (
               <dl className="space-y-2.5">
@@ -259,7 +259,7 @@ export default async function ShowDetailPage({ params }: Props) {
             ) : (
               <p className="text-sm text-gray-400">Not applicable for this show.</p>
             )}
-          </section>
+          </section>}
 
           {/* Split */}
           <section className="flex items-center justify-between gap-3 rounded-2xl bg-hero p-5 text-hero-fg shadow-sm">
