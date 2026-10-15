@@ -161,7 +161,7 @@ export function DayDetailPanel({ date, items, members, boards = [], nameById, re
         <div className="space-y-1.5">
           <SectionLabel>Tasks due</SectionLabel>
           {items.tasks.map(t => (
-            <Row key={t.id} kind="task" href={readOnly ? undefined : `/tasks/${t.board_id}?task=${t.id}`}>
+            <Row key={t.id} kind="task" href={readOnly ? undefined : `/tasks?task=${t.id}`}>
               <RowText
                 title={t.title}
                 sub={t.assignee_ids.length > 0 ? t.assignee_ids.map(id => nameById[id] ?? 'Someone').join(', ') : undefined}

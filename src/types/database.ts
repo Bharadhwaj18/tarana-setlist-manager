@@ -478,6 +478,39 @@ export type Database = {
         }
         Relationships: []
       }
+      task_fields: {
+        Row: {
+          id: string
+          workspace_id: string
+          name: string
+          type: string
+          options: Json
+          position: number
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          name: string
+          type: string
+          options?: Json
+          position?: number
+          created_by?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          name?: string
+          type?: string
+          options?: Json
+          position?: number
+          created_by?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       tasks: {
         Row: {
           workspace_id: string
@@ -502,6 +535,7 @@ export type Database = {
           updated_by: string | null
           created_at: string
           updated_at: string
+          custom: Json
         }
         Insert: {
           workspace_id?: string
@@ -526,6 +560,7 @@ export type Database = {
           updated_by?: string | null
           created_at?: string
           updated_at?: string
+          custom?: Json
         }
         Update: {
           workspace_id?: string
@@ -550,6 +585,7 @@ export type Database = {
           updated_by?: string | null
           created_at?: string
           updated_at?: string
+          custom?: Json
         }
         Relationships: []
       }

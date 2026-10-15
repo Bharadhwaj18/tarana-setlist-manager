@@ -6,7 +6,8 @@ import { requireWorkspaceId } from '@/lib/workspace'
 import { sendNotification } from '@/actions/notifications'
 import { addDaysISO, addMonthsISO, daysUntil, formatDateDMY } from '@/lib/dates'
 import { boardNameSchema, labelInputSchema, taskInputSchema, type TaskInput } from '@/lib/validators'
-import { DEFAULT_BUCKETS, TASK_PROGRESS, type TaskLabel, type TaskProgress, type TaskRecurrence } from '@/types/tasks'
+import { DEFAULT_BUCKETS, TASK_FIELD_TYPES, TASK_PRIORITIES, TASK_PROGRESS, type TaskFieldType, type TaskLabel, type TaskProgress, type TaskRecurrence } from '@/types/tasks'
+import type { Database, Json } from '@/types/database'
 
 type Supabase = Awaited<ReturnType<typeof createClient>>
 type Result = { error?: string }
@@ -29,7 +30,7 @@ async function actorName(supabase: Supabase, userId: string) {
   return data?.display_name ?? 'Someone'
 }
 
-const taskLink = (boardId: string, taskId: string) => `/tasks/${boardId}?task=${taskId}`
+const taskLink = (_boardId: string, taskId: string) => `/tasks?task=${taskId}`
 
 async function notifyAssigned(supabase: Supabase, actorId: string, userIds: string[], task: { id: string; board_id: string; title: string }) {
   const recipients = userIds.filter(id => id !== actorId)
@@ -425,6 +426,150 @@ export async function deleteTask(id: string): Promise<Result> {
     })))
   }
 
+  refresh()
+  return {}
+}
+
+// ---- Editing one thing at a time, straight from the list ---------------------------------
+
+export interface TaskPatch {
+  title?: string
+  progress?: TaskProgress
+  priority?: string
+  dueDate?: string | null
+  startDate?: string | null
+  assigneeIds?: string[]
+  /** Moving to another group puts the task in that group's first bucket. */
+  boardId?: string
+  bucketId?: string
+  description?: string | null
+  checklist?: { id?: string; text: string; done: boolean }[]
+  /** One custom column's value; null clears it. */
+  custom?: { fieldId: string; value: string | number | boolean | null }
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
+
+/** Changes just the fields given, so every cell in the list can save on its own. */
+export async function patchTask(id: string, patch: TaskPatch): Promise<Result> {
+  const { supabase, user } = await getActor()
+  if (!user) return { error: 'Not authenticated' }
+  const { data: existing } = await supabase.from('tasks').select('*').eq('id', id).maybeSingle()
+  if (!existing) return { error: 'Task not found' }
+
+  const update: Database['public']['Tables']['tasks']['Update'] = { updated_by: user.id }
+
+  if (patch.title !== undefined) {
+    const title = patch.title.trim()
+    if (!title) return { error: 'A task needs a name' }
+    if (title.length > 300) return { error: 'Keep the name under 300 characters' }
+    update.title = title
+  }
+  if (patch.progress !== undefined) {
+    if (!(TASK_PROGRESS as readonly string[]).includes(patch.progress)) return { error: 'Invalid status' }
+    update.progress = patch.progress
+    update.completed_at = patch.progress === 'completed' ? (existing.completed_at ?? new Date().toISOString()) : null
+  }
+  if (patch.priority !== undefined) {
+    if (!(TASK_PRIORITIES as readonly string[]).includes(patch.priority)) return { error: 'Invalid priority' }
+    update.priority = patch.priority
+  }
+  for (const [key, column] of [['dueDate', 'due_date'], ['startDate', 'start_date']] as const) {
+    const v = patch[key]
+    if (v === undefined) continue
+    if (v !== null && !ISO_DATE.test(v)) return { error: 'Invalid date' }
+    update[column] = v
+  }
+  if (patch.dueDate === null) { update.remind_days_before = null; update.recurrence = null }
+  if (patch.assigneeIds !== undefined) update.assignee_ids = [...new Set(patch.assigneeIds)]
+  if (patch.description !== undefined) {
+    const d = patch.description?.trim() ? patch.description : null
+    if (d && d.length > 5000) return { error: 'Keep the notes under 5,000 characters' }
+    update.description = d
+  }
+  if (patch.checklist !== undefined) {
+    if (patch.checklist.length > 100) return { error: 'Up to 100 checklist items' }
+    update.checklist = patch.checklist.filter(c => c.text.trim()).map(c => ({ id: c.id ?? crypto.randomUUID(), text: c.text.trim().slice(0, 300), done: !!c.done }))
+  }
+  if (patch.boardId !== undefined && patch.boardId !== existing.board_id) {
+    const { data: first } = await supabase.from('task_buckets').select('id').eq('board_id', patch.boardId).order('position').limit(1)
+    const bucketId = first?.[0]?.id
+    if (!bucketId) return { error: 'That group has no buckets yet' }
+    update.board_id = patch.boardId
+    update.bucket_id = bucketId
+    update.label_ids = [] // labels belong to a group
+    update.position = await nextPosition(supabase, bucketId)
+  } else if (patch.bucketId !== undefined && patch.bucketId !== existing.bucket_id) {
+    update.bucket_id = patch.bucketId
+    update.position = await nextPosition(supabase, patch.bucketId)
+  }
+  if (patch.custom) {
+    const { fieldId, value } = patch.custom
+    const current = existing.custom && typeof existing.custom === 'object' && !Array.isArray(existing.custom) ? { ...(existing.custom as Record<string, Json>) } : {}
+    if (value === null || value === '') delete current[fieldId]
+    else current[fieldId] = typeof value === 'string' ? value.slice(0, 500) : value
+    update.custom = current
+  }
+
+  const { error } = await supabase.from('tasks').update(update).eq('id', id)
+  if (error) return { error: /custom/.test(error.message) ? 'Custom columns aren’t switched on yet. Run the task columns SQL first.' : error.message }
+
+  if (patch.assigneeIds) {
+    const added = (update.assignee_ids as string[]).filter(a => !existing.assignee_ids.includes(a))
+    await notifyAssigned(supabase, user.id, added, { id, board_id: (update.board_id as string) ?? existing.board_id, title: (update.title as string) ?? existing.title })
+  }
+  if (patch.progress === 'completed' && existing.progress !== 'completed') await onTaskCompleted(supabase, user.id, id)
+
+  refresh()
+  return {}
+}
+
+// ---- Custom columns ------------------------------------------------------------------------
+
+function cleanOptions(options: string[] | undefined) {
+  return [...new Set((options ?? []).map(o => o.trim().slice(0, 40)).filter(Boolean))].slice(0, 30)
+}
+
+export async function createTaskField(input: { name: string; type: TaskFieldType; options?: string[] }): Promise<Result & { id?: string }> {
+  const name = input.name.trim()
+  if (!name || name.length > 40) return { error: 'Give the column a name under 40 characters' }
+  if (!(TASK_FIELD_TYPES as readonly string[]).includes(input.type)) return { error: 'Pick a column type' }
+  const options = input.type === 'select' ? cleanOptions(input.options) : []
+  if (input.type === 'select' && options.length === 0) return { error: 'Add at least one option' }
+  const { supabase, user } = await getActor()
+  if (!user) return { error: 'Not authenticated' }
+  const ws = await requireWorkspaceId()
+  const { data: last } = await supabase.from('task_fields').select('position').eq('workspace_id', ws).order('position', { ascending: false }).limit(1)
+  const { data, error } = await supabase.from('task_fields')
+    .insert({ workspace_id: ws, name, type: input.type, options, position: (last?.[0]?.position ?? 0) + 1 })
+    .select('id').single()
+  if (error) return { error: /task_fields/.test(error.message) ? 'Custom columns aren’t switched on yet. Run the task columns SQL first.' : error.message }
+  refresh()
+  return { id: data.id }
+}
+
+export async function updateTaskField(id: string, input: { name?: string; options?: string[] }): Promise<Result> {
+  const { supabase, user } = await getActor()
+  if (!user) return { error: 'Not authenticated' }
+  const update: { name?: string; options?: string[] } = {}
+  if (input.name !== undefined) {
+    const name = input.name.trim()
+    if (!name || name.length > 40) return { error: 'Give the column a name under 40 characters' }
+    update.name = name
+  }
+  if (input.options !== undefined) update.options = cleanOptions(input.options)
+  const { error } = await supabase.from('task_fields').update(update).eq('id', id)
+  if (error) return { error: error.message }
+  refresh()
+  return {}
+}
+
+/** Removes a column. Values already typed into it stay on the tasks but are no longer shown. */
+export async function deleteTaskField(id: string): Promise<Result> {
+  const { supabase, user } = await getActor()
+  if (!user) return { error: 'Not authenticated' }
+  const { error } = await supabase.from('task_fields').delete().eq('id', id)
+  if (error) return { error: error.message }
   refresh()
   return {}
 }

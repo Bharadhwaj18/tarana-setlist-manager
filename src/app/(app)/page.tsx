@@ -215,7 +215,7 @@ export default async function TodayPage() {
                 const isOverdue = !!t.due_date && t.due_date < today
                 return (
                   <li key={t.id}>
-                    <Link href={`/tasks/${t.board_id}?task=${t.id}`} className="flex items-start justify-between gap-3 text-sm hover:text-brand-700">
+                    <Link href={`/tasks?task=${t.id}`} className="flex items-start justify-between gap-3 text-sm hover:text-brand-700">
                       <span className="min-w-0 text-gray-900">{t.title}</span>
                       <span className={cn('shrink-0 text-xs', isOverdue ? 'font-bold text-red-600' : 'text-gray-500')}>
                         {isOverdue ? 'Overdue' : t.due_date ? shortDate(t.due_date) : ''}
@@ -226,7 +226,7 @@ export default async function TodayPage() {
               })}
             </ul>
           )}
-          <Link href="/tasks?view=mine" className="mt-auto inline-flex items-center gap-1 pt-1 text-sm font-semibold text-brand-600 hover:underline">
+          <Link href="/tasks?mine=1" className="mt-auto inline-flex items-center gap-1 pt-1 text-sm font-semibold text-brand-600 hover:underline">
             All my tasks <ArrowRight className="h-4 w-4" />
           </Link>
         </section>

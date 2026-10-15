@@ -5,6 +5,7 @@ type Tables = Database['public']['Tables']
 export type TaskBoard = Tables['task_boards']['Row']
 export type TaskBucket = Tables['task_buckets']['Row']
 export type Task = Tables['tasks']['Row']
+export type TaskField = Tables['task_fields']['Row']
 /** A label as stored in task_boards.labels. A task points at it by id (tasks.label_ids). */
 export type TaskLabel = TaskBoardLabel
 /** One checklist row as stored in tasks.checklist. */
@@ -15,6 +16,33 @@ export interface TaskData {
   boards: TaskBoard[]
   buckets: TaskBucket[]
   tasks: Task[]
+  /** The workspace's own columns, in order. */
+  fields: TaskField[]
+}
+
+export const TASK_FIELD_TYPES = ['checkbox', 'select', 'text', 'number', 'date', 'person'] as const
+export type TaskFieldType = (typeof TASK_FIELD_TYPES)[number]
+
+export const TASK_FIELD_TYPE_LABELS: Record<TaskFieldType, { label: string; hint: string }> = {
+  checkbox: { label: 'Tick box', hint: 'Yes or no' },
+  select: { label: 'Dropdown', hint: 'Pick one option' },
+  text: { label: 'Text', hint: 'A short note' },
+  number: { label: 'Number', hint: 'Amounts, counts' },
+  date: { label: 'Date', hint: 'Any date' },
+  person: { label: 'Person', hint: 'Someone in the workspace' },
+}
+
+/** A custom field's options (dropdowns only), read safely from the stored JSON. */
+export function fieldOptions(field: Pick<TaskField, 'options'>): string[] {
+  return Array.isArray(field.options) ? field.options.filter((o): o is string => typeof o === 'string') : []
+}
+
+/** A task's value for one custom field, read safely from the stored JSON. */
+export function customValue(task: Pick<Task, 'custom'>, fieldId: string): string | number | boolean | null {
+  const c = task.custom
+  if (!c || typeof c !== 'object' || Array.isArray(c)) return null
+  const v = (c as Record<string, unknown>)[fieldId]
+  return typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' ? v : null
 }
 
 export const TASK_PROGRESS = ['not_started', 'in_progress', 'completed'] as const

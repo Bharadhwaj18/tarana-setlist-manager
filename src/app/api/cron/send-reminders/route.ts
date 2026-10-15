@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
   for (const task of toRemind) {
     const recipientIds = task.assignee_ids.length ? task.assignee_ids : [task.created_by]
     const dueLabel = task.due_date === today ? 'today' : `on ${formatDateDMY(task.due_date!)}`
-    const link = `/tasks/${task.board_id}?task=${task.id}`
+    const link = `/tasks?task=${task.id}`
     for (const recipientId of recipientIds) {
       const { error } = await supabase.from('notifications').insert({
         recipient_id: recipientId,
