@@ -6,8 +6,8 @@ import { Eye, EyeOff, Lock, Minus, Plus, Trash2 } from 'lucide-react'
 import { renameFinanceTag, saveFinanceSettings } from '@/actions/finance-settings'
 import { computeEntitlements } from '@/lib/finance/settlement'
 import {
-  CURRENCIES, formatMoney, isLockedCategory, newCategoryKey,
-  type FinanceCategory, type FinanceFeatures, type FinanceSettings, type MoneyDirection,
+  CURRENCIES, currencySymbol, evenPercents, formatMoney, isLockedCategory, newCategoryKey, percentTotal, splitRulesFrom,
+  type FinanceCategory, type FinanceFeatures, type FinanceSettings, type MoneyDirection, type ShareMode,
 } from '@/lib/finance/settings'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -70,16 +70,29 @@ export function MoneySettings({ initial, members, canEdit, usedTags = [] }: Prop
   const cutTotal = s.cuts.reduce((sum, c) => sum + c.percent, 0)
   const problems: string[] = []
   if (!s.fundName.trim()) problems.push('Give the shared money a name.')
-  if (cutTotal + s.fundPercent > 100) problems.push('Cuts and the shared money add up to more than 100%.')
+  if (cutTotal + (s.shareMode === 'fixed' ? 0 : s.fundPercent) > 100) problems.push(s.shareMode === 'fixed' ? 'The cuts add up to more than 100%.' : 'Cuts and the shared money add up to more than 100%.')
   if (s.cuts.some(c => !c.memberId)) problems.push('Choose who gets each cut.')
   if (s.cuts.some(c => !c.label.trim())) problems.push('Give each cut a name.')
+  const memberIds = members.map(m => m.id)
+  const pctTotal = percentTotal(s, memberIds)
+  if (s.shareMode === 'percent' && Math.abs(pctTotal - 100) > 0.01) problems.push(`The percentages add up to ${pctTotal}%. They need to add up to 100%.`)
+  if (s.shareMode === 'ratio' && memberIds.every(id => (s.shares[id] ?? 1) === 0)) problems.push('Give at least one person a part of the ratio.')
+  const fixedTotal = memberIds.reduce((sum, id) => sum + (s.fixedAmounts[id] ?? 0), 0)
+
+  const chooseMode = (mode: ShareMode) => {
+    setS(prev => ({
+      ...prev,
+      shareMode: mode,
+      // Start percentages off even, so they already add up to 100.
+      percents: mode === 'percent' && percentTotal(prev, memberIds) === 0 ? evenPercents(memberIds) : prev.percents,
+    }))
+  }
 
   // A worked example, so the effect of every choice is visible before saving.
   const example = useMemo(() => {
     const ids = members.map(m => m.id)
-    const weights = s.shareMode === 'shares' ? Object.fromEntries(ids.map(id => [id, s.shares[id] ?? 1])) : {}
-    return computeEntitlements(10000, ids, s.fundPercent, {}, { weights, cuts: s.cuts.filter(c => c.memberId) })
-  }, [members, s.fundPercent, s.shareMode, s.shares, s.cuts])
+    return computeEntitlements(10000, ids, s.fundPercent, {}, splitRulesFrom(s, ids))
+  }, [members, s])
 
   const save = () => {
     if (problems.length > 0) { toast(problems[0], 'error'); return }
@@ -205,47 +218,105 @@ export function MoneySettings({ initial, members, canEdit, usedTags = [] }: Prop
 
           <div>
             <label htmlFor="fund-pct" className={label}>2. How much goes to the {s.fundName}?</label>
+            {s.shareMode === 'fixed' ? (
+              <p className="rounded-lg bg-brand-50 px-3 py-2 text-sm text-gray-600">With fixed amounts, whatever is left after paying everyone goes to the {s.fundName}.</p>
+            ) : (<>
             <div className="flex items-center gap-3">
               <input id="fund-pct" type="range" min={0} max={100} step={5} value={s.fundPercent} disabled={!canEdit}
                 onChange={e => set('fundPercent', Number(e.target.value))} className="w-full accent-brand-500" />
               <span className="w-14 shrink-0 text-right font-display text-xl font-bold text-gray-900">{s.fundPercent}%</span>
             </div>
             <p className="mt-1 text-xs text-gray-500">Kept aside for shared costs like gear, travel or the next recording. 0% if you share everything.</p>
+            </>)}
           </div>
 
           <div>
-            <p className={label}>3. How is the rest shared among the people who played?</p>
+            <p className={label}>3. How is {s.shareMode === 'fixed' ? 'the money' : 'the rest'} shared among the people who played?</p>
             <div className="grid gap-2 sm:grid-cols-2">
               {([
                 { value: 'equal', title: 'Equally', text: 'Everyone who played gets the same.' },
-                { value: 'shares', title: 'By shares', text: 'Some people get more, e.g. 2 shares vs 1.' },
+                { value: 'percent', title: 'By percentage', text: 'e.g. Harsh 40%, everyone else 20%.' },
+                { value: 'ratio', title: 'By ratio', text: 'e.g. 2 : 1 — one person gets twice as much.' },
+                { value: 'fixed', title: 'Fixed amount', text: 'e.g. 3,000 each per show, the rest to the fund.' },
               ] as const).map(o => (
-                <button key={o.value} type="button" disabled={!canEdit} onClick={() => set('shareMode', o.value)} aria-pressed={s.shareMode === o.value}
+                <button key={o.value} type="button" disabled={!canEdit} onClick={() => chooseMode(o.value)} aria-pressed={s.shareMode === o.value}
                   className={cn('rounded-xl border p-3 text-left transition-colors disabled:cursor-default', s.shareMode === o.value ? 'border-brand-400 bg-brand-100' : 'border-brand-200 hover:bg-brand-50')}>
                   <span className="block text-sm font-bold text-gray-900">{o.title}</span>
                   <span className="block text-xs text-gray-500">{o.text}</span>
                 </button>
               ))}
             </div>
-            {s.shareMode === 'shares' && (
-              <ul className="mt-3 divide-y divide-brand-100 rounded-xl border border-brand-200">
-                {members.map(m => {
-                  const n = s.shares[m.id] ?? 1
-                  const change = (v: number) => set('shares', { ...s.shares, [m.id]: Math.max(0, Math.min(100, Math.round(v * 2) / 2)) })
-                  return (
+
+            {s.shareMode === 'percent' && (
+              <div className="mt-3 rounded-xl border border-brand-200">
+                <ul className="divide-y divide-brand-100">
+                  {members.map(m => (
                     <li key={m.id} className="flex items-center justify-between gap-3 px-3 py-2">
                       <span className="text-sm text-gray-900">{m.name}</span>
-                      <span className="flex items-center gap-1">
-                        <button type="button" aria-label={`Fewer shares for ${m.name}`} disabled={!canEdit || n <= 0} onClick={() => change(n - 0.5)}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-100 text-gray-700 hover:bg-brand-200 disabled:opacity-40"><Minus className="h-4 w-4" /></button>
-                        <span className="w-16 text-center text-sm font-bold text-gray-900">{n} {n === 1 ? 'share' : 'shares'}</span>
-                        <button type="button" aria-label={`More shares for ${m.name}`} disabled={!canEdit} onClick={() => change(n + 0.5)}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-100 text-gray-700 hover:bg-brand-200 disabled:opacity-40"><Plus className="h-4 w-4" /></button>
-                      </span>
+                      <div className="relative w-24">
+                        <Input aria-label={`Percentage for ${m.name}`} type="number" inputMode="decimal" min={0} max={100} step="any" disabled={!canEdit} className="pr-7 text-right"
+                          value={s.percents[m.id] ?? 0}
+                          onChange={e => set('percents', { ...s.percents, [m.id]: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })} />
+                        <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-sm text-gray-500">%</span>
+                      </div>
                     </li>
-                  )
-                })}
-              </ul>
+                  ))}
+                </ul>
+                <div className="flex items-center justify-between gap-3 border-t border-brand-100 px-3 py-2">
+                  <span className={cn('text-sm font-bold', Math.abs(pctTotal - 100) < 0.01 ? 'text-brand-700' : 'text-red-700')}>
+                    Total {pctTotal}%{Math.abs(pctTotal - 100) < 0.01 ? ' ✓' : ` — ${pctTotal < 100 ? `${Math.round((100 - pctTotal) * 100) / 100}% left to give` : `${Math.round((pctTotal - 100) * 100) / 100}% too much`}`}
+                  </span>
+                  {canEdit && <Button type="button" variant="secondary" size="sm" onClick={() => set('percents', evenPercents(memberIds))}>Split evenly</Button>}
+                </div>
+                <p className="border-t border-brand-100 px-3 py-2 text-xs text-gray-500">If someone doesn’t play a show, their part is shared among the others in the same proportions.</p>
+              </div>
+            )}
+
+            {s.shareMode === 'ratio' && (
+              <div className="mt-3 rounded-xl border border-brand-200">
+                <ul className="divide-y divide-brand-100">
+                  {members.map(m => {
+                    const n = s.shares[m.id] ?? 1
+                    const change = (v: number) => set('shares', { ...s.shares, [m.id]: Math.max(0, Math.min(20, v)) })
+                    return (
+                      <li key={m.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                        <span className="text-sm text-gray-900">{m.name}</span>
+                        <span className="flex items-center gap-1">
+                          <button type="button" aria-label={`Less for ${m.name}`} disabled={!canEdit || n <= 0} onClick={() => change(n - 1)}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-100 text-gray-700 hover:bg-brand-200 disabled:opacity-40"><Minus className="h-4 w-4" /></button>
+                          <span className="w-10 text-center font-display text-lg font-bold text-gray-900">{n}</span>
+                          <button type="button" aria-label={`More for ${m.name}`} disabled={!canEdit || n >= 20} onClick={() => change(n + 1)}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-100 text-gray-700 hover:bg-brand-200 disabled:opacity-40"><Plus className="h-4 w-4" /></button>
+                        </span>
+                      </li>
+                    )
+                  })}
+                </ul>
+                <p className="border-t border-brand-100 px-3 py-2 text-xs text-gray-500">
+                  Ratio {members.map(m => s.shares[m.id] ?? 1).join(' : ')}. Someone on 2 gets twice what someone on 1 gets; 0 means nothing. If someone doesn’t play a show, the others share it in the same ratio.
+                </p>
+              </div>
+            )}
+
+            {s.shareMode === 'fixed' && (
+              <div className="mt-3 rounded-xl border border-brand-200">
+                <ul className="divide-y divide-brand-100">
+                  {members.map(m => (
+                    <li key={m.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                      <span className="text-sm text-gray-900">{m.name}</span>
+                      <div className="relative w-32">
+                        <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-gray-500">{currencySymbol(s.currency)}</span>
+                        <Input aria-label={`Fixed amount for ${m.name}`} type="number" inputMode="decimal" min={0} step="any" disabled={!canEdit} className="pl-7 text-right"
+                          value={s.fixedAmounts[m.id] ?? 0}
+                          onChange={e => set('fixedAmounts', { ...s.fixedAmounts, [m.id]: Math.max(0, Number(e.target.value) || 0) })} />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                <p className="border-t border-brand-100 px-3 py-2 text-xs text-gray-500">
+                  {money(fixedTotal)} per show if everyone plays. Whatever is left goes to the {s.fundName}. If a show makes less than this, everyone’s amount is reduced by the same proportion.
+                </p>
+              </div>
             )}
           </div>
 

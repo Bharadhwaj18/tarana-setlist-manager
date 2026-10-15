@@ -4,7 +4,7 @@ import { useMoney } from '@/components/finance/FinanceSettingsContext'
 import { useState, useTransition, useMemo } from 'react'
 import { Check, ArrowRight, Download, X, Plus } from 'lucide-react'
 import { splitShows, type ShowSplitInput, type SplitPayment } from '@/actions/finance'
-import { describeSplitRule } from '@/lib/finance/settings'
+import { describeSplitRule, splitRulesFrom } from '@/lib/finance/settings'
 import { computeEntitlements, computeBalanceTopUp, computeShowSettlement, poolShowSettlements, routeSettlement, settlementMemberIds, type Payment } from '@/lib/finance/settlement'
 import { Button } from '@/components/ui/Button'
 import { SectionLabel } from '@/components/ui/SectionLabel'
@@ -64,12 +64,9 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
     return net > 0 ? new Set([shows[0].id]) : new Set()
   })
   const [bandPct, setBandPct] = useState(moneySettings.fundPercent)
-  // The workspace's sharing rules: shares per member and anything taken off the top first.
-  const memberIds = new Set(members.map(m => m.id))
-  const rules = {
-    weights: moneySettings.shareMode === 'shares' ? moneySettings.shares : {},
-    cuts: moneySettings.cuts.filter(c => memberIds.has(c.memberId)),
-  }
+  // The workspace's sharing rules: cuts off the top, then equal / percentage / ratio / fixed amounts.
+  const rules = splitRulesFrom(moneySettings, members.map(m => m.id))
+  const isFixed = moneySettings.shareMode === 'fixed'
   const cutMemberIds = rules.cuts.map(c => c.memberId)
   const [involvedByShow, setInvolvedByShow] = useState<Record<string, Set<string>>>(
     Object.fromEntries(shows.map(s => [s.id, new Set(members.map(m => m.id))]))
@@ -601,17 +598,23 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
           <section id="split-fund" className={cn(card, 'scroll-mt-6')}>
             <div className="mb-3 flex items-baseline justify-between gap-3">
               <SectionLabel>{moneySettings.fundName} share</SectionLabel>
-              <span className="font-display text-2xl font-bold text-gray-900">{bandPct}%</span>
+              <span className="font-display text-2xl font-bold text-gray-900">{isFixed ? fmt(totalBandFund) : `${bandPct}%`}</span>
             </div>
-            <div className="mb-2 flex items-center justify-between gap-3 text-sm text-gray-500">
-              <span>{moneySettings.fundName} <span className="font-bold text-brand-600">{bandPct}%</span> = {fmt(totalBandFund)}</span>
-              <span>Artists <span className="font-bold text-emerald-700">{100 - bandPct}%</span> ({moneySettings.shareMode === 'shares' ? 'by shares' : 'equal split'})</span>
-            </div>
-            <input type="range" min={0} max={100} step={5} value={bandPct}
-              onChange={e => setBandPct(Number(e.target.value))}
-              aria-label={`${moneySettings.fundName} percentage`}
-              className="w-full cursor-pointer accent-brand-400" />
-            <div className="mt-1 flex justify-between text-xs font-semibold text-gray-400"><span>0%</span><span>100%</span></div>
+            {isFixed ? (
+              <p className="text-sm text-gray-500">Everyone who played gets their fixed amount; the {fmt(totalBandFund)} left goes to the {moneySettings.fundName}.</p>
+            ) : (
+              <>
+                <div className="mb-2 flex items-center justify-between gap-3 text-sm text-gray-500">
+                  <span>{moneySettings.fundName} <span className="font-bold text-brand-600">{bandPct}%</span> = {fmt(totalBandFund)}</span>
+                  <span>Artists <span className="font-bold text-emerald-700">{100 - bandPct}%</span> ({moneySettings.shareMode === 'percent' ? 'by percentage' : moneySettings.shareMode === 'ratio' ? 'by ratio' : 'equal split'})</span>
+                </div>
+                <input type="range" min={0} max={100} step={5} value={bandPct}
+                  onChange={e => setBandPct(Number(e.target.value))}
+                  aria-label={`${moneySettings.fundName} percentage`}
+                  className="w-full cursor-pointer accent-brand-400" />
+                <div className="mt-1 flex justify-between text-xs font-semibold text-gray-400"><span>0%</span><span>100%</span></div>
+              </>
+            )}
             <p className="mt-3 rounded-lg bg-brand-50 px-3 py-2 text-xs text-gray-600">
               How it&apos;s shared: {describeSplitRule(moneySettings, bandPct, nameOf)}. An admin can change this in Workspace settings → Money.
             </p>

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   DEFAULT_FINANCE_SETTINGS, normaliseFinanceSettings, activeCategories, categoryLabel, newCategoryKey,
-  formatMoney, formatMoneyPdf, describeSplitRule, sharesOf,
+  formatMoney, formatMoneyPdf, describeSplitRule, splitRulesFrom, evenPercents, percentTotal,
 } from './settings'
 import { computeEntitlements } from './settlement'
 import { occurrences, nextOccurrence } from './recurring'
@@ -37,10 +37,23 @@ describe('normaliseFinanceSettings', () => {
     expect(s.tags).toEqual(['Goa tour'])
   })
 
-  it('only counts shares when share mode is on', () => {
-    const s = normaliseFinanceSettings({ shares: { a: 2 } })
-    expect(sharesOf(s, 'a')).toBe(1)
-    expect(sharesOf({ ...s, shareMode: 'shares' }, 'a')).toBe(2)
+  it('reads the old "shares" mode as ratio', () => {
+    const s = normaliseFinanceSettings({ shareMode: 'shares', shares: { a: 2 } })
+    expect(s.shareMode).toBe('ratio')
+    expect(splitRulesFrom(s, ['a', 'b']).weights).toEqual({ a: 2, b: 1 })
+  })
+
+  it('only uses the map for the chosen mode', () => {
+    const s = normaliseFinanceSettings({ shares: { a: 2 }, percents: { a: 60, b: 40 }, fixedAmounts: { a: 5000 } })
+    expect(splitRulesFrom(s, ['a', 'b'])).toEqual({ weights: undefined, fixed: undefined, cuts: [] })
+    expect(splitRulesFrom({ ...s, shareMode: 'percent' }, ['a', 'b']).weights).toEqual({ a: 60, b: 40 })
+    expect(splitRulesFrom({ ...s, shareMode: 'fixed' }, ['a', 'b']).fixed).toEqual({ a: 5000, b: 0 })
+  })
+
+  it('makes even percentages that add up to 100', () => {
+    const p = evenPercents(['a', 'b', 'c'])
+    expect(p).toEqual({ a: 34, b: 33, c: 33 })
+    expect(percentTotal({ ...DEFAULT_FINANCE_SETTINGS, percents: p }, ['a', 'b', 'c'])).toBe(100)
   })
 })
 
@@ -109,6 +122,39 @@ describe('computeEntitlements with rules', () => {
     const { cutShares, memberShares } = computeEntitlements(-200, ['a', 'b'], 0, {}, { cuts: [{ memberId: 'm', percent: 10 }] })
     expect(cutShares).toEqual({})
     expect(memberShares).toEqual({ a: -100, b: -100 })
+  })
+})
+
+describe('percentage and fixed splits', () => {
+  it('shares by percentage, and spreads an absent player\'s part over the rest', () => {
+    const all = computeEntitlements(1000, ['a', 'b', 'c'], 0, {}, { weights: { a: 50, b: 30, c: 20 } })
+    expect(all.memberShares).toEqual({ a: 500, b: 300, c: 200 })
+    const withoutC = computeEntitlements(1000, ['a', 'b'], 0, {}, { weights: { a: 50, b: 30, c: 20 } })
+    expect(withoutC.memberShares).toEqual({ a: 625, b: 375 })
+  })
+
+  it('pays fixed amounts and sends the rest to the fund', () => {
+    const r = computeEntitlements(10000, ['a', 'b'], 20, {}, { fixed: { a: 3000, b: 2000 } })
+    expect(r.memberShares).toEqual({ a: 3000, b: 2000 })
+    expect(r.bandFundAmount).toBe(5000)
+  })
+
+  it('reduces fixed amounts evenly when the show made less', () => {
+    const r = computeEntitlements(2500, ['a', 'b'], 20, {}, { fixed: { a: 3000, b: 2000 } })
+    expect(r.memberShares).toEqual({ a: 1500, b: 1000 })
+    expect(r.bandFundAmount).toBe(0)
+  })
+
+  it('shares a loss equally under fixed amounts', () => {
+    const r = computeEntitlements(-400, ['a', 'b'], 20, {}, { fixed: { a: 3000, b: 2000 } })
+    expect(r.memberShares).toEqual({ a: -200, b: -200 })
+    expect(r.bandFundAmount).toBe(0)
+  })
+
+  it('takes cuts before fixed amounts', () => {
+    const r = computeEntitlements(10000, ['a'], 0, {}, { fixed: { a: 5000 }, cuts: [{ memberId: 'm', percent: 10 }] })
+    expect(r.memberShares).toEqual({ a: 5000, m: 1000 })
+    expect(r.bandFundAmount).toBe(4000)
   })
 })
 

@@ -30,16 +30,26 @@ export interface FinanceFeatures {
   tds: boolean
 }
 
+export type ShareMode = 'equal' | 'percent' | 'ratio' | 'fixed'
+
 export interface FinanceSettings {
   fundName: string
   currency: CurrencyCode
   categories: FinanceCategory[]
   /** Default share of each show kept in the shared fund. Can still be changed on each split. */
   fundPercent: number
-  /** 'equal': everyone who played gets the same. 'shares': each member gets a number of shares. */
-  shareMode: 'equal' | 'shares'
-  /** memberId -> number of shares. Anyone missing has 1. */
+  /**
+   * How what's left after cuts and the fund is shared among the people who played:
+   * 'equal' the same each; 'percent' a percentage each (adds up to 100); 'ratio' parts each, e.g. 2 : 1;
+   * 'fixed' a set amount each, with whatever is left going to the fund.
+   */
+  shareMode: ShareMode
+  /** Ratio parts per member, for 'ratio'. Anyone missing has 1. (Saved as "shares" before ratios were named.) */
   shares: Record<string, number>
+  /** Percent per member, for 'percent'. Anyone missing has 0. */
+  percents: Record<string, number>
+  /** Fixed amount per show per member, for 'fixed'. Anyone missing gets 0. */
+  fixedAmounts: Record<string, number>
   cuts: OffTopCut[]
   tags: string[]
   features: FinanceFeatures
@@ -76,6 +86,8 @@ export const DEFAULT_FINANCE_SETTINGS: FinanceSettings = {
   fundPercent: 20,
   shareMode: 'equal',
   shares: {},
+  percents: {},
+  fixedAmounts: {},
   cuts: [],
   tags: [],
   features: { projects: true, recurring: true, receivables: true, tds: true },
@@ -158,13 +170,22 @@ export function normaliseFinanceSettings(raw: unknown): FinanceSettings {
 
   const currency = CURRENCIES.some(c => c.code === r.currency) ? (r.currency as CurrencyCode) : d.currency
 
-  const shares: Record<string, number> = {}
-  if (r.shares && typeof r.shares === 'object') {
-    for (const [id, v] of Object.entries(r.shares as Record<string, unknown>)) {
-      const n = num(v, 1, 0, 100)
-      if (n !== 1) shares[id] = n
+  const numberMap = (v: unknown, fallback: number, max: number, keep: (n: number) => boolean) => {
+    const out: Record<string, number> = {}
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      for (const [id, x] of Object.entries(v as Record<string, unknown>)) {
+        const n = num(x, fallback, 0, max)
+        if (keep(n)) out[id] = n
+      }
     }
+    return out
   }
+  const shares = numberMap(r.shares, 1, 100, n => n !== 1)
+  const percents = numberMap(r.percents, 0, 100, n => n > 0)
+  const fixedAmounts = numberMap(r.fixedAmounts, 0, 1e9, n => n > 0)
+  // Older saves called ratios "shares".
+  const shareMode: ShareMode = r.shareMode === 'shares' ? 'ratio'
+    : r.shareMode === 'percent' || r.shareMode === 'ratio' || r.shareMode === 'fixed' ? r.shareMode : 'equal'
 
   const cuts: OffTopCut[] = []
   let cutTotal = 0
@@ -191,8 +212,10 @@ export function normaliseFinanceSettings(raw: unknown): FinanceSettings {
     currency,
     categories,
     fundPercent: num(r.fundPercent, d.fundPercent, 0, 100),
-    shareMode: r.shareMode === 'shares' ? 'shares' : 'equal',
+    shareMode,
     shares,
+    percents,
+    fixedAmounts,
     cuts,
     tags,
     features: { projects: flag('projects'), recurring: flag('recurring'), receivables: flag('receivables'), tds: flag('tds') },
@@ -222,16 +245,44 @@ export function newCategoryKey(label: string, existing: FinanceCategory[]) {
   return key
 }
 
-/** The number of shares a member holds under the current rules (1 unless set). */
-export function sharesOf(s: FinanceSettings, memberId: string) {
-  return s.shareMode === 'shares' ? (s.shares[memberId] ?? 1) : 1
+/**
+ * The workspace's sharing rules in the form the split maths takes, limited to current members (a
+ * cut or amount for someone who has left is ignored).
+ */
+export function splitRulesFrom(s: FinanceSettings, memberIds: string[]) {
+  const pick = (map: Record<string, number>, fallback: number) => Object.fromEntries(memberIds.map(id => [id, map[id] ?? fallback]))
+  return {
+    weights: s.shareMode === 'ratio' ? pick(s.shares, 1) : s.shareMode === 'percent' ? pick(s.percents, 0) : undefined,
+    fixed: s.shareMode === 'fixed' ? pick(s.fixedAmounts, 0) : undefined,
+    cuts: s.cuts.filter(c => memberIds.includes(c.memberId)),
+  }
+}
+
+/** Sum of the percentages set for these members, for checking it reaches 100. */
+export function percentTotal(s: FinanceSettings, memberIds: string[]) {
+  return Math.round(memberIds.reduce((sum, id) => sum + (s.percents[id] ?? 0), 0) * 100) / 100
+}
+
+/** Percentages that add up to exactly 100, as even as whole numbers allow. */
+export function evenPercents(memberIds: string[]): Record<string, number> {
+  const base = memberIds.length > 0 ? Math.floor(100 / memberIds.length) : 0
+  const extra = 100 - base * memberIds.length
+  return Object.fromEntries(memberIds.map((id, i) => [id, base + (i < extra ? 1 : 0)]))
 }
 
 /** One plain sentence describing how a show's money is shared, for split screens and reports. */
 export function describeSplitRule(s: FinanceSettings, fundPercent: number, nameOf: (id: string) => string) {
   const parts: string[] = []
   for (const c of s.cuts) parts.push(`${c.percent}% to ${nameOf(c.memberId)} (${c.label}) first`)
+  if (s.shareMode === 'fixed') {
+    parts.push(`a fixed amount to each person who played, and whatever is left to the ${s.fundName}`)
+    return parts.join(', then ')
+  }
   parts.push(`${fundPercent}% to the ${s.fundName}`)
-  parts.push(s.shareMode === 'shares' ? 'the rest by shares among everyone who played' : 'the rest equally among everyone who played')
+  parts.push(
+    s.shareMode === 'percent' ? 'the rest by each person’s percentage among everyone who played'
+      : s.shareMode === 'ratio' ? 'the rest by ratio among everyone who played'
+        : 'the rest equally among everyone who played'
+  )
   return parts.join(', then ')
 }

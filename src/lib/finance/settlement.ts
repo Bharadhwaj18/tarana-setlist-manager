@@ -25,8 +25,14 @@ export interface EntitlementResult {
 }
 
 export interface SplitRules {
-  /** memberId -> number of shares; anyone missing has 1. All 1s is the plain equal split. */
+  /** memberId -> parts or percentage; anyone missing has 1. All equal is the plain equal split. */
   weights?: Record<string, number>
+  /**
+   * memberId -> a set amount per show. When given, these are paid first and whatever is left goes to
+   * the fund (the fund % is ignored). If the show made less than the amounts add up to, each is
+   * reduced by the same proportion; a loss is shared equally, the same as the plain split.
+   */
+  fixed?: Record<string, number>
   /** Percentages of a profitable show's net paid to a member before anything else. */
   cuts?: { memberId: string; percent: number }[]
 }
@@ -58,6 +64,8 @@ export function computeEntitlements(
   }
   const afterCuts = round2(netAmount - cutTotal)
 
+  if (rules.fixed) return fixedEntitlements(afterCuts, involvedMemberIds, rules.fixed, overrides, cutShares)
+
   const bandFundAmount = round2((afterCuts * bandFundPct) / 100)
   const memberPool = round2(afterCuts - bandFundAmount)
 
@@ -81,6 +89,37 @@ export function computeEntitlements(
     memberShares[id] = round2((memberShares[id] ?? 0) + amount)
   }
 
+  return { memberShares, bandFundAmount, cutShares }
+}
+
+function fixedEntitlements(
+  pool: number,
+  involvedMemberIds: string[],
+  fixed: Record<string, number>,
+  overrides: Record<string, number>,
+  cutShares: Record<string, number>
+): EntitlementResult {
+  const memberShares: Record<string, number> = {}
+  const overriddenTotal = involvedMemberIds.filter(id => overrides[id] !== undefined).reduce((sum, id) => sum + overrides[id], 0)
+  const remainingIds = involvedMemberIds.filter(id => overrides[id] === undefined)
+  const available = round2(pool - overriddenTotal)
+  const wanted = round2(remainingIds.reduce((sum, id) => sum + Math.max(0, fixed[id] ?? 0), 0))
+
+  let bandFundAmount = 0
+  if (available <= 0) {
+    // A loss (or nothing left): shared equally, as in the plain split.
+    const each = remainingIds.length > 0 ? round2(available / remainingIds.length) : 0
+    for (const id of remainingIds) memberShares[id] = each
+    if (remainingIds.length === 0) bandFundAmount = available
+  } else if (available >= wanted) {
+    for (const id of remainingIds) memberShares[id] = round2(Math.max(0, fixed[id] ?? 0))
+    bandFundAmount = round2(available - wanted)
+  } else {
+    const scale = available / wanted
+    for (const id of remainingIds) memberShares[id] = round2(Math.max(0, fixed[id] ?? 0) * scale)
+  }
+  for (const id of involvedMemberIds) if (overrides[id] !== undefined) memberShares[id] = overrides[id]
+  for (const [id, amount] of Object.entries(cutShares)) memberShares[id] = round2((memberShares[id] ?? 0) + amount)
   return { memberShares, bandFundAmount, cutShares }
 }
 

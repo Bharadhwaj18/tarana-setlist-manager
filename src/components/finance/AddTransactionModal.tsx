@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Plus, Pencil, X } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, ChevronDown, Plus, Pencil, X } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Chip'
@@ -39,6 +39,7 @@ interface Props {
 const inputCls = 'w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400'
 const labelCls = 'mb-1.5 block text-xs font-bold text-gray-700'
 const NEW_SHOW = '__new__'
+const NO_SHOW = ''
 const AUTO = '__auto__'
 const NO_BUDGET = ''
 
@@ -48,12 +49,12 @@ function firstCategory(settings: FinanceSettings, dir: 'credit' | 'debit') {
   return activeCategories(settings, dirKey(dir))[0]?.key ?? 'misc'
 }
 
-function fieldsFrom(settings: FinanceSettings, transaction: FinanceTransaction | undefined, unsplitShows: Show[], lockedShow?: { id: string; title: string }) {
+function fieldsFrom(settings: FinanceSettings, transaction: FinanceTransaction | undefined, lockedShow?: { id: string; title: string }) {
   if (!transaction) {
     return {
-      tag: (lockedShow ? 'show' : null) as 'misc' | 'show' | null,
       category: firstCategory(settings, 'credit'),
-      showId: lockedShow?.id ?? unsplitShows[0]?.id ?? NEW_SHOW,
+      // Empty = not for a show.
+      showId: lockedShow?.id ?? NO_SHOW,
       memberId: AUTO,
       amount: '',
       dir: 'credit' as 'credit' | 'debit',
@@ -66,10 +67,9 @@ function fieldsFrom(settings: FinanceSettings, transaction: FinanceTransaction |
   }
   const dir = (transaction.amount >= 0 ? 'credit' : 'debit') as 'credit' | 'debit'
   return {
-    tag: (transaction.show_id ? 'show' : 'misc') as 'misc' | 'show',
     // Keep whatever category is saved, even one that's since been hidden.
     category: transaction.category ?? firstCategory(settings, dir),
-    showId: transaction.show_id ?? (unsplitShows[0]?.id ?? NEW_SHOW),
+    showId: transaction.show_id ?? NO_SHOW,
     memberId: transaction.member_id ?? AUTO,
     amount: String(Math.abs(transaction.amount)),
     dir,
@@ -79,22 +79,6 @@ function fieldsFrom(settings: FinanceSettings, transaction: FinanceTransaction |
     tags: transaction.tags ?? [],
     projectId: transaction.project_id ?? '',
   }
-}
-
-function Segmented({ children }: { children: React.ReactNode }) {
-  return <div className="flex rounded-xl bg-brand-100 p-1">{children}</div>
-}
-
-function SegmentButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn('flex-1 rounded-lg px-2 py-2 text-sm font-bold transition-colors', active ? 'bg-brand-400 text-white shadow-sm' : 'text-gray-700 hover:text-gray-900')}
-    >
-      {children}
-    </button>
-  )
 }
 
 export function AddTransactionModal({ members, shows, budgets = [], transaction, lockedShow, open: controlledOpen, onOpenChange, fab, projects: projectsProp, knownTags: knownTagsProp }: Props) {
@@ -115,13 +99,15 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
   const [internalOpen, setInternalOpen] = useState(false)
   const open = isControlled ? controlledOpen : internalOpen
   const setOpen = isControlled ? onOpenChange : setInternalOpen
-  const [fields, setFields] = useState(() => fieldsFrom(settings, transaction, unsplitShows, lockedShow))
+  const [fields, setFields] = useState(() => fieldsFrom(settings, transaction, lockedShow))
   const [newShowTitle, setNewShowTitle] = useState('')
   const [tagDraft, setTagDraft] = useState('')
+  const [moreOpen, setMoreOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const toast = useToast()
 
-  const { tag, category, showId, memberId, amount, dir, description, date, budgetId, tags, projectId } = fields
+  const { category, showId, memberId, amount, dir, description, date, budgetId, tags, projectId } = fields
+  const forShow = showId !== NO_SHOW
   const set = <K extends keyof typeof fields>(key: K, value: typeof fields[K]) =>
     setFields(prev => ({ ...prev, [key]: value }))
 
@@ -136,7 +122,8 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
   if (open !== prevOpen) {
     setPrevOpen(open)
     if (open) {
-      setFields(fieldsFrom(settings, transaction, unsplitShows, lockedShow))
+      setFields(fieldsFrom(settings, transaction, lockedShow))
+      setMoreOpen(isEdit && !!(transaction?.tags?.length || transaction?.project_id || transaction?.budget_id))
       setNewShowTitle('')
       setTagDraft('')
     }
@@ -164,11 +151,10 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
 
   // Only Misc debits can be tagged to a budget. Editing keeps a closed budget selectable if it's already the one attached.
   const budgetOptions = budgets.filter(b => b.status === 'active' || b.id === transaction?.budget_id)
-  const showBudgetField = tag === 'misc' && dir === 'debit' && !isReimbursement && budgetOptions.length > 0
+  const showBudgetField = !forShow && dir === 'debit' && !isReimbursement && budgetOptions.length > 0
 
-  const canSubmit = tag !== null
-    && !!category
-    && (tag === 'misc' || showId !== NEW_SHOW || newShowTitle.trim() !== '')
+  const canSubmit = !!category
+    && (showId !== NEW_SHOW || newShowTitle.trim() !== '')
     && !!amount
     && (!isReimbursement || (memberId !== AUTO && memberId !== ''))
 
@@ -180,7 +166,7 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
     startTransition(async () => {
       let resolvedShowId: string | null = null
 
-      if (tag === 'show') {
+      if (forShow) {
         if (showId === NEW_SHOW) {
           const showResult = await addShow({ title: newShowTitle.trim() })
           if (showResult.error || !showResult.id) {
@@ -200,7 +186,7 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
         description: description.trim() || (isReimbursement ? 'Reimbursement' : effectiveDir === 'credit' ? 'Credit' : 'Debit'),
         category,
         show_id: resolvedShowId,
-        budget_id: tag === 'misc' && effectiveDir === 'debit' && !isReimbursement && budgetId ? budgetId : null,
+        budget_id: !forShow && effectiveDir === 'debit' && !isReimbursement && budgetId ? budgetId : null,
         date,
         tags: tagDraft.trim() ? [...new Set([...tags, tagDraft.trim().slice(0, 40)])] : tags,
         project_id: projectId || null,
@@ -251,64 +237,38 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
         title={isEdit ? 'Edit entry' : lockedShow ? `Add expense — ${lockedShow.title}` : 'Add money in or out'}
         className="max-w-[480px] rounded-2xl"
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Credit / Debit — skipped for Reimbursement, which is always a
-              debit: money the band owes someone back, never money in.
-              Switching direction resets Sub type to that direction's own
-              first option — travel/food/etc. and show_fee/sponsorship/etc.
-              are different lists, a stale pick from the other one wouldn't
-              be valid. */}
-          {!isReimbursement && (
-            <Segmented>
-              <SegmentButton active={dir === 'credit'} onClick={() => { set('dir', 'credit'); set('category', firstCategory(settings, 'credit')) }}>
-                Money in
-              </SegmentButton>
-              <SegmentButton active={dir === 'debit'} onClick={() => { set('dir', 'debit'); set('category', firstCategory(settings, 'debit')) }}>
-                Money out
-              </SegmentButton>
-            </Segmented>
-          )}
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* 1. In or out — the one choice everything else follows from. */}
+          <div className="grid grid-cols-2 gap-2">
+            {([
+              { value: 'credit', title: 'Money in', hint: 'Someone paid us', icon: ArrowDownLeft },
+              { value: 'debit', title: 'Money out', hint: 'We spent or paid', icon: ArrowUpRight },
+            ] as const).map(o => (
+              <button key={o.value} type="button" aria-pressed={dir === o.value}
+                onClick={() => { if (dir !== o.value) { set('dir', o.value); set('category', firstCategory(settings, o.value)) } }}
+                className={cn('flex items-center gap-3 rounded-xl border-2 p-3 text-left transition-colors',
+                  dir === o.value ? 'border-brand-400 bg-brand-100' : 'border-brand-200 hover:bg-brand-50')}>
+                <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
+                  dir === o.value ? (o.value === 'credit' ? 'bg-brand-400 text-white' : 'bg-red-600 text-white') : 'bg-brand-100 text-gray-500')}>
+                  <o.icon className="h-5 w-5" />
+                </span>
+                <span>
+                  <span className="block text-sm font-bold text-gray-900">{o.title}</span>
+                  <span className="block text-xs text-gray-500">{o.hint}</span>
+                </span>
+              </button>
+            ))}
+          </div>
 
-          {/* Tag — mandatory, nothing pre-selected. Skipped entirely when
-              the transaction is already pinned to one show. */}
-          {!lockedShow && (
-            <div>
-              <label className={labelCls}>What is it for? *</label>
-              <Segmented>
-                <SegmentButton active={tag === 'misc'} onClick={() => set('tag', 'misc')}>General</SegmentButton>
-                <SegmentButton active={tag === 'show'} onClick={() => set('tag', 'show')}>A show</SegmentButton>
-              </Segmented>
-            </div>
-          )}
-
-          {/* Show sub-selection: which show, with inline creation */}
-          {tag === 'show' && !lockedShow && (
-            <div>
-              <label className={labelCls}>Which show *</label>
-              <select value={showId} onChange={e => set('showId', e.target.value)} className={inputCls}>
-                {availableShows.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
-                <option value={NEW_SHOW}>+ New show…</option>
-              </select>
-              {showId === NEW_SHOW && (
-                <input
-                  type="text"
-                  value={newShowTitle}
-                  onChange={e => setNewShowTitle(e.target.value)}
-                  placeholder="Show name, e.g. BMC"
-                  className={cn(inputCls, 'mt-2')}
-                  autoFocus
-                />
-              )}
-            </div>
-          )}
-
-          {/* Amount */}
+          {/* 2. How much */}
           <div>
-            <label className={labelCls}>Amount *</label>
+            <label htmlFor="entry-amount" className={labelCls}>How much?</label>
             <div className="flex items-center gap-2 rounded-xl border-2 border-brand-400 px-3.5 py-2">
               <span className="font-display text-2xl font-bold text-gray-500">{symbol}</span>
               <input
+                id="entry-amount"
                 type="number"
+                inputMode="decimal"
                 min="0.01"
                 step="any"
                 value={amount}
@@ -320,117 +280,151 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
             </div>
           </div>
 
-          {/* Reimbursement: who it's for, right up front and mandatory —
-              the whole point of this category. Everyone else: the usual
-              optional "who recorded this" field, further down. */}
+          {/* 3. What was it */}
+          <div>
+            <label htmlFor="entry-description" className={labelCls}>
+              {isReimbursement ? 'What was it for?' : dir === 'credit' ? 'What was it?' : 'What was it for?'}
+              {isReimbursement && <span className="font-normal text-gray-500"> (optional)</span>}
+            </label>
+            <input id="entry-description" type="text" value={description} onChange={e => set('description', e.target.value)}
+              placeholder={isReimbursement ? 'e.g. Fuel for the car' : dir === 'credit' ? 'e.g. Fee for the BMC gig' : 'e.g. Cab to the venue'}
+              className={inputCls} required={!isReimbursement} />
+          </div>
+
+          {/* 4. What kind — always visible, one tap */}
+          <div>
+            <p className={labelCls}>What kind?</p>
+            <div className="flex flex-wrap gap-1.5">
+              {shownCategories.map(c => (
+                <Chip key={c.key} active={category === c.key} onClick={() => set('category', c.key)}>{c.label}</Chip>
+              ))}
+            </div>
+          </div>
+
+          {/* Reimbursement: who gets it back, required — the point of this kind. */}
           {isReimbursement && (
             <div>
-              <label className={labelCls}>Reimburse *</label>
-              <select value={memberId === AUTO ? '' : memberId} onChange={e => set('memberId', e.target.value)} className={inputCls} required>
-                <option value="" disabled>Who gets this back?</option>
+              <label htmlFor="entry-reimburse" className={labelCls}>Who gets this back?</label>
+              <select id="entry-reimburse" value={memberId === AUTO ? '' : memberId} onChange={e => set('memberId', e.target.value)} className={inputCls} required>
+                <option value="" disabled>Choose a person</option>
                 {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
               <p className="mt-1 text-xs text-gray-500">
-                Paid back to them in full on top of their cut — never taken from their {settings.fundName} balance.
+                Paid back to them in full when the show is split — never taken from their {settings.fundName} balance.
               </p>
             </div>
           )}
 
-          {/* Description */}
-          <div>
-            <label className={labelCls}>
-              {isReimbursement ? 'What for' : 'Description *'} {isReimbursement && <span className="font-normal text-gray-500">(optional)</span>}
-            </label>
-            <input type="text" value={description} onChange={e => set('description', e.target.value)}
-              placeholder={isReimbursement ? 'e.g. Fuel for car' : 'e.g. Rehearsal space, Sound engineer'}
-              className={inputCls} required={!isReimbursement} />
-          </div>
-
-          {/* Sub type — mandatory once a tag is picked; the option list
-              follows whichever direction is currently selected. */}
-          {tag && (
+          {/* 5. Which show, if any — optional, defaults to none */}
+          {!lockedShow && (
             <div>
-              <label className={labelCls}>Category *</label>
-              <div className="flex flex-wrap gap-1.5">
-                {shownCategories.map(c => (
-                  <Chip key={c.key} active={category === c.key} onClick={() => set('category', c.key)}>{c.label}</Chip>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {showBudgetField && (
-            <div>
-              <label className={labelCls}>
-                Budget <span className="font-normal text-gray-500">(optional)</span>
-              </label>
-              <select value={budgetId} onChange={e => set('budgetId', e.target.value)} className={inputCls}>
-                <option value={NO_BUDGET}>No budget</option>
-                {budgetOptions.map(b => <option key={b.id} value={b.id}>{b.name}{b.status === 'closed' ? ' (closed)' : ''}</option>)}
+              <label htmlFor="entry-show" className={labelCls}>Is it for a show? <span className="font-normal text-gray-500">(optional)</span></label>
+              <select id="entry-show" value={showId} onChange={e => set('showId', e.target.value)} className={inputCls}>
+                <option value={NO_SHOW}>No, not for a show</option>
+                {availableShows.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
+                <option value={NEW_SHOW}>+ A new show…</option>
               </select>
+              {showId === NEW_SHOW && (
+                <input
+                  type="text"
+                  value={newShowTitle}
+                  onChange={e => setNewShowTitle(e.target.value)}
+                  placeholder="Show name, e.g. BMC"
+                  aria-label="New show name"
+                  className={cn(inputCls, 'mt-2')}
+                  autoFocus
+                />
+              )}
+              {forShow && <p className="mt-1 text-xs text-gray-500">It will be counted when that show’s money is split.</p>}
             </div>
           )}
 
-          {projectOptions.length > 0 && (
-            <div>
-              <label className={labelCls}>Project <span className="font-normal text-gray-500">(optional)</span></label>
-              <select value={projectId} onChange={e => set('projectId', e.target.value)} className={inputCls}>
-                <option value="">No project</option>
-                {projectOptions.map(p => <option key={p.id} value={p.id}>{p.name}{p.archived_at ? ' (finished)' : ''}</option>)}
-              </select>
-            </div>
-          )}
-
-          <div>
-            <label className={labelCls} htmlFor="entry-tags">Tags <span className="font-normal text-gray-500">(optional)</span></label>
-            <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-gray-300 bg-white px-2 py-1.5 focus-within:border-brand-400 focus-within:ring-1 focus-within:ring-brand-400">
-              {tags.map(t => (
-                <span key={t} className="inline-flex items-center gap-1 rounded-full bg-brand-100 py-0.5 pl-2.5 pr-1 text-xs font-bold text-gray-800">
-                  {t}
-                  <button type="button" aria-label={`Remove tag ${t}`} onClick={() => set('tags', tags.filter(x => x !== t))} className="rounded-full p-0.5 hover:bg-brand-200"><X className="h-3 w-3" /></button>
-                </span>
-              ))}
-              <input
-                id="entry-tags"
-                list="entry-tag-suggestions"
-                value={tagDraft}
-                onChange={e => setTagDraft(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(tagDraft) }
-                  else if (e.key === 'Backspace' && !tagDraft && tags.length > 0) set('tags', tags.slice(0, -1))
-                }}
-                onBlur={() => tagDraft.trim() && addTag(tagDraft)}
-                placeholder={tags.length === 0 ? 'e.g. Goa tour' : ''}
-                className="min-w-[8rem] flex-1 bg-transparent py-1 text-sm text-gray-900 placeholder-gray-400 focus:outline-none"
-              />
-              <datalist id="entry-tag-suggestions">
-                {tagSuggestions.map(t => <option key={t} value={t} />)}
-              </datalist>
-            </div>
-            {tagSuggestions.length > 0 && tags.length < 10 && (
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {tagSuggestions.slice(0, 6).map(t => (
-                  <button key={t} type="button" onClick={() => addTag(t)} className="rounded-full border border-dashed border-brand-300 px-2.5 py-0.5 text-xs font-semibold text-gray-600 hover:bg-brand-50">+ {t}</button>
-                ))}
-              </div>
-            )}
-          </div>
-
+          {/* 6. Who and when */}
           <div className="grid grid-cols-2 gap-3">
-            {/* Date */}
-            <div>
-              <label className={labelCls}>Date</label>
-              <input type="date" value={date} onChange={e => set('date', e.target.value)} className={inputCls} />
-            </div>
-
-            {/* Paid by / Received by — optional, real members only */}
             {!isReimbursement && (
               <div>
-                <label className={labelCls}>{dir === 'credit' ? 'Received by' : 'Paid by'}</label>
-                <select value={memberId} onChange={e => set('memberId', e.target.value)} className={inputCls}>
-                  <option value={AUTO}>Auto (whoever&apos;s adding)</option>
+                <label htmlFor="entry-member" className={labelCls}>{dir === 'credit' ? 'Who got the money?' : 'Who paid?'}</label>
+                <select id="entry-member" value={memberId} onChange={e => set('memberId', e.target.value)} className={inputCls}>
+                  <option value={AUTO}>Me</option>
                   {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                 </select>
+              </div>
+            )}
+            <div className={cn(isReimbursement && 'col-span-2')}>
+              <label htmlFor="entry-date" className={labelCls}>When?</label>
+              <input id="entry-date" type="date" value={date} onChange={e => set('date', e.target.value)} className={inputCls} />
+            </div>
+          </div>
+
+          {/* Extras, tucked away until wanted */}
+          <div className="rounded-xl border border-brand-200">
+            <button type="button" aria-expanded={moreOpen} onClick={() => setMoreOpen(v => !v)}
+              className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm font-bold text-gray-700">
+              <span>
+                More options
+                <span className="ml-1.5 font-normal text-gray-500">
+                  {[tags.length > 0 && `${tags.length} tag${tags.length === 1 ? '' : 's'}`, projectId && 'project', budgetId && 'budget'].filter(Boolean).join(' · ') || (projectOptions.length > 0 ? 'tags, project' : 'tags')}
+                </span>
+              </span>
+              <ChevronDown className={cn('h-4 w-4 transition-transform', moreOpen && 'rotate-180')} />
+            </button>
+            {moreOpen && (
+              <div className="space-y-4 border-t border-brand-100 px-3 pb-3 pt-3">
+                <div>
+                  <label className={labelCls} htmlFor="entry-tags">Tags</label>
+                  <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-gray-300 bg-white px-2 py-1.5 focus-within:border-brand-400 focus-within:ring-1 focus-within:ring-brand-400">
+                    {tags.map(t => (
+                      <span key={t} className="inline-flex items-center gap-1 rounded-full bg-brand-100 py-0.5 pl-2.5 pr-1 text-xs font-bold text-gray-800">
+                        {t}
+                        <button type="button" aria-label={`Remove tag ${t}`} onClick={() => set('tags', tags.filter(x => x !== t))} className="rounded-full p-0.5 hover:bg-brand-200"><X className="h-3 w-3" /></button>
+                      </span>
+                    ))}
+                    <input
+                      id="entry-tags"
+                      list="entry-tag-suggestions"
+                      value={tagDraft}
+                      onChange={e => setTagDraft(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(tagDraft) }
+                        else if (e.key === 'Backspace' && !tagDraft && tags.length > 0) set('tags', tags.slice(0, -1))
+                      }}
+                      onBlur={() => tagDraft.trim() && addTag(tagDraft)}
+                      placeholder={tags.length === 0 ? 'e.g. Goa tour' : ''}
+                      className="min-w-[8rem] flex-1 bg-transparent py-1 text-sm text-gray-900 placeholder-gray-400 focus:outline-none"
+                    />
+                    <datalist id="entry-tag-suggestions">
+                      {tagSuggestions.map(t => <option key={t} value={t} />)}
+                    </datalist>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">Your own labels, to find and total things later. Press Enter after each one.</p>
+                  {tagSuggestions.length > 0 && tags.length < 10 && (
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {tagSuggestions.slice(0, 6).map(t => (
+                        <button key={t} type="button" onClick={() => addTag(t)} className="rounded-full border border-dashed border-brand-300 px-2.5 py-0.5 text-xs font-semibold text-gray-600 hover:bg-brand-50">+ {t}</button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {projectOptions.length > 0 && (
+                  <div>
+                    <label htmlFor="entry-project" className={labelCls}>Project</label>
+                    <select id="entry-project" value={projectId} onChange={e => set('projectId', e.target.value)} className={inputCls}>
+                      <option value="">No project</option>
+                      {projectOptions.map(p => <option key={p.id} value={p.id}>{p.name}{p.archived_at ? ' (finished)' : ''}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                {showBudgetField && (
+                  <div>
+                    <label htmlFor="entry-budget" className={labelCls}>Budget</label>
+                    <select id="entry-budget" value={budgetId} onChange={e => set('budgetId', e.target.value)} className={inputCls}>
+                      <option value={NO_BUDGET}>No budget</option>
+                      {budgetOptions.map(b => <option key={b.id} value={b.id}>{b.name}{b.status === 'closed' ? ' (closed)' : ''}</option>)}
+                    </select>
+                  </div>
+                )}
               </div>
             )}
           </div>
