@@ -1,9 +1,12 @@
 import { getCachedUser, getCachedRecordings, getCachedSongs } from '@/lib/data'
+import { sectionGuard } from '@/lib/section-guard'
 import { RecordButton } from '@/components/recordings/RecordButton'
 import { RecordingsList } from '@/components/recordings/RecordingsList'
 import type { RecordingWithSong } from '@/types'
 
 export default async function RecordingsPage() {
+  const denied = await sectionGuard('recordings')
+  if (denied) return denied
   const [{ data: { user } }, recordings, songs] = await Promise.all([
     getCachedUser(),
     getCachedRecordings(),

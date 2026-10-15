@@ -1,4 +1,5 @@
 import { getCachedNotes, getCachedChecklistItems, getCachedAllProfiles, getCachedShows, getCachedSongs, getCachedUser } from '@/lib/data'
+import { sectionGuard } from '@/lib/section-guard'
 import { createClient } from '@/lib/supabase/server'
 import { purgeOldTrash } from '@/lib/notes-trash'
 import { NotesList } from '@/components/notes/NotesList'
@@ -10,6 +11,8 @@ interface Props {
 }
 
 export default async function NotesPage({ searchParams }: Props) {
+  const denied = await sectionGuard('notes')
+  if (denied) return denied
   const { open, new: isNew, show, song } = await searchParams
 
   // Trash older than 30 days is removed whenever someone opens Notes.

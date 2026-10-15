@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { sectionGuard } from '@/lib/section-guard'
 import { Plus, CalendarDays } from 'lucide-react'
 import { getCachedShows, getCachedShowTransactions, getCachedSetlistsByShow, getCachedEventManagementCompanies } from '@/lib/data'
 import { todayISO, isUpcoming, canonicalCity } from '@/lib/shows'
@@ -9,6 +10,8 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { SectionLabel } from '@/components/ui/SectionLabel'
 
 export default async function ShowsPage() {
+  const denied = await sectionGuard('shows')
+  if (denied) return denied
   const [shows, txns, setlists, eventManagementCompanies] = await Promise.all([
     getCachedShows(),
     getCachedShowTransactions(),

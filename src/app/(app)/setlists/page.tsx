@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { sectionGuard } from '@/lib/section-guard'
 import { Plus, ListMusic } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedSetlists, getCachedSetlistSongCounts } from '@/lib/data'
@@ -11,6 +12,8 @@ import { PageHeader } from '@/components/ui/PageHeader'
 const PREVIEW_SONGS = 5
 
 export default async function SetlistsPage() {
+  const denied = await sectionGuard('setlists')
+  if (denied) return denied
   const supabase = await createClient()
   const [setlists, counts, { data: songRows }] = await Promise.all([
     getCachedSetlists(),

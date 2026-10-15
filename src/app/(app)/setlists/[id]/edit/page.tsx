@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { sectionGuard } from '@/lib/section-guard'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
@@ -14,6 +15,8 @@ interface Props {
 }
 
 export default async function EditSetlistPage({ params }: Props) {
+  const denied = await sectionGuard('setlists')
+  if (denied) return denied
   const { id } = await params
   const supabase = await createClient()
   const [{ data: setlist }, setlistSongs, allSongs] = await Promise.all([

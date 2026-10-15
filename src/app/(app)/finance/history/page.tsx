@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { sectionGuard } from '@/lib/section-guard'
 import { ChevronLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { requireWorkspaceId } from '@/lib/workspace'
@@ -8,6 +9,8 @@ import { ExportModal } from '@/components/finance/ExportModal'
 import { PageHeader } from '@/components/ui/PageHeader'
 
 export default async function FinanceHistoryPage() {
+  const denied = await sectionGuard('finance')
+  if (denied) return denied
   const supabase = await createClient()
   const ws = await requireWorkspaceId()
 

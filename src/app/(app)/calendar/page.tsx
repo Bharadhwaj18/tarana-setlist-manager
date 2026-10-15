@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { sectionGuard } from '@/lib/section-guard'
 import { getCachedShows, getCachedTaskData, getCachedUnavailability, getCachedCalendarEvents, getCachedAllProfiles, getCachedUser, getCachedExternalCalendar, getCachedAllCalendars } from '@/lib/data'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { todayISO } from '@/lib/shows'
@@ -8,6 +9,8 @@ import { CalendarMonthView } from '@/components/calendar/CalendarMonthView'
 const tab = 'rounded-lg px-3 py-1.5 text-xs font-extrabold transition-colors'
 
 export default async function CalendarPage({ searchParams }: { searchParams: Promise<{ scope?: string }> }) {
+  const denied = await sectionGuard('calendar')
+  if (denied) return denied
   const { scope } = await searchParams
   const ctx = await getWorkspaceContext()
   const multiple = (ctx?.memberships.length ?? 0) > 1

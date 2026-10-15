@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { sectionGuard } from '@/lib/section-guard'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
@@ -10,6 +11,8 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import type { FinanceTransaction } from '@/types/finance'
 
 export default async function SplitPage() {
+  const denied = await sectionGuard('finance')
+  if (denied) return denied
   const supabase = await createClient()
   const ws = await requireWorkspaceId()
 

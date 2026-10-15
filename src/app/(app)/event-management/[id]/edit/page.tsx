@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { sectionGuard } from '@/lib/section-guard'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { getCachedEventManagementCompany } from '@/lib/data'
@@ -11,6 +12,8 @@ interface Props {
 }
 
 export default async function EditEventManagementPage({ params }: Props) {
+  const denied = await sectionGuard('agencies')
+  if (denied) return denied
   const { id } = await params
   const company = await getCachedEventManagementCompany(id)
   if (!company) notFound()

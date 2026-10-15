@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { sectionGuard } from '@/lib/section-guard'
 import { getCachedTaskData, getCachedAllProfiles, getCachedUser } from '@/lib/data'
 import { todayISO } from '@/lib/shows'
 import { buildPeople, byPosition } from '@/lib/tasks'
@@ -12,6 +13,8 @@ interface Props {
 }
 
 export default async function TasksPage({ searchParams }: Props) {
+  const denied = await sectionGuard('tasks')
+  if (denied) return denied
   const { view } = await searchParams
   const tab = view === 'boards' ? 'boards' : 'list'
   const [data, profiles, { data: { user } }] = await Promise.all([getCachedTaskData(), getCachedAllProfiles(), getCachedUser()])

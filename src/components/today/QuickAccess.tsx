@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { sectionForHref, type SectionKey } from '@/lib/workspace-sections'
 import { Building2, CalendarDays, CalendarRange, Ellipsis, ListMusic, Mic, Music2, SquareKanban, StickyNote, type LucideIcon } from 'lucide-react'
 import { SectionLabel } from '@/components/ui/SectionLabel'
 
@@ -21,7 +22,8 @@ function nextLabel(date: string | null) {
 }
 
 /** Everything the phone's bottom bar doesn't carry, one tap from the home screen. */
-export function QuickAccess({ counts, variant }: { counts: QuickCounts; variant: 'desktop' | 'phone' }) {
+export function QuickAccess({ counts, variant, hiddenSections = [] }: { counts: QuickCounts; variant: 'desktop' | 'phone'; hiddenSections?: SectionKey[] }) {
+  const visible = (t: Tile) => { const sec = sectionForHref(t.href); return !sec || !hiddenSections.includes(sec) }
   if (variant === 'phone') {
     const tiles: Tile[] = [
       { href: '/shows', label: 'Shows', icon: CalendarDays },
@@ -37,7 +39,7 @@ export function QuickAccess({ counts, variant }: { counts: QuickCounts; variant:
       <section className="space-y-2 lg:hidden">
         <SectionLabel>Jump to</SectionLabel>
         <div className="grid grid-cols-4 gap-2">
-          {tiles.map(({ href, label, icon: Icon }) => (
+          {tiles.filter(visible).map(({ href, label, icon: Icon }) => (
             <Link key={href} href={href} className="flex flex-col items-center gap-1.5 rounded-2xl border border-brand-200 bg-white px-1 pb-2.5 pt-3 text-center transition-colors hover:border-brand-300">
               <Icon className="h-[22px] w-[22px] text-brand-700" />
               <span className="text-[11px] font-extrabold text-gray-900">{label}</span>
@@ -62,7 +64,7 @@ export function QuickAccess({ counts, variant }: { counts: QuickCounts; variant:
     <section className="hidden space-y-2 lg:block">
       <SectionLabel>Jump to</SectionLabel>
       <div className="grid grid-cols-4 gap-2.5">
-        {tiles.map(({ href, label, icon: Icon, hint }) => (
+        {tiles.filter(visible).map(({ href, label, icon: Icon, hint }) => (
           <Link key={href} href={href} className="flex items-center gap-3 rounded-2xl border border-brand-200 bg-white p-3 transition-colors hover:border-brand-300">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-brand-700">
               <Icon className="h-5 w-5" />

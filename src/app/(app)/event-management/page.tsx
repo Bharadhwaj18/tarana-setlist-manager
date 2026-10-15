@@ -1,10 +1,13 @@
 import Link from 'next/link'
+import { sectionGuard } from '@/lib/section-guard'
 import { Plus, Building2 } from 'lucide-react'
 import { getCachedEventManagementCompanies, getCachedShows } from '@/lib/data'
 import { Button } from '@/components/ui/Button'
 import { EventManagementSearchList } from '@/components/event-management/EventManagementSearchList'
 
 export default async function EventManagementPage() {
+  const denied = await sectionGuard('agencies')
+  if (denied) return denied
   const [companies, shows] = await Promise.all([
     getCachedEventManagementCompanies(),
     getCachedShows(),

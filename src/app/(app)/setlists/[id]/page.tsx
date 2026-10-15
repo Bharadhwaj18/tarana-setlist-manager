@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { sectionGuard } from '@/lib/section-guard'
 import Link from 'next/link'
 import { ChevronLeft, Pencil, Calendar, MapPin, Link2, Play } from 'lucide-react'
 import { getCachedSetlist, getCachedSetlistSongs, getCachedSongs, getCachedAllProfiles, getCachedUser, getCachedShow } from '@/lib/data'
@@ -20,6 +21,8 @@ interface Props {
 const AVG_SONG_MINUTES = 4.5
 
 export default async function SetlistPage({ params }: Props) {
+  const denied = await sectionGuard('setlists')
+  if (denied) return denied
   const { id } = await params
 
   const [setlist, setlistSongs, allSongs, profiles, { data: { user } }] = await Promise.all([

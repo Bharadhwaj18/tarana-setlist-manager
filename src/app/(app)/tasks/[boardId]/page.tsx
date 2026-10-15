@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { sectionGuard } from '@/lib/section-guard'
 import { getCachedTaskData, getCachedAllProfiles, getCachedUser } from '@/lib/data'
 import { buildPeople } from '@/lib/tasks'
 import { todayISO } from '@/lib/shows'
@@ -10,6 +11,8 @@ interface Props {
 }
 
 export default async function BoardPage({ params, searchParams }: Props) {
+  const denied = await sectionGuard('tasks')
+  if (denied) return denied
   const [{ boardId }, { task }] = await Promise.all([params, searchParams])
   const [all, profiles, { data: { user } }] = await Promise.all([getCachedTaskData(), getCachedAllProfiles(), getCachedUser()])
 

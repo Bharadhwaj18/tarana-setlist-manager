@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { sectionGuard } from '@/lib/section-guard'
 import Link from 'next/link'
 import { ChevronLeft, Pencil, Phone, Mail, User, CalendarDays, MapPin } from 'lucide-react'
 import { getCachedEventManagementCompany, getCachedShows } from '@/lib/data'
@@ -10,6 +11,8 @@ interface Props {
 }
 
 export default async function EventManagementDetailPage({ params }: Props) {
+  const denied = await sectionGuard('agencies')
+  if (denied) return denied
   const { id } = await params
   const [company, shows] = await Promise.all([
     getCachedEventManagementCompany(id),

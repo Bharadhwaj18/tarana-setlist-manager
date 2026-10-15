@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { sectionGuard } from '@/lib/section-guard'
 import { ChevronLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { requireWorkspaceId } from '@/lib/workspace'
@@ -12,6 +13,8 @@ import { Button } from '@/components/ui/Button'
 import type { SplitRun } from '@/types'
 
 export default async function SplitHistoryPage() {
+  const denied = await sectionGuard('finance')
+  if (denied) return denied
   const supabase = await createClient()
   const ws = await requireWorkspaceId()
 

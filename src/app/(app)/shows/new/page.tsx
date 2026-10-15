@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { sectionGuard } from '@/lib/section-guard'
 import { ChevronLeft } from 'lucide-react'
 import { ShowForm } from '@/components/shows/ShowForm'
 import { createShow } from '@/actions/shows'
@@ -9,6 +10,8 @@ interface Props {
 }
 
 export default async function NewShowPage({ searchParams }: Props) {
+  const denied = await sectionGuard('shows')
+  if (denied) return denied
   const [eventManagementCompanies, { date }] = await Promise.all([
     getCachedEventManagementCompanies(),
     searchParams,

@@ -9,9 +9,6 @@ import { IdentifyUser } from '@/components/analytics/IdentifyUser'
 import type { ReactNode } from 'react'
 import { hiddenSectionsOf } from '@/lib/workspace-sections'
 import { getWorkspaceContext } from '@/lib/workspace'
-import { headers } from 'next/headers'
-import { sectionForHref, sectionLabelOf } from '@/lib/workspace-sections'
-import { NoAccess } from '@/components/layout/NoAccess'
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const supabase = await createClient()
@@ -48,10 +45,6 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   const ctx = await getWorkspaceContext()
   const hiddenSections = ctx ? hiddenSectionsOf(ctx.current.sections) : []
-  const pathname = (await headers()).get('x-pathname') ?? ''
-  const blockedSection = sectionForHref(pathname)
-  const blocked = !!ctx && !!blockedSection && ctx.current.sections[blockedSection] === 'none'
-  const sectionLabel = blockedSection ? sectionLabelOf(blockedSection) : ''
 
   return (
     <div className="flex h-screen">
@@ -62,7 +55,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         currentWorkspaceId={currentWorkspaceId} hiddenSections={hiddenSections} />
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-5xl px-4 pb-28 pt-16 sm:px-6 lg:px-8 lg:pb-8 lg:pt-8">
-          {blocked ? <NoAccess section={sectionLabel} workspaceName={ctx?.current.workspace.name ?? 'this workspace'} /> : children}
+          {children}
         </div>
       </main>
     </div>

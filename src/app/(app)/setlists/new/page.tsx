@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { sectionGuard } from '@/lib/section-guard'
 import { redirect } from 'next/navigation'
 import { ChevronLeft, Plus, CalendarDays } from 'lucide-react'
 import { SetlistForm } from '@/components/setlists/SetlistForm'
@@ -11,6 +12,8 @@ interface Props {
 }
 
 export default async function NewSetlistPage({ searchParams }: Props) {
+  const denied = await sectionGuard('setlists')
+  if (denied) return denied
   const { showId, blank } = await searchParams
   const show = showId ? await getCachedShow(showId) : undefined
   if (showId) {

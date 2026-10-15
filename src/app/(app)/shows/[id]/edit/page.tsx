@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { sectionGuard } from '@/lib/section-guard'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { getCachedShow, getCachedEventManagementCompanies } from '@/lib/data'
@@ -11,6 +12,8 @@ interface Props {
 }
 
 export default async function EditShowPage({ params }: Props) {
+  const denied = await sectionGuard('shows')
+  if (denied) return denied
   const { id } = await params
   const [show, eventManagementCompanies] = await Promise.all([
     getCachedShow(id),

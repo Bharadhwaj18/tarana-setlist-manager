@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { sectionGuard } from '@/lib/section-guard'
 import { LinkedNotes } from '@/components/notes/LinkedNotes'
 import { cookies } from 'next/headers'
 import Link from 'next/link'
@@ -20,6 +21,8 @@ interface Props {
 }
 
 export default async function SongPage({ params, searchParams }: Props) {
+  const denied = await sectionGuard('songs')
+  if (denied) return denied
   const { id } = await params
   const { from } = await searchParams
 

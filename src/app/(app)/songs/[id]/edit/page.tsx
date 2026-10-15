@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { sectionGuard } from '@/lib/section-guard'
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { SongForm } from '@/components/songs/SongForm'
@@ -12,6 +13,8 @@ interface Props {
 }
 
 export default async function EditSongPage({ params, searchParams }: Props) {
+  const denied = await sectionGuard('songs')
+  if (denied) return denied
   const { id } = await params
   const { from } = await searchParams
   const supabase = await createClient()

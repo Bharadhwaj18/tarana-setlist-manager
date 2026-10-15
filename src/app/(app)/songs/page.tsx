@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { sectionGuard } from '@/lib/section-guard'
 import { Plus, Music2 } from 'lucide-react'
 import { getCachedSongs } from '@/lib/data'
 import { createClient } from '@/lib/supabase/server'
@@ -8,6 +9,8 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { EmptyState } from '@/components/ui/EmptyState'
 
 export default async function SongsPage() {
+  const denied = await sectionGuard('songs')
+  if (denied) return denied
   const supabase = await createClient()
   const [songs, { data: usage }] = await Promise.all([
     getCachedSongs(),

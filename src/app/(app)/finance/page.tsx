@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { sectionGuard } from '@/lib/section-guard'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedAllProfiles, getCachedUser, getCachedPendingPayments } from '@/lib/data'
 import { todayISO, isUpcoming } from '@/lib/shows'
@@ -18,6 +19,8 @@ import { isCurrentTreasurer, requireWorkspaceId } from '@/lib/workspace'
 import { cn } from '@/lib/utils'
 
 export default async function FinancePage() {
+  const denied = await sectionGuard('finance')
+  if (denied) return denied
   const supabase = await createClient()
   const ws = await requireWorkspaceId()
 

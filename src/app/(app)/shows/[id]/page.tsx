@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { sectionGuard } from '@/lib/section-guard'
 import { LinkedNotes } from '@/components/notes/LinkedNotes'
 import Link from 'next/link'
 import { ChevronLeft, Pencil, MapPin, ListMusic, Wallet, Plus, Building2, User, Phone, Mail, Film, Check } from 'lucide-react'
@@ -39,6 +40,8 @@ function Row({ label, children }: { label: React.ReactNode; children: React.Reac
 }
 
 export default async function ShowDetailPage({ params }: Props) {
+  const denied = await sectionGuard('shows')
+  if (denied) return denied
   const { id } = await params
   const supabase = await createClient()
 
