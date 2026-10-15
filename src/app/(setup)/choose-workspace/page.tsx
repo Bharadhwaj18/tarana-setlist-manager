@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
+import { WORKSPACE_CHOSEN_COOKIE } from '@/lib/workspace-shared'
 import { ChevronLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedUser } from '@/lib/auth-cache'
@@ -30,6 +32,8 @@ export default async function ChooseWorkspacePage({ searchParams }: { searchPara
   ])
   if (!profile?.display_name?.trim()) redirect('/setup')
   const firstName = profile.display_name.trim().split(/\s+/)[0]
+  // Back only when they opened this themselves; on the way in after signing in there's nowhere to go back to.
+  const cameFromApp = !!(await cookies()).get(WORKSPACE_CHOSEN_COOKIE)
 
   return (
     <div className="w-full max-w-5xl py-10">
@@ -38,7 +42,7 @@ export default async function ChooseWorkspacePage({ searchParams }: { searchPara
           <BrandMark className="h-9 w-9" />
           <Wordmark className="text-xl text-gray-900" />
         </div>
-        {currentId && (
+        {cameFromApp && (
           <Link href="/" className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-bold text-gray-700 hover:bg-white/60">
             <ChevronLeft className="h-4 w-4" /> Back
           </Link>

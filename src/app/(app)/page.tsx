@@ -106,14 +106,6 @@ export default async function TodayPage() {
   const showTasks = canSee('tasks')
   const showFinance = canSee('finance')
 
-  const stats: { label: string; value: string | number; tag: string }[] = [
-    ...(showShows ? [{ label: 'Upcoming shows', value: upcoming.length, tag: 'Shows' }] : []),
-    ...(showTasks ? [{ label: 'Open tasks', value: openTaskCount, tag: 'Tasks' }] : []),
-    ...(canSee('songs') ? [{ label: 'Songs', value: songsCount?.count ?? '—', tag: 'Songs' }] : []),
-    ...(canSee('setlists') ? [{ label: 'Setlists', value: setlistsCount?.count ?? '—', tag: 'Setlists' }] : []),
-    ...(canSee('recordings') ? [{ label: 'Recordings', value: recordingsCount?.count ?? '—', tag: 'Recordings' }] : []),
-  ]
-
   const quickActions = [
     showShows && { href: '/shows/new', label: 'New show', icon: CalendarDays },
     canSee('setlists') && { href: '/setlists/new', label: 'New setlist', icon: ListMusic },
@@ -238,22 +230,6 @@ export default async function TodayPage() {
             All my tasks <ArrowRight className="h-4 w-4" />
           </Link>
         </section>
-      ),
-    })
-  }
-
-  for (const st of stats) {
-    widgets.push({
-      id: `stat-${st.label}`,
-      span: 3,
-      node: (
-        <div className="flex h-full flex-col justify-between gap-2 rounded-2xl border border-brand-200 bg-white px-4 py-3.5 shadow-sm">
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-gray-500">{st.label}</p>
-            <SectionTag label={st.tag} />
-          </div>
-          <p className="font-display text-2xl font-bold text-gray-900">{st.value}</p>
-        </div>
       ),
     })
   }
