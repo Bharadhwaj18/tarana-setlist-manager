@@ -88,9 +88,9 @@ export default async function SetlistPage({ params }: Props) {
         </div>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)]">
+      <div className="grid gap-5 lg:h-[calc(100vh-14rem)] lg:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)]">
         {/* Songs */}
-        <div className="min-w-0">
+        <div className="no-scrollbar min-w-0 lg:overflow-y-auto lg:pb-6">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-bold text-gray-900">
               {songCount} {songCount === 1 ? 'song' : 'songs'}

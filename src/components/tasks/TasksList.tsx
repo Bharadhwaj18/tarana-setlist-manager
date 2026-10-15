@@ -3,15 +3,15 @@
 import { useMemo, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { CalendarDays, Check, Pencil, RotateCcw, Trash2, CheckCircle2, ChevronDown, FolderClosed, ListChecks, Plus, Search, SquareKanban, User } from 'lucide-react'
+import { ArrowDown, ArrowUp, CalendarDays, Check, Pencil, RotateCcw, Trash2, CheckCircle2, ChevronDown, FolderClosed, ListChecks, Plus, Search, SquareKanban, User } from 'lucide-react'
 import { createBoard, createTask, deleteTask, setTaskProgress } from '@/actions/tasks'
 import { LongPressMenu, type MenuItem } from '@/components/ui/LongPressMenu'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useToast } from '@/components/ui/Toaster'
 import { cn } from '@/lib/utils'
 import { formatDateDMY } from '@/lib/dates'
-import { compareOpenTasks } from '@/lib/tasks'
-import { PRIORITY_CHIP, PRIORITY_LABELS, type Member, type Task, type TaskBoard, type TaskBucket, type TaskPriority } from '@/types/tasks'
+import { PRIORITY_CHIP, PRIORITY_LABELS, PROGRESS_LABELS, type Member, type Task, type TaskBoard, type TaskBucket, type TaskPriority, type TaskProgress } from '@/types/tasks'
+import { Chip } from '@/components/ui/Chip'
 import { Avatar } from './AssigneePicker'
 import { ProgressToggle } from './TaskCard'
 import { TaskModal } from './TaskModal'
@@ -39,7 +39,9 @@ export function TasksList({ boards, buckets, tasks, members, nameById, today, cu
   const [query, setQuery] = useState('')
   const [onlyMine, setOnlyMine] = useState(initialMine)
   const [groupFilter, setGroupFilter] = useState<string>('all')
-  const [showDone, setShowDone] = useState(false)
+  const [status, setStatus] = useState<StatusFilter>('open')
+  const [sortKey, setSortKey] = useState<SortKey>('deadline')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [openTaskId, setOpenTaskId] = useState<string | null>(null)
 
   const [title, setTitle] = useState('')
@@ -61,11 +63,10 @@ export function TasksList({ boards, buckets, tasks, members, nameById, today, cu
     })
   }, [tasks, boardById, groupFilter, onlyMine, currentUserId, query])
 
-  const open = useMemo(() => visible.filter(t => t.progress !== 'completed').sort(compareOpenTasks), [visible])
-  const completed = useMemo(
-    () => visible.filter(t => t.progress === 'completed').sort((a, b) => (b.completed_at ?? '').localeCompare(a.completed_at ?? '')),
-    [visible]
-  )
+  const ordered = useMemo(() => {
+    const keep = visible.filter(t => (status === 'all' ? true : status === 'open' ? t.progress !== 'completed' : t.progress === status))
+    return keep.sort((a, b) => compareTasks(a, b, sortKey, sortDir, boardById))
+  }, [visible, status, sortKey, sortDir, boardById])
   const openTask = openTaskId ? tasks.find(t => t.id === openTaskId) : undefined
 
   const submit = (e: React.FormEvent) => {
@@ -92,7 +93,7 @@ export function TasksList({ boards, buckets, tasks, members, nameById, today, cu
     })
   }
 
-  const filtersActive = onlyMine || groupFilter !== 'all' || query.trim() !== ''
+  const filtersActive = onlyMine || groupFilter !== 'all' || status !== 'open' || query.trim() !== ''
 
   return (
     <div className="space-y-4">
@@ -187,37 +188,45 @@ export function TasksList({ boards, buckets, tasks, members, nameById, today, cu
         )}
       </div>
 
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Status">
+          {STATUS_FILTERS.map(f => (
+            <Chip key={f.value} active={status === f.value} onClick={() => setStatus(f.value)}>{f.label}</Chip>
+          ))}
+        </div>
+        <div className="ml-auto flex items-center gap-1.5">
+          <span className="text-xs font-bold text-gray-500">Sort</span>
+          <select
+            value={sortKey}
+            onChange={e => setSortKey(e.target.value as SortKey)}
+            aria-label="Sort by"
+            className="compact-field rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-sm font-semibold text-gray-800 focus:border-brand-400 focus:outline-none"
+          >
+            {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+          <button
+            type="button"
+            onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))}
+            aria-label={sortDir === 'asc' ? 'Sorted ascending, switch to descending' : 'Sorted descending, switch to ascending'}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-brand-200 bg-white text-gray-700 hover:bg-brand-50"
+          >
+            {sortDir === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+          </button>
+        </div>
+      </div>
+
       {boards.length === 0 ? (
         <EmptyState
           icon={<CheckCircle2 className="h-10 w-10" />}
           title="No tasks yet"
           description="Type a task above. Pick a group like “Admin” or “Album release” (or create one) to keep things tidy."
         />
-      ) : open.length === 0 && completed.length === 0 ? (
+      ) : ordered.length === 0 ? (
         <EmptyState icon={<CheckCircle2 className="h-10 w-10" />} title={filtersActive ? 'No tasks match' : 'Nothing to do'} description={filtersActive ? 'Try clearing the filters.' : 'Add your first task above.'} />
       ) : (
-        <>
-          {open.length > 0 ? (
-            <ul className="divide-y divide-brand-100 overflow-hidden rounded-2xl border border-brand-200 bg-white">
-              {open.map(t => <TaskRow key={t.id} task={t} group={boardById[t.board_id].name} today={today} nameById={nameById} onOpen={() => setOpenTaskId(t.id)} onGroup={() => setGroupFilter(t.board_id)} />)}
-            </ul>
-          ) : (
-            <p className="rounded-2xl border border-brand-200 bg-white px-4 py-6 text-center text-sm text-gray-500">All caught up.</p>
-          )}
-
-          {completed.length > 0 && (
-            <div>
-              <button type="button" onClick={() => setShowDone(v => !v)} className="mb-2 inline-flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-[0.12em] text-gray-500 hover:text-gray-700">
-                <ChevronDown className={cn('h-4 w-4 transition-transform', !showDone && '-rotate-90')} /> Completed ({completed.length})
-              </button>
-              {showDone && (
-                <ul className="divide-y divide-brand-100 overflow-hidden rounded-2xl border border-brand-200 bg-white">
-                  {completed.slice(0, 50).map(t => <TaskRow key={t.id} task={t} group={boardById[t.board_id].name} today={today} nameById={nameById} onOpen={() => setOpenTaskId(t.id)} onGroup={() => setGroupFilter(t.board_id)} />)}
-                </ul>
-              )}
-            </div>
-          )}
-        </>
+        <ul className="divide-y divide-brand-100 overflow-hidden rounded-2xl border border-brand-200 bg-white">
+          {ordered.map(t => <TaskRow key={t.id} task={t} group={boardById[t.board_id].name} today={today} nameById={nameById} onOpen={() => setOpenTaskId(t.id)} onGroup={() => setGroupFilter(t.board_id)} />)}
+        </ul>
       )}
 
       {openTask && boardById[openTask.board_id] && (
@@ -261,11 +270,10 @@ function TaskRow({ task, group, today, nameById, onOpen, onGroup }: { task: Task
           >
             {group}
           </span>
-          {task.due_date && (
-            <span className={cn('inline-flex items-center gap-1', overdue && 'font-bold text-red-600')}>
-              <CalendarDays className="h-3 w-3" /> {formatDateDMY(task.due_date)}
-            </span>
-          )}
+          <span className={cn('inline-flex items-center gap-1', overdue ? 'font-bold text-red-600' : !task.due_date && 'text-gray-400')}>
+            <CalendarDays className="h-3 w-3" /> {task.due_date ? (overdue ? `Overdue · ${formatDateDMY(task.due_date)}` : formatDateDMY(task.due_date)) : 'No deadline'}
+          </span>
+          <span className={cn('rounded-full px-2 py-0.5 font-bold', STATUS_CHIP[task.progress] ?? STATUS_CHIP.not_started)}>{PROGRESS_LABELS[task.progress as TaskProgress] ?? task.progress}</span>
           {priority !== 'medium' && !done && <span className={cn('rounded px-1.5 py-0.5 font-bold', PRIORITY_CHIP[priority])}>{PRIORITY_LABELS[priority]}</span>}
           {task.checklist.length > 0 && <span className="inline-flex items-center gap-1"><ListChecks className="h-3 w-3" /> {doneItems}/{task.checklist.length}</span>}
         </div>
@@ -329,4 +337,47 @@ function GroupFilter({ boards, tasks, value, onChange }: { boards: TaskBoard[]; 
       )}
     </div>
   )
+}
+
+type StatusFilter = 'open' | 'all' | 'not_started' | 'in_progress' | 'completed'
+type SortKey = 'deadline' | 'priority' | 'status' | 'title' | 'group'
+
+const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
+  { value: 'open', label: 'Open' },
+  { value: 'not_started', label: 'Not started' },
+  { value: 'in_progress', label: 'In progress' },
+  { value: 'completed', label: 'Done' },
+  { value: 'all', label: 'All' },
+]
+
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: 'deadline', label: 'Deadline' },
+  { value: 'priority', label: 'Priority' },
+  { value: 'status', label: 'Status' },
+  { value: 'title', label: 'Name' },
+  { value: 'group', label: 'Group' },
+]
+
+const STATUS_CHIP: Record<string, string> = {
+  not_started: 'bg-gray-100 text-gray-700',
+  in_progress: 'bg-sky-100 text-sky-800',
+  completed: 'bg-emerald-100 text-emerald-800',
+}
+
+const STATUS_RANK: Record<string, number> = { in_progress: 0, not_started: 1, completed: 2 }
+const PRIORITY_ORDER: Record<string, number> = { urgent: 0, important: 1, medium: 2, low: 3 }
+
+/** Sorts by the chosen column. Tasks without a deadline always go last, whichever way you sort. */
+function compareTasks(a: Task, b: Task, key: SortKey, dir: 'asc' | 'desc', boardById: Record<string, TaskBoard>): number {
+  const sign = dir === 'asc' ? 1 : -1
+  if (key === 'deadline') {
+    if (!a.due_date && !b.due_date) return a.title.localeCompare(b.title)
+    if (!a.due_date) return 1
+    if (!b.due_date) return -1
+    return (a.due_date < b.due_date ? -1 : a.due_date > b.due_date ? 1 : 0) * sign
+  }
+  if (key === 'priority') return ((PRIORITY_ORDER[a.priority] ?? 2) - (PRIORITY_ORDER[b.priority] ?? 2)) * sign
+  if (key === 'status') return ((STATUS_RANK[a.progress] ?? 1) - (STATUS_RANK[b.progress] ?? 1)) * sign
+  if (key === 'group') return (boardById[a.board_id]?.name ?? '').localeCompare(boardById[b.board_id]?.name ?? '') * sign
+  return a.title.localeCompare(b.title) * sign
 }

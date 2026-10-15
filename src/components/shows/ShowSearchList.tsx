@@ -205,8 +205,8 @@ export function ShowSearchList({ shows, netByShow, setlistByShow, today, eventMa
           <div className="space-y-2">{flat.map(s => row(s, isUpcoming(s.show_date, today) ? 'upcoming' : 'played'))}</div>
         )
       ) : tab === 'upcoming' ? (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-          <div className="space-y-6">
+        <div className="grid gap-6 lg:h-[calc(100vh-14rem)] lg:grid-cols-[minmax(0,1fr)_280px]">
+          <div className="no-scrollbar space-y-6 lg:overflow-y-auto lg:pb-6">
             {upcomingShown.length === 0 ? (
               <EmptyState
                 icon={<CalendarDays className="h-10 w-10" />}
