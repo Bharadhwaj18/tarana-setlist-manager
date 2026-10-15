@@ -4,7 +4,9 @@ import type { Database } from '@/types/database'
 import { safeNextPath } from '@/lib/safe-redirect'
 
 export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request })
+  const passHeaders = new Headers(request.headers)
+  passHeaders.set('x-pathname', request.nextUrl.pathname)
+  let supabaseResponse = NextResponse.next({ request: { headers: passHeaders } })
 
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -18,7 +20,7 @@ export async function updateSession(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           )
-          supabaseResponse = NextResponse.next({ request })
+          supabaseResponse = NextResponse.next({ request: { headers: passHeaders } })
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           )

@@ -41,3 +41,7 @@ export function sectionForHref(href: string): SectionKey | null {
   const match = SECTIONS.find(s => href === s.href || href.startsWith(`${s.href}/`))
   return match ? match.key : null
 }
+
+export function sectionLabelOf(key: SectionKey): string {
+  return SECTIONS.find(s => s.key === key)?.label ?? key
+}
