@@ -7,7 +7,8 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { sendNotification } from '@/actions/notifications'
 import { DOCUMENT_BUCKET } from '@/types/show-document'
 import { getWorkspaceContext } from '@/lib/workspace'
-import { WORKSPACE_COOKIE, normalisePermissions } from '@/lib/workspace-shared'
+import { WORKSPACE_COOKIE } from '@/lib/workspace-shared'
+import { SECTIONS, type SectionLevel, type SectionKey } from '@/lib/workspace-sections'
 import { createWorkspaceInputSchema, updateWorkspaceDetailsSchema, type CreateWorkspaceInput, type UpdateWorkspaceDetailsInput } from '@/lib/validators'
 
 async function selectWorkspace(workspaceId: string) {
@@ -158,7 +159,8 @@ export async function setMemberTreasurer(userId: string, isTreasurer: boolean): 
     .eq('user_id', userId)
     .maybeSingle()
   if (!member) return { error: 'Member not found.' }
-  const permissions = { ...normalisePermissions(member.permissions), treasurer: isTreasurer }
+  const raw = member.permissions && typeof member.permissions === 'object' && !Array.isArray(member.permissions) ? member.permissions : {}
+  const permissions = { ...raw, treasurer: isTreasurer }
   const { error } = await supabase
     .from('workspace_members')
     .update({ permissions })
@@ -259,6 +261,37 @@ export async function deleteWorkspace(confirmName: string): Promise<{ error?: st
     type: 'workspace_deleted',
   })))
 
+  revalidatePath('/', 'layout')
+  return {}
+}
+
+/** Sets what sections a member can see (none / view / edit). Owners and admins can't be restricted. */
+export async function setMemberSections(userId: string, levels: Partial<Record<SectionKey, SectionLevel>>): Promise<{ error?: string }> {
+  const auth = await requireAdminContext()
+  if ('error' in auth) return { error: auth.error }
+  const supabase = await createClient()
+  const { data: member } = await supabase
+    .from('workspace_members')
+    .select('permissions, role')
+    .eq('workspace_id', auth.workspaceId)
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (!member) return { error: 'Member not found.' }
+  if (member.role === 'owner' || member.role === 'admin') return { error: 'Owners and admins always have access to everything.' }
+
+  const raw = member.permissions && typeof member.permissions === 'object' && !Array.isArray(member.permissions) ? (member.permissions as Record<string, unknown>) : {}
+  const current = raw.sections && typeof raw.sections === 'object' && !Array.isArray(raw.sections) ? (raw.sections as Record<string, string>) : {}
+  const allowed = new Set<string>(SECTIONS.map(s => s.key))
+  const next: Record<string, string> = { ...current }
+  for (const [key, level] of Object.entries(levels)) {
+    if (allowed.has(key) && (level === 'edit' || level === 'view' || level === 'none')) next[key] = level
+  }
+  const { error } = await supabase
+    .from('workspace_members')
+    .update({ permissions: { ...raw, sections: next } })
+    .eq('workspace_id', auth.workspaceId)
+    .eq('user_id', userId)
+  if (error) return { error: error.message }
   revalidatePath('/', 'layout')
   return {}
 }

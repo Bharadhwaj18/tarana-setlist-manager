@@ -16,6 +16,7 @@ import { ThemeIconButton } from '@/components/ui/ThemeToggle'
 import { MobileTabBar } from './MobileTabBar'
 import { MobileTopBar } from './MobileTopBar'
 import type { NotificationItem } from '@/types/notifications'
+import { sectionForHref, type SectionKey } from '@/lib/workspace-sections'
 
 interface SidebarProps {
   user: User
@@ -26,6 +27,8 @@ interface SidebarProps {
   /** Workspaces this user belongs to, and which one is selected. */
   workspaces?: WorkspaceOption[]
   currentWorkspaceId?: string
+  /** Sections this member can't open; their links are hidden. */
+  hiddenSections?: SectionKey[]
 }
 
 const navGroups = [
@@ -51,7 +54,8 @@ const navGroups = [
   },
 ]
 
-export function Sidebar({ user, pendingPaymentCount = 0, notifications = [], workspaces = [], currentWorkspaceId = '' }: SidebarProps) {
+export function Sidebar({ user, pendingPaymentCount = 0, notifications = [], workspaces = [], currentWorkspaceId = '', hiddenSections = [] }: SidebarProps) {
+  const visibleGroups = navGroups.map(g => ({ ...g, items: g.items.filter(i => { const sec = sectionForHref(i.href); return !sec || !hiddenSections.includes(sec) }) })).filter(g => g.items.length > 0)
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -78,7 +82,7 @@ export function Sidebar({ user, pendingPaymentCount = 0, notifications = [], wor
 
   const nav = (
     <nav className="flex flex-1 flex-col gap-2.5 py-2">
-      {navGroups.map((group, i) => (
+      {visibleGroups.map((group, i) => (
         <div key={group.label ?? i} className="flex flex-col gap-0.5">
           {group.label && (
             <span className="px-3 pb-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-sidebar-muted [@media(max-height:640px)]:hidden">{group.label}</span>
@@ -164,7 +168,7 @@ export function Sidebar({ user, pendingPaymentCount = 0, notifications = [], wor
 
       {/* Phone: workspace + notifications on top, tabs at the bottom (everything else lives under "More") */}
       <MobileTopBar workspaces={workspaces} currentId={currentWorkspaceId} notifications={notifications} />
-      <MobileTabBar pendingPaymentCount={pendingPaymentCount} />
+      <MobileTabBar pendingPaymentCount={pendingPaymentCount} hiddenSections={hiddenSections} />
     </>
   )
 }

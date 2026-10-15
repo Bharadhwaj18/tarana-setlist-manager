@@ -9,11 +9,13 @@ import { SectionLabel } from '@/components/ui/SectionLabel'
 import { ThemePicker } from '@/components/ui/ThemeToggle'
 import { WorkspaceAvatar } from '@/components/ui/WorkspaceAvatar'
 import { isPersonal, roleLabel, workspaceLabel, type WorkspaceOption } from '@/lib/workspace-options'
+import { sectionForHref, type SectionKey } from '@/lib/workspace-sections'
 
 interface Props {
   email: string
   workspaces: WorkspaceOption[]
   currentWorkspaceId: string
+  hiddenSections?: SectionKey[]
 }
 
 const GROUPS = [
@@ -22,7 +24,8 @@ const GROUPS = [
   { label: 'Account', items: [{ href: '/workspaces', label: 'Workspaces' }, { href: '/workspace', label: 'Workspace & members' }, { href: '/settings', label: 'Settings' }] },
 ]
 
-export function MoreMenu({ email, workspaces, currentWorkspaceId }: Props) {
+export function MoreMenu({ email, workspaces, currentWorkspaceId, hiddenSections = [] }: Props) {
+  const groups = GROUPS.map(g => ({ ...g, items: g.items.filter(i => { const sec = sectionForHref(i.href); return !sec || !hiddenSections.includes(sec) }) })).filter(g => g.items.length > 0)
   const router = useRouter()
 
   const current = workspaces.find(w => w.id === currentWorkspaceId) ?? workspaces[0]
@@ -57,7 +60,7 @@ export function MoreMenu({ email, workspaces, currentWorkspaceId }: Props) {
         </Link>
       )}
 
-      {GROUPS.map(group => (
+      {groups.map(group => (
         <section key={group.label} className="space-y-2">
           <SectionLabel>{group.label}</SectionLabel>
           <div className="overflow-hidden rounded-2xl border border-brand-200 bg-white">

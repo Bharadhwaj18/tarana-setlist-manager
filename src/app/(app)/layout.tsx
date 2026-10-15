@@ -7,6 +7,8 @@ import { Sidebar } from '@/components/layout/Sidebar'
 import { OfflineUserSync } from '@/components/OfflineUserSync'
 import { IdentifyUser } from '@/components/analytics/IdentifyUser'
 import type { ReactNode } from 'react'
+import { hiddenSectionsOf } from '@/lib/workspace-sections'
+import { getWorkspaceContext } from '@/lib/workspace'
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const supabase = await createClient()
@@ -41,13 +43,16 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const pendingCount = pendingPayments.filter(p => p.from_member === effectiveUser.id).length
   const notificationItems = resolveNotificationItems(notifications, profiles, effectiveUser.id)
 
+  const ctx = await getWorkspaceContext()
+  const hiddenSections = ctx ? hiddenSectionsOf(ctx.current.sections) : []
+
   return (
     <div className="flex h-screen">
       <OfflineUserSync email={effectiveUser.email ?? ''} displayName={profile?.display_name ?? ''} />
       <IdentifyUser userId={effectiveUser.id} email={effectiveUser.email} name={profile?.display_name} />
       <Sidebar user={effectiveUser} pendingPaymentCount={pendingCount} notifications={notificationItems}
         workspaces={workspaceOptions}
-        currentWorkspaceId={currentWorkspaceId} />
+        currentWorkspaceId={currentWorkspaceId} hiddenSections={hiddenSections} />
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-5xl px-4 pb-28 pt-16 sm:px-6 lg:px-8 lg:pb-8 lg:pt-8">
           {children}

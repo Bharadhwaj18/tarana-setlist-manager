@@ -10,6 +10,7 @@ const m = (id: string, type: string, created_at: string): WorkspaceMembership =>
   },
   role: 'member',
   permissions: {},
+  sections: { shows: 'edit', setlists: 'edit', songs: 'edit', recordings: 'edit', finance: 'edit', calendar: 'edit', tasks: 'edit', notes: 'edit', agencies: 'edit' },
 })
 
 describe('pickCurrentWorkspace', () => {

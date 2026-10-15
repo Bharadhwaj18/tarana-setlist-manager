@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getCachedUser } from '@/lib/auth-cache'
 import { WORKSPACE_COOKIE, pickCurrentWorkspace, normalisePermissions } from '@/lib/workspace-shared'
 import type { WorkspaceContext, WorkspaceMembership } from '@/types/workspace'
+import { sectionLevelsFrom } from '@/lib/workspace-sections'
 
 /**
  * The signed-in user's workspaces plus which one is currently selected
@@ -31,7 +32,9 @@ export const getWorkspaceContext = cache(async (): Promise<WorkspaceContext | nu
   const memberships: WorkspaceMembership[] = members
     .map(m => {
       const workspace = workspaces.find(w => w.id === m.workspace_id)
-      return workspace ? { workspace, role: m.role, permissions: normalisePermissions(m.permissions) } : null
+      return workspace
+        ? { workspace, role: m.role, permissions: normalisePermissions(m.permissions), sections: sectionLevelsFrom(m.permissions, m.role) }
+        : null
     })
     .filter((m): m is WorkspaceMembership => m !== null)
   if (!memberships.length) return null

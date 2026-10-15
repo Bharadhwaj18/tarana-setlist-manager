@@ -14,6 +14,7 @@ import { MembersSettings } from '@/components/workspace/MembersSettings'
 import { InvitesSettings } from '@/components/workspace/InvitesSettings'
 import { DangerSettings } from '@/components/workspace/DangerSettings'
 import { SETTINGS_TABS, type InviteRow, type MemberRow, type SettingsTab } from '@/components/workspace/settings-types'
+import { sectionLevelsFrom } from '@/lib/workspace-sections'
 
 interface Props {
   searchParams: Promise<{ tab?: string }>
@@ -76,6 +77,7 @@ export default async function WorkspacePage({ searchParams }: Props) {
     name: profiles.find(p => p.id === m.user_id)?.display_name?.trim() || 'Unnamed member',
     role: m.role,
     treasurer: normalisePermissions(m.permissions).treasurer === true,
+    sections: sectionLevelsFrom(m.permissions, m.role),
     isYou: m.user_id === ctx.userId,
   }))
 

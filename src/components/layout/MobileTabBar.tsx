@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { LayoutDashboard, CalendarDays, ListMusic, Wallet, Ellipsis } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { sectionForHref, type SectionKey } from '@/lib/workspace-sections'
 
 const TABS = [
   { href: '/', label: 'Today', icon: LayoutDashboard },
@@ -22,7 +23,7 @@ function activeHref(pathname: string) {
   return main ? main.href : '/more'
 }
 
-export function MobileTabBar({ pendingPaymentCount = 0 }: { pendingPaymentCount?: number }) {
+export function MobileTabBar({ pendingPaymentCount = 0, hiddenSections = [] }: { pendingPaymentCount?: number; hiddenSections?: SectionKey[] }) {
   const pathname = usePathname()
   const active = activeHref(pathname)
 
@@ -31,7 +32,7 @@ export function MobileTabBar({ pendingPaymentCount = 0 }: { pendingPaymentCount?
       aria-label="Main"
       className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-brand-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden"
     >
-      {TABS.map(({ href, label, icon: Icon }) => {
+      {TABS.filter(t => { const sec = sectionForHref(t.href); return !sec || !hiddenSections.includes(sec) }).map(({ href, label, icon: Icon }) => {
         const isActive = href === active
         return (
           <Link

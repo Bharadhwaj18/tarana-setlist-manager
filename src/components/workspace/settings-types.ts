@@ -1,4 +1,7 @@
+import type { SectionLevels } from '@/lib/workspace-sections'
+
 export interface MemberRow {
+  sections: SectionLevels
   userId: string
   name: string
   role: string

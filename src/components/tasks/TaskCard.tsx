@@ -7,7 +7,13 @@ import { useToast } from '@/components/ui/Toaster'
 import { Avatar } from './AssigneePicker'
 import { cn } from '@/lib/utils'
 import { formatDateDMY } from '@/lib/dates'
-import { PRIORITY_CHIP, PRIORITY_LABELS, labelStyle, type TaskLabel, type TaskPriority, type Task } from '@/types/tasks'
+import { PRIORITY_CHIP, PRIORITY_LABELS, PROGRESS_LABELS, labelStyle, type TaskLabel, type TaskPriority, type TaskProgress, type Task } from '@/types/tasks'
+
+const STATUS_CHIP: Record<string, string> = {
+  not_started: 'bg-gray-100 text-gray-700',
+  in_progress: 'bg-sky-100 text-sky-800',
+  completed: 'bg-emerald-100 text-emerald-800',
+}
 
 interface Props {
   task: Task
@@ -73,11 +79,10 @@ export function TaskCard({ task, labelsById, nameById, today, onOpen }: Props) {
         {priority !== 'medium' && (
           <span className={cn('rounded px-1.5 py-0.5 font-medium', PRIORITY_CHIP[priority])}>{PRIORITY_LABELS[priority]}</span>
         )}
-        {task.due_date && (
-          <span className={cn('inline-flex items-center gap-1 rounded px-1.5 py-0.5', overdue ? 'bg-red-50 font-medium text-red-600' : 'bg-gray-50')}>
-            <CalendarDays className="h-3 w-3" /> {formatDateDMY(task.due_date)}
-          </span>
-        )}
+        <span className={cn('inline-flex items-center gap-1 rounded px-1.5 py-0.5', overdue ? 'bg-red-50 font-medium text-red-600' : task.due_date ? 'bg-gray-50' : 'text-gray-400')}>
+          <CalendarDays className="h-3 w-3" /> {task.due_date ? (overdue ? `Overdue · ${formatDateDMY(task.due_date)}` : formatDateDMY(task.due_date)) : 'No deadline'}
+        </span>
+        <span className={cn('rounded-full px-2 py-0.5 font-bold', STATUS_CHIP[task.progress] ?? STATUS_CHIP.not_started)}>{PROGRESS_LABELS[task.progress as TaskProgress] ?? task.progress}</span>
         {task.checklist.length > 0 && (
           <span className="inline-flex items-center gap-1"><ListChecks className="h-3 w-3" /> {doneItems}/{task.checklist.length}</span>
         )}

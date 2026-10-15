@@ -3,11 +3,13 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Link2, Trash2, UserPlus } from 'lucide-react'
+import { KeyRound, Link2, Trash2, UserPlus } from 'lucide-react'
 import { setMemberRole, setMemberTreasurer, removeMember } from '@/actions/workspace'
 import { StatusPill } from '@/components/ui/StatusPill'
 import { cn } from '@/lib/utils'
 import type { MemberRow } from './settings-types'
+import { AccessDialog } from './AccessDialog'
+import { SECTIONS } from '@/lib/workspace-sections'
 
 const ROLE_LABEL: Record<string, string> = { owner: 'Owner', admin: 'Admin', member: 'Member' }
 
@@ -31,6 +33,7 @@ export function MembersSettings({ workspaceName, members, isAdmin, isOwner, acti
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const [accessFor, setAccessFor] = useState<MemberRow | null>(null)
 
   const run = (fn: () => Promise<{ error?: string }>) => {
     setError(null)
@@ -67,6 +70,9 @@ export function MembersSettings({ workspaceName, members, isAdmin, isOwner, acti
                 <div className="mt-0.5 flex flex-wrap gap-1.5">
                   <StatusPill tone={m.role === 'member' ? 'gray' : 'green'}>{ROLE_LABEL[m.role] ?? m.role}</StatusPill>
                   {m.treasurer && <StatusPill tone="amber">Treasurer</StatusPill>}
+                  {m.role === 'member' && SECTIONS.some(sec => m.sections[sec.key] === 'none') && (
+                    <StatusPill tone="gray">Limited</StatusPill>
+                  )}
                 </div>
               </div>
 
@@ -87,6 +93,16 @@ export function MembersSettings({ workspaceName, members, isAdmin, isOwner, acti
                       <option value="member">Member</option>
                       <option value="admin">Admin</option>
                     </select>
+                  )}
+                  {m.role === 'member' && (
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={() => setAccessFor(m)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 px-2.5 py-1.5 text-xs font-bold text-gray-700 hover:bg-brand-50"
+                    >
+                      <KeyRound className="h-3.5 w-3.5" /> Access
+                    </button>
                   )}
                   <button
                     type="button"
@@ -110,6 +126,16 @@ export function MembersSettings({ workspaceName, members, isAdmin, isOwner, acti
           <span className="flex-1">{activeInviteCount} active invite {activeInviteCount === 1 ? 'link' : 'links'}</span>
           <span className="font-bold text-brand-600">Manage</span>
         </Link>
+      )}
+      {accessFor && (
+        <AccessDialog
+          key={accessFor.userId}
+          memberId={accessFor.userId}
+          memberName={accessFor.name}
+          initial={accessFor.sections}
+          open
+          onOpenChange={o => { if (!o) setAccessFor(null) }}
+        />
       )}
     </div>
   )
