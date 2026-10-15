@@ -118,7 +118,7 @@ export function SetlistsBrowser({ setlists, countMap, previews, today }: Props) 
       )}
 
       <div className="grid gap-5 lg:h-[calc(100vh-12.5rem)] lg:grid-cols-[300px_minmax(0,1fr)]">
-        <div className="no-scrollbar flex min-w-0 flex-col gap-3 lg:overflow-y-auto lg:pb-6">
+        <div className="no-scrollbar flex min-w-0 flex-col gap-3 px-1 py-1 lg:overflow-y-auto lg:pb-6">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-300" />
             <input

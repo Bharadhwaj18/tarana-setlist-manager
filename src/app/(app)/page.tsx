@@ -25,10 +25,10 @@ function rupees(n: number) {
   return `₹${Math.round(n).toLocaleString('en-IN')}`
 }
 
-function headline(days: number | null, firstName: string) {
-  if (days === null) return firstName ? `Hi ${firstName}` : 'Welcome back'
-  if (days === 0) return 'Showtime is today'
-  if (days === 1) return 'Showtime is tomorrow'
+function headline(days: number) {
+  if (days === 0) return "Showtime is today"
+  if (days === 1) return "Showtime is tomorrow"
+  if (days < 0) return "Show has passed"
   return `${days} days to showtime`
 }
 
@@ -327,7 +327,8 @@ export default async function TodayPage() {
     <div className="space-y-6">
       <header>
         <p className={eyebrow}>{todayLabel}</p>
-        <h1 className="mt-1 text-3xl font-bold text-gray-900 sm:text-4xl">{headline(days, firstName)}</h1>
+        <h1 className="mt-1 text-3xl font-bold text-gray-900 sm:text-4xl">{firstName ? `Hi ${firstName}` : "Welcome back"}</h1>
+        {days !== null && <p className="mt-1 text-base text-gray-600">{headline(days)}</p>}
       </header>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
