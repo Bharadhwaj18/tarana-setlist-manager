@@ -93,7 +93,7 @@ export default async function WorkspacePage({ searchParams }: Props) {
           .order('created_at', { ascending: false })
       : Promise.resolve({ data: [] }),
     getCachedFinanceSettings(),
-    tabParam === 'money' ? usedTags(workspace.id) : Promise.resolve([] as string[]),
+    tabParam === 'money' && isAdmin ? usedTags(workspace.id) : Promise.resolve([] as string[]),
   ])
 
   const members: MemberRow[] = (memberRows ?? []).map(m => ({
@@ -121,7 +121,7 @@ export default async function WorkspacePage({ searchParams }: Props) {
     avatarUrl: workspace.avatar_url ?? null,
   }
 
-  const visibleTabs = SETTINGS_TABS.filter(t => (t.key !== 'invites' || isAdmin) && (t.key !== 'money' || ctx.current.sections.finance !== 'none'))
+  const visibleTabs = SETTINGS_TABS.filter(t => (t.key !== 'invites' || isAdmin) && (t.key !== 'money' || isAdmin))
   const activeTab: SettingsTab = visibleTabs.some(t => t.key === tab) ? tab : 'general'
 
   return (
@@ -154,7 +154,7 @@ export default async function WorkspacePage({ searchParams }: Props) {
           {activeTab === 'general' && <GeneralSettings workspace={summary} canEdit={isAdmin} />}
           {activeTab === 'members' && <MembersSettings workspaceName={workspace.name} members={members} isAdmin={isAdmin} isOwner={isOwner} activeInviteCount={invites.length} />}
           {activeTab === 'invites' && isAdmin && <InvitesSettings invites={invites} workspaceName={workspace.name} />}
-          {activeTab === 'money' && <MoneySettings initial={financeSettings} members={members.map(m => ({ id: m.userId, name: m.name }))} canEdit={isAdmin} usedTags={tagsInUse} />}
+          {activeTab === 'money' && isAdmin && <MoneySettings initial={financeSettings} members={members.map(m => ({ id: m.userId, name: m.name }))} canEdit usedTags={tagsInUse} />}
           {activeTab === 'danger' && <DangerSettings workspaceName={workspace.name} members={members} isAdmin={isAdmin} isOwner={isOwner} />}
         </div>
       </div>
