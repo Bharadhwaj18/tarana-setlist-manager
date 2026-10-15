@@ -11,6 +11,13 @@ describe('parseSong', () => {
     expect(html).toContain('world')
   })
 
+  it('keeps lyrics and chords that contain a backslash', () => {
+    const html = formatSong(parseSong('[G]Lokada [C]kaalaji madatheenanti\\\nNingyaar [D]byaad'))
+    expect(html).toContain('Lokada')
+    expect(html).toContain('Ningyaar')
+    expect(html).toContain('>D<')
+  })
+
   it('never throws on empty input', () => {
     expect(() => parseSong('')).not.toThrow()
   })
