@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import type { Database } from '@/types/database'
 import { safeNextPath } from '@/lib/safe-redirect'
+import { PENDING_INVITE_COOKIE } from '@/lib/workspace-shared'
 
 export async function updateSession(request: NextRequest) {
   const passHeaders = new Headers(request.headers)
@@ -45,6 +46,12 @@ export async function updateSession(request: NextRequest) {
 
   // Invite pages are reachable signed-out (they show the band and a sign-in prompt) and signed-in (accept).
   const isPublicRoute = isAuthRoute || pathname.startsWith('/invite/')
+
+  // Remember an opened invite, so whatever sign-up path someone takes they end up back at it.
+  const inviteToken = pathname.match(/^\/invite\/([A-Za-z0-9_-]{6,})$/)?.[1]
+  if (inviteToken) {
+    supabaseResponse.cookies.set(PENDING_INVITE_COOKIE, inviteToken, { path: '/', maxAge: 60 * 60 * 24 * 30, sameSite: 'lax', httpOnly: true })
+  }
 
   if (!effectiveUser && !isPublicRoute) {
     const url = request.nextUrl.clone()

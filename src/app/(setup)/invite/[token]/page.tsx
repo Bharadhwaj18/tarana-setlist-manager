@@ -79,9 +79,9 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
               </div>
             ) : (
               <div className="mt-6 space-y-2">
-                <Button asChild className="w-full"><Link href={loginHref}>Sign in to join</Link></Button>
-                <Button asChild variant="secondary" className="w-full"><Link href={loginHref}>Create an account</Link></Button>
-                <p className="pt-1 text-xs text-gray-400">New here? Choose “Magic Link” on the next screen and we’ll email you a sign-in link. You’ll come straight back to this invite.</p>
+                <Button asChild className="w-full"><Link href={`${loginHref}&mode=signup`}>Create an account to join</Link></Button>
+                <Button asChild variant="secondary" className="w-full"><Link href={loginHref}>I already have an account</Link></Button>
+                <p className="pt-1 text-xs text-gray-400">New here? Create an account with your name, email and a password. After you confirm your email you’ll come straight back to this invite.</p>
               </div>
             )}
             {invite.expires_at && <p className="mt-5 text-xs text-gray-400">This link expires on {formatExpiry(invite.expires_at)}</p>}

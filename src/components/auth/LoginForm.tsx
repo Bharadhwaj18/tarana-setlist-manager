@@ -24,7 +24,9 @@ export function LoginForm({ next = '/' }: { next?: string }) {
     setServerError('')
     const { error } = await supabase.auth.signInWithPassword(data)
     if (error) {
-      setServerError(error.message)
+      setServerError(error.message === 'Invalid login credentials'
+        ? 'Wrong email or password. New here, or forgot it? Use “Email me a link” instead.'
+        : error.message)
       return
     }
     router.push(next)

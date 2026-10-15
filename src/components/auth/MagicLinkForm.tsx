@@ -36,11 +36,12 @@ export function MagicLinkForm({ next = '/' }: { next?: string }) {
   if (sent) {
     return (
       <div className="flex flex-col items-center gap-3 py-4 text-center">
-        <Mail className="h-10 w-10 text-indigo-600" />
+        <Mail className="h-10 w-10 text-brand-600" />
         <p className="font-medium text-gray-900">Check your inbox</p>
         <p className="text-sm text-gray-500">
-          We sent a magic link to <strong>{getValues('email')}</strong>. Click it to sign in.
+          We sent a sign-in link to <strong>{getValues('email')}</strong>. Open it on this same phone or computer.
         </p>
+        <p className="text-xs text-gray-400">Not there? Check spam, or wait a minute and ask again.</p>
       </div>
     )
   }
@@ -60,7 +61,7 @@ export function MagicLinkForm({ next = '/' }: { next?: string }) {
       </div>
       {serverError && <p className="text-sm text-red-600">{serverError}</p>}
       <Button type="submit" className="w-full" loading={isSubmitting}>
-        Send magic link
+        Email me a sign-in link
       </Button>
     </form>
   )

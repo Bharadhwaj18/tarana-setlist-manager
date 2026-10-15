@@ -7,7 +7,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { sendNotification } from '@/actions/notifications'
 import { DOCUMENT_BUCKET } from '@/types/show-document'
 import { getWorkspaceContext } from '@/lib/workspace'
-import { WORKSPACE_COOKIE } from '@/lib/workspace-shared'
+import { PENDING_INVITE_COOKIE, WORKSPACE_COOKIE } from '@/lib/workspace-shared'
 import { SECTIONS, type SectionLevel, type SectionKey } from '@/lib/workspace-sections'
 import { createWorkspaceInputSchema, updateWorkspaceDetailsSchema, type CreateWorkspaceInput, type UpdateWorkspaceDetailsInput } from '@/lib/validators'
 
@@ -147,12 +147,18 @@ export async function revokeInvite(inviteId: string): Promise<{ error?: string }
   return {}
 }
 
+/** "Not now" on an invite: stop sending this person back to it. */
+export async function dismissPendingInvite(): Promise<void> {
+  ;(await cookies()).delete(PENDING_INVITE_COOKIE)
+}
+
 export async function acceptInvite(token: string): Promise<{ error?: string }> {
   const supabase = await createClient()
   // join_with_invite also applies the access chosen on the invite. Until its SQL has been run, fall back to the plain join.
   let { data, error } = await supabase.rpc('join_with_invite', { p_token: token })
   if (error?.code === 'PGRST202') ({ data, error } = await supabase.rpc('accept_workspace_invite', { p_token: token }))
   if (error || !data) return { error: error?.message ?? 'Couldn’t join this workspace.' }
+  ;(await cookies()).delete(PENDING_INVITE_COOKIE)
   await selectWorkspace(data)
   return {}
 }

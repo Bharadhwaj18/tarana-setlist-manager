@@ -1,9 +1,8 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { acceptInvite } from '@/actions/workspace'
+import { acceptInvite, dismissPendingInvite } from '@/actions/workspace'
 import { Button } from '@/components/ui/Button'
 
 export function AcceptInviteButton({ token }: { token: string }) {
@@ -27,7 +26,8 @@ export function AcceptInviteButton({ token }: { token: string }) {
   return (
     <div className="space-y-2">
       <Button onClick={accept} loading={pending} className="w-full">Join workspace</Button>
-      <Button asChild variant="secondary" className="w-full"><Link href="/">Not now</Link></Button>
+      <Button variant="secondary" className="w-full" disabled={pending}
+        onClick={() => startTransition(async () => { await dismissPendingInvite(); router.push('/') })}>Not now</Button>
       {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   )

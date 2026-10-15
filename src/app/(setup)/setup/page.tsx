@@ -24,5 +24,7 @@ export default async function SetupPage() {
   // Only skip setup if we got a successful response confirming name is set
   if (!profileError && profile?.display_name?.trim()) redirect('/')
 
-  return <SetupForm email={effectiveUser.email ?? ''} />
+  // Prefill the name given on the sign-up form, if any.
+  const suggested = typeof effectiveUser.user_metadata?.display_name === 'string' ? effectiveUser.user_metadata.display_name : ''
+  return <SetupForm email={effectiveUser.email ?? ''} suggestedName={suggested} />
 }

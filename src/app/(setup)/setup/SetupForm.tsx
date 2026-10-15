@@ -7,8 +7,8 @@ import { useRouter } from 'next/navigation'
 import { saveDisplayName } from '@/actions/profile'
 import { Button } from '@/components/ui/Button'
 
-export function SetupForm({ email }: { email: string }) {
-  const [name, setName] = useState('')
+export function SetupForm({ email, suggestedName = '' }: { email: string; suggestedName?: string }) {
+  const [name, setName] = useState(suggestedName)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()

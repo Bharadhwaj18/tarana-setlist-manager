@@ -6,6 +6,12 @@ export const loginSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters'),
 })
 
+export const signUpSchema = z.object({
+  name: z.string().trim().min(1, 'Tell us your name').max(40, 'Keep it under 40 characters'),
+  email: z.string().email('Enter a valid email'),
+  password: z.string().min(8, 'Use at least 8 characters'),
+})
+
 export const magicLinkSchema = z.object({
   email: z.string().email('Enter a valid email'),
 })
@@ -78,6 +84,7 @@ export const calendarEventSchema = z.object({
 
 export type LoginFormData = z.infer<typeof loginSchema>
 export type MagicLinkFormData = z.infer<typeof magicLinkSchema>
+export type SignUpFormData = z.infer<typeof signUpSchema>
 export type SongFormData = z.infer<typeof songSchema>
 export type SetlistFormData = z.infer<typeof setlistSchema>
 export type ShowFormData = z.infer<typeof showSchema>

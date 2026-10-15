@@ -1,4 +1,6 @@
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
+import { PENDING_INVITE_COOKIE } from '@/lib/workspace-shared'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedUser, getCachedPendingPayments, getCachedNotifications, getCachedAllProfiles, getCachedFinanceSettings } from '@/lib/data'
 import { FinanceSettingsProvider } from '@/components/finance/FinanceSettingsContext'
@@ -26,6 +28,13 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   }
 
   if (!effectiveUser) redirect('/login')
+
+  // Opened an invite but haven't joined yet (e.g. signed up in another tab or browser)? Take them back to it.
+  const pendingInvite = (await cookies()).get(PENDING_INVITE_COOKIE)?.value
+  if (pendingInvite) {
+    const { data: preview } = await supabase.rpc('invite_preview', { p_token: pendingInvite })
+    if (preview?.[0]?.state === 'valid') redirect(`/invite/${pendingInvite}`)
+  }
 
   // Everything the shell needs is independent of everything else, so fetch it in ONE round
   // trip instead of a chain of awaits (each await used to add a full database latency).
