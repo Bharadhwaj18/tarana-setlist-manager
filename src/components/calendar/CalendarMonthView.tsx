@@ -1,7 +1,6 @@
 'use client'
 
-import { useMemo, useState, type ReactNode } from 'react'
-import { useSwipe } from '@/lib/use-swipe'
+import { useMemo, useRef, useState, type ReactNode, type TouchEvent } from 'react'
 import { addMonths, subMonths, format } from 'date-fns'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { buildMonthGrid, groupItemsByDate, externalLabel, type DayItems, type ExternalItem } from '@/lib/calendar'
@@ -80,14 +79,52 @@ export function CalendarMonthView({
     return KINDS.filter(k => present[k])
   }
 
+  // Which side the new month slides in from, and how far a finger is currently dragging the month.
+  const [slideFrom, setSlideFrom] = useState<'left' | 'right' | null>(null)
+  const [dragX, setDragX] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const touch = useRef<{ x: number; y: number; axis: 'x' | 'y' | null } | null>(null)
+
   const goToday = () => {
-    setCurrentMonth(parseISODate(today))
+    const target = parseISODate(today)
+    setSlideFrom(target < currentMonth ? 'left' : target > currentMonth ? 'right' : null)
+    setCurrentMonth(target)
     setSelectedDate(today)
   }
-  const prev = () => setCurrentMonth(m => subMonths(m, 1))
-  const next = () => setCurrentMonth(m => addMonths(m, 1))
+  const prev = () => { setSlideFrom('left'); setCurrentMonth(m => subMonths(m, 1)) }
+  const next = () => { setSlideFrom('right'); setCurrentMonth(m => addMonths(m, 1)) }
   const monthLabel = format(currentMonth, 'MMMM yyyy')
-  const swipe = useSwipe(next, prev)
+  const slideClass = slideFrom === 'right' ? 'cal-from-right' : slideFrom === 'left' ? 'cal-from-left' : ''
+
+  // The month follows the finger sideways; past the threshold it changes, otherwise it springs back.
+  const SWIPE_AT = 60
+  const swipe = {
+    onTouchStart: (e: TouchEvent) => {
+      const t = e.touches[0]
+      touch.current = e.touches.length === 1 ? { x: t.clientX, y: t.clientY, axis: null } : null
+    },
+    onTouchMove: (e: TouchEvent) => {
+      const s0 = touch.current
+      if (!s0) return
+      const t = e.touches[0]
+      const dx = t.clientX - s0.x
+      const dy = t.clientY - s0.y
+      if (!s0.axis && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) s0.axis = Math.abs(dx) > Math.abs(dy) * 1.2 ? 'x' : 'y'
+      if (s0.axis !== 'x') return
+      setDragging(true)
+      setDragX(dx * 0.85)
+    },
+    onTouchEnd: (e: TouchEvent) => {
+      const s0 = touch.current
+      touch.current = null
+      setDragging(false)
+      if (!s0 || s0.axis !== 'x') { setDragX(0); return }
+      const dx = e.changedTouches[0].clientX - s0.x
+      setDragX(0)
+      if (dx <= -SWIPE_AT) next()
+      else if (dx >= SWIPE_AT) prev()
+    },
+  }
 
   const selectedItems = byDate[selectedDate] ?? EMPTY_DAY
   const detailProps = { date: selectedDate, items: selectedItems, readOnly, workspaceNameById, members, boards, nameById }
@@ -125,7 +162,7 @@ export function CalendarMonthView({
               <div key={label} className="py-2 text-center text-[11px] font-extrabold uppercase tracking-[0.1em] text-gray-500">{label}</div>
             ))}
           </div>
-          <div className="grid grid-cols-7">
+          <div key={monthLabel} className={cn('grid grid-cols-7', slideClass)}>
             {weeks.flat().map(day => {
               const items = byDate[day.date]
               const isToday = day.date === today
@@ -171,9 +208,9 @@ export function CalendarMonthView({
         </div>
 
         {/* Phone month: dots under each day, the agenda below */}
-        <div {...swipe} className="rounded-2xl border border-brand-200 bg-white px-2 pb-2 pt-2.5 shadow-sm md:hidden">
+        <div {...swipe} className="touch-pan-y overflow-hidden rounded-2xl border border-brand-200 bg-white px-2 pb-2 pt-2.5 shadow-sm md:hidden">
           <div className="flex items-center justify-between px-2.5 pb-2">
-            <h2 className="font-display text-lg font-bold text-gray-900">{monthLabel}</h2>
+            <h2 key={monthLabel} className={cn('font-display text-lg font-bold text-gray-900', slideClass)}>{monthLabel}</h2>
             <div className="flex items-center gap-1">
               <button type="button" onClick={prev} aria-label="Previous month" className="rounded-lg p-1.5 text-gray-600 hover:bg-brand-100"><ChevronLeft className="h-5 w-5" /></button>
               <button type="button" onClick={goToday} className="rounded-lg px-2 py-1 text-xs font-bold text-gray-600 hover:bg-brand-100">Today</button>
@@ -184,6 +221,12 @@ export function CalendarMonthView({
             {WEEKDAYS.map(label => (
               <div key={label} className="pb-1 text-center text-[10px] font-extrabold text-gray-400">{label[0]}</div>
             ))}
+          </div>
+          <div
+            style={{ transform: dragX ? `translateX(${dragX}px)` : undefined, opacity: dragX ? Math.max(0.4, 1 - Math.abs(dragX) / 400) : undefined }}
+            className={cn(!dragging && 'transition-[transform,opacity] duration-200 ease-out')}
+          >
+          <div key={monthLabel} className={cn('grid grid-cols-7', slideClass)}>
             {weeks.flat().map(day => {
               const items = byDate[day.date]
               const isToday = day.date === today
@@ -215,6 +258,7 @@ export function CalendarMonthView({
                 </button>
               )
             })}
+          </div>
           </div>
         </div>
 

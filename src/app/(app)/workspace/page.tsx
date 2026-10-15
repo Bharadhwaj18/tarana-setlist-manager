@@ -101,7 +101,8 @@ export default async function WorkspacePage({ searchParams }: Props) {
     name: profiles.find(p => p.id === m.user_id)?.display_name?.trim() || 'Unnamed member',
     role: m.role,
     treasurer: normalisePermissions(m.permissions).treasurer === true,
-    sections: sectionLevelsFrom(m.permissions, m.role),
+    // Only admins get to know what anyone else can open.
+    sections: sectionLevelsFrom(isAdmin ? m.permissions : null, m.role),
     isYou: m.user_id === ctx.userId,
   }))
 

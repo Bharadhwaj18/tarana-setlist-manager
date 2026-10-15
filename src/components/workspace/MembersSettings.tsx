@@ -70,7 +70,7 @@ export function MembersSettings({ workspaceName, members, isAdmin, isOwner, acti
                 <div className="mt-0.5 flex flex-wrap gap-1.5">
                   <StatusPill tone={m.role === 'member' ? 'gray' : 'green'}>{ROLE_LABEL[m.role] ?? m.role}</StatusPill>
                   {m.treasurer && <StatusPill tone="amber">Treasurer</StatusPill>}
-                  {m.role === 'member' && SECTIONS.some(sec => m.sections[sec.key] === 'none') && (
+                  {isAdmin && m.role === 'member' && SECTIONS.some(sec => m.sections[sec.key] === 'none') && (
                     <StatusPill tone="gray">Limited</StatusPill>
                   )}
                 </div>
