@@ -91,7 +91,7 @@ export function SetlistsBrowser({ setlists, countMap, previews, today }: Props) 
     return out
   }, [setlists, upcomingAll, filter, query, today])
 
-  const selected = setlists.find(s => s.id === selectedId) ?? null
+  const selected = setlists.find(s => s.id === selectedId) ?? groups[0]?.items[0] ?? null
   const selectedSongs = selected ? previews[selected.id] ?? [] : []
   const selectedCount = selected ? countMap[selected.id] ?? 0 : 0
 
@@ -117,8 +117,8 @@ export function SetlistsBrowser({ setlists, countMap, previews, today }: Props) 
         </div>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-[300px_minmax(0,1fr)]">
-        <div className="flex min-w-0 flex-col gap-3">
+      <div className="grid gap-5 lg:h-[calc(100vh-12.5rem)] lg:grid-cols-[300px_minmax(0,1fr)]">
+        <div className="no-scrollbar flex min-w-0 flex-col gap-3 lg:overflow-y-auto lg:pb-6">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-300" />
             <input
@@ -142,7 +142,7 @@ export function SetlistsBrowser({ setlists, countMap, previews, today }: Props) 
                 <SectionLabel className="mt-2">{group.label}</SectionLabel>
                 {group.items.map(s => {
                   const count = countMap[s.id] ?? 0
-                  const active = s.id === selectedId
+                  const active = s.id === selected?.id
                   const menu: MenuItem[] = [
                     { label: 'Open', href: `/setlists/${s.id}`, icon: ListMusic },
                     { label: 'Stage mode', href: stageHref(s.id, previews[s.id]?.[0]), icon: Play },
@@ -176,7 +176,7 @@ export function SetlistsBrowser({ setlists, countMap, previews, today }: Props) 
           )}
         </div>
 
-        <aside className="hidden min-w-0 lg:block">
+        <aside className="no-scrollbar hidden min-w-0 lg:block lg:overflow-y-auto lg:pb-6">
           {selected ? (
             <div className="flex flex-col gap-4 rounded-2xl border border-brand-200 bg-white p-6 shadow-sm">
               <div className="flex items-start justify-between gap-4">
