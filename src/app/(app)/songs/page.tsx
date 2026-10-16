@@ -1,8 +1,7 @@
 import Link from 'next/link'
 import { sectionGuard } from '@/lib/section-guard'
 import { Plus, Music2 } from 'lucide-react'
-import { getCachedSongs } from '@/lib/data'
-import { createClient } from '@/lib/supabase/server'
+import { getCachedSongs, getCachedSetlistSongCounts } from '@/lib/data'
 import { SongSearchList } from '@/components/songs/SongSearchList'
 import { Button } from '@/components/ui/Button'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -11,14 +10,10 @@ import { EmptyState } from '@/components/ui/EmptyState'
 export default async function SongsPage() {
   const denied = await sectionGuard('songs')
   if (denied) return denied
-  const supabase = await createClient()
-  const [songs, { data: usage }] = await Promise.all([
-    getCachedSongs(),
-    supabase.from('setlist_songs').select('song_id'),
-  ])
+  const [songs, usage] = await Promise.all([getCachedSongs(), getCachedSetlistSongCounts()])
 
   const setlistCounts: Record<string, number> = {}
-  for (const row of usage ?? []) setlistCounts[row.song_id] = (setlistCounts[row.song_id] ?? 0) + 1
+  for (const row of usage) setlistCounts[row.song_id] = (setlistCounts[row.song_id] ?? 0) + 1
 
   const needChart = songs.filter(s => !s.chord_chart).length
   const subtitle = `${songs.length} ${songs.length === 1 ? 'song' : 'songs'}${needChart ? ` · ${needChart} still need a chord chart` : ''}`

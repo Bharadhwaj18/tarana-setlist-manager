@@ -16,21 +16,18 @@ export type Database = {
         Row: {
           id: string
           display_name: string | null
-          role: string
           created_at: string
           avatar_url: string | null
         }
         Insert: {
           id: string
           display_name?: string | null
-          role?: string
           created_at?: string
           avatar_url?: string | null
         }
         Update: {
           id?: string
           display_name?: string | null
-          role?: string
           created_at?: string
           avatar_url?: string | null
         }
@@ -142,9 +139,12 @@ export type Database = {
           position: number
           section: string | null
           created_at: string
+          workspace_id: string
         }
         Insert: {
           id?: string
+          // Filled from the setlist by a trigger.
+          workspace_id?: string
           setlist_id: string
           song_id: string
           position?: number
@@ -1174,6 +1174,7 @@ export type Database = {
           type: string
           read_at: string | null
           created_at: string
+          dedupe_key: string | null
         }
         Insert: {
           id?: string
@@ -1186,6 +1187,8 @@ export type Database = {
           type?: string
           read_at?: string | null
           created_at?: string
+          // Service role only (the reminder job).
+          dedupe_key?: string | null
         }
         Update: {
           id?: string

@@ -1,8 +1,7 @@
 import Link from 'next/link'
 import { sectionGuard } from '@/lib/section-guard'
 import { Plus, ListMusic } from 'lucide-react'
-import { createClient } from '@/lib/supabase/server'
-import { getCachedSetlists, getCachedSetlistSongCounts } from '@/lib/data'
+import { getCachedSetlists, getCachedSetlistPreviewRows } from '@/lib/data'
 import { todayISO } from '@/lib/shows'
 import { SetlistsBrowser, type PreviewSong } from '@/components/setlists/SetlistsBrowser'
 import { Button } from '@/components/ui/Button'
@@ -14,20 +13,15 @@ const PREVIEW_SONGS = 5
 export default async function SetlistsPage() {
   const denied = await sectionGuard('setlists')
   if (denied) return denied
-  const supabase = await createClient()
-  const [setlists, counts, { data: songRows }] = await Promise.all([
-    getCachedSetlists(),
-    getCachedSetlistSongCounts(),
-    supabase.from('setlist_songs').select('setlist_id, position, song:songs(id, title, artist, song_key)').order('position'),
-  ])
+  const [setlists, songRows] = await Promise.all([getCachedSetlists(), getCachedSetlistPreviewRows()])
 
   const countMap: Record<string, number> = {}
-  counts.forEach(({ setlist_id }) => {
+  songRows.forEach(({ setlist_id }) => {
     countMap[setlist_id] = (countMap[setlist_id] ?? 0) + 1
   })
 
   const previews: Record<string, PreviewSong[]> = {}
-  for (const row of songRows ?? []) {
+  for (const row of songRows) {
     const song = row.song
     if (!song) continue
     const list = (previews[row.setlist_id] ??= [])

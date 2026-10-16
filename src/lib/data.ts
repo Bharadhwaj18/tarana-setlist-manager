@@ -27,11 +27,18 @@ export const getCachedSetlists = cache(() =>
   )
 )
 
-export const getCachedSetlistSongCounts = cache(async () => {
-  const supabase = await createClient()
-  const { data } = await supabase.from('setlist_songs').select('setlist_id')
-  return data ?? []
-})
+// One row per song-in-a-setlist for the current workspace: counts per setlist, and how many
+// setlists each song is in.
+export const getCachedSetlistSongCounts = cache(() =>
+  inWorkspace((supabase, ws) => supabase.from('setlist_songs').select('setlist_id, song_id').eq('workspace_id', ws))
+)
+
+// Every setlist's songs in order with the bits the Setlists list previews — counts come from the same rows.
+export const getCachedSetlistPreviewRows = cache(() =>
+  inWorkspace((supabase, ws) =>
+    supabase.from('setlist_songs').select('setlist_id, position, song:songs(id, title, artist, song_key)').eq('workspace_id', ws).order('position')
+  )
+)
 
 export const getCachedSong = cache(async (id: string) => {
   const supabase = await createClient()
@@ -112,8 +119,14 @@ export const getCachedNotes = cache(() =>
 // client-side) rather than one query per note — same "fetch all, group in
 // JS" convention as getCachedShowTransactions.
 export const getCachedChecklistItems = cache(async () => {
+  const ctx = await getWorkspaceContext()
+  if (!ctx) return []
   const supabase = await createClient()
-  const { data } = await supabase.from('note_checklist_items').select('*').order('position')
+  const { data } = await supabase
+    .from('note_checklist_items')
+    .select('*, note:notes!inner(workspace_id)')
+    .eq('note.workspace_id', ctx.current.workspace.id)
+    .order('position')
   return data ?? []
 })
 
