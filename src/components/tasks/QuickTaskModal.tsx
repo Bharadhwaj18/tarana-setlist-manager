@@ -26,7 +26,9 @@ export function QuickTaskModal({ boards, members, open, onOpenChange, dueDate }:
   const [boardId, setBoardId] = useState(boards[0]?.id ?? '')
   const [title, setTitle] = useState('')
   const [due, setDue] = useState(dueDate ?? '')
-  const [assigneeIds, setAssigneeIds] = useState<string[]>([])
+  // The person adding it is doing it, unless they pick someone else.
+  const me = members.find(m => m.isYou)?.id
+  const [assigneeIds, setAssigneeIds] = useState<string[]>(me ? [me] : [])
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const toast = useToast()
@@ -39,7 +41,7 @@ export function QuickTaskModal({ boards, members, open, onOpenChange, dueDate }:
       setBoardId(prev => (boards.some(b => b.id === prev) ? prev : boards[0]?.id ?? ''))
       setTitle('')
       setDue(dueDate ?? '')
-      setAssigneeIds([])
+      setAssigneeIds(me ? [me] : [])
       setError(null)
     }
   }

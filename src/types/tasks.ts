@@ -110,7 +110,8 @@ export function labelStyle(color: string) {
 
 export const DEFAULT_BUCKETS = ['To do', 'In progress', 'Done'] as const
 
-export interface Member { id: string; name: string }
+/** isYou marks the signed-in person, so forms can put them first and pick them by default. */
+export interface Member { id: string; name: string; isYou?: boolean }
 
 /** A dated task as the Calendar sees it. */
 export type CalendarTask = Task

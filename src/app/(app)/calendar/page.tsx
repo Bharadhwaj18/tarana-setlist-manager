@@ -71,7 +71,8 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
 
   const tasks = taskData.tasks.filter(t => t.due_date)
   const nameById = nameFor(profiles)
-  const members = profiles.map(p => ({ id: p.id, name: nameById[p.id] }))
+  // The signed-in person first, so "who's unavailable" starts on them.
+  const members = profiles.map(p => ({ id: p.id, name: nameById[p.id], isYou: p.id === user?.id })).sort((a, b) => Number(b.isYou) - Number(a.isYou))
 
   return (
     <div className="max-w-5xl">

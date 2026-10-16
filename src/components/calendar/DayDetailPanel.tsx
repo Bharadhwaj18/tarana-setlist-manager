@@ -21,7 +21,7 @@ import { externalLabel, type DayItems } from '@/lib/calendar'
 import { HATCH_ROW, KIND_BAR, type CalendarKind } from './calendarStyles'
 import { Select } from '@/components/ui/Select'
 
-interface Member { id: string; name: string }
+interface Member { id: string; name: string; isYou?: boolean }
 
 interface RowProps {
   kind: CalendarKind
@@ -87,7 +87,7 @@ export function DayDetailPanel({ date, items, members, boards = [], nameById, re
   const [unavailVisibility, setUnavailVisibility] = useState<Visibility>(DEFAULT_VISIBILITY)
   const [eventVisibility, setEventVisibility] = useState<Visibility>(DEFAULT_VISIBILITY)
   const [taskModalOpen, setTaskModalOpen] = useState(false)
-  const [memberId, setMemberId] = useState(members[0]?.id ?? '')
+  const [memberId, setMemberId] = useState(members.find(m => m.isYou)?.id ?? members[0]?.id ?? '')
   const [endDate, setEndDate] = useState(date)
   const [reason, setReason] = useState('')
   const [eventTitle, setEventTitle] = useState('')

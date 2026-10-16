@@ -74,7 +74,15 @@ describe('buildPeople', () => {
       [{ id: 'u1', display_name: 'Asha' }, { id: 'u2', display_name: null }],
       'u1'
     )
-    expect(members).toEqual([{ id: 'u1', name: 'Asha (you)' }, { id: 'u2', name: 'Member' }])
+    expect(members).toEqual([{ id: 'u1', name: 'Asha (you)', isYou: true }, { id: 'u2', name: 'Member' }])
     expect(nameById).toEqual({ u1: 'Asha', u2: 'Member' })
+  })
+
+  it('puts the current user first, wherever they were, and leaves the rest in order', () => {
+    const { members } = buildPeople(
+      [{ id: 'u1', display_name: 'Asha' }, { id: 'u2', display_name: 'Bo' }, { id: 'u3', display_name: 'Cy' }],
+      'u3'
+    )
+    expect(members.map(m => m.id)).toEqual(['u3', 'u1', 'u2'])
   })
 })

@@ -1,4 +1,4 @@
-import type { Task, TaskBucket } from '@/types/tasks'
+import type { Member, Task, TaskBucket } from '@/types/tasks'
 
 export function byPosition<T extends { position: number }>(a: T, b: T) {
   return a.position - b.position
@@ -57,10 +57,12 @@ export function compareOpenTasks(a: Pick<Task, 'due_date' | 'priority'>, b: Pick
 /** Picker members (own name suffixed "(you)") and a plain id → real-name lookup for avatars and lists. */
 export function buildPeople(profiles: { id: string; display_name: string | null }[], currentUserId: string | undefined) {
   const nameById: Record<string, string> = {}
-  const members = profiles.map(p => {
+  const members: Member[] = profiles.map(p => {
     const name = p.display_name?.trim() || 'Member'
     nameById[p.id] = name
-    return { id: p.id, name: p.id === currentUserId ? `${name} (you)` : name }
+    return p.id === currentUserId ? { id: p.id, name: `${name} (you)`, isYou: true } : { id: p.id, name }
   })
+  // The signed-in person first, so they're the easy pick; everyone else keeps their order.
+  members.sort((a, b) => Number(!!b.isYou) - Number(!!a.isYou))
   return { members, nameById }
 }

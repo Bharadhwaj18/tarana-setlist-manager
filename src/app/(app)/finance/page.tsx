@@ -104,7 +104,7 @@ export default async function FinancePage() {
   const isTreasurer = await isCurrentTreasurer()
   const memberNames = Object.fromEntries(profiles.map(p => [p.id, p.display_name ?? 'Member']))
 
-  const memberOptions = profiles.map(p => ({ id: p.id, name: p.id === user?.id ? 'You' : (p.display_name ?? 'Member') }))
+  const memberOptions = profiles.map(p => ({ id: p.id, name: p.id === user?.id ? 'You' : (p.display_name ?? 'Member'), isYou: p.id === user?.id })).sort((a, b) => Number(b.isYou) - Number(a.isYou))
   const myPendingPayments = user ? pendingPayments.filter(p => p.from_member === user.id) : []
 
   return (

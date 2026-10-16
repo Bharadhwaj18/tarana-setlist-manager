@@ -34,7 +34,7 @@ export default async function RecurringPage() {
       {header}
       <RecurringManager
         rules={rules}
-        members={profiles.map(p => ({ id: p.id, name: p.id === user?.id ? 'You' : (p.display_name ?? 'Member') }))}
+        members={profiles.map(p => ({ id: p.id, name: p.id === user?.id ? 'You' : (p.display_name ?? 'Member'), isYou: p.id === user?.id })).sort((a, b) => Number(b.isYou) - Number(a.isYou))}
         projects={projects}
         today={todayISO()}
         canEdit={ctx?.current.sections.finance === 'edit'}

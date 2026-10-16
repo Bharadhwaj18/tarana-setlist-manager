@@ -246,7 +246,8 @@ export async function createTask(input: {
     if (!bucketId) return { error: 'This board has no buckets' }
   }
 
-  const assigneeIds = [...new Set(input.assigneeIds ?? [])]
+  // Nobody named: the person adding it is doing it. Passing an empty list leaves it unassigned.
+  const assigneeIds = [...new Set(input.assigneeIds ?? [user.id])]
   const { data: task, error } = await supabase.from('tasks').insert({
     board_id: input.boardId,
     bucket_id: bucketId,
