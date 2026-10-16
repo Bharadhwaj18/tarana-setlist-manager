@@ -1,19 +1,58 @@
-name: Backup Supabase Database
+name: Backup Supabase
 
-# This repo is public, so backups never touch it — they're dumped and
-# pushed straight to a separate PRIVATE repo (Bharadhwaj18/db-dump). Only
-# the public schema is dumped, never auth/storage/other Supabase-internal
-# schemas, to keep the backup's blast radius to just this app's own data.
+# Full backup of the Supabase project into a separate PRIVATE repo (Bharadhwaj18/db-dump):
+#
+#   db/schema.sql      every table, column, constraint, index, function, trigger, RLS policy and grant
+#                      in the public schema
+#   db/data.sql        every row in public, auth (user accounts, logins) and storage (buckets, file records)
+#   db/extras.sql      our own policies/triggers on Supabase-managed tables (storage file access,
+#                      the sign-up -> profile trigger)
+#   storage/           every file in every Storage bucket, plus manifest.json
+#   RESTORE.md         how to bring all of it back
+#
+# Left out on purpose: live login sessions and refresh tokens (they are working credentials, and a
+# restore just asks people to sign in again), and Supabase's own migration bookkeeping tables.
+#
+# Runs every 15 minutes, on every push to main that changes the database migrations or this backup,
+# and on demand from the Actions tab. A run with nothing new commits nothing. Every earlier backup stays
+# in the private repo's git history.
+#
+# This repo is PUBLIC, so its Actions logs are public: nothing here prints row data, file names or secrets.
+#
+# Secrets: SUPABASE_DB_URL (session-mode connection string), BACKUP_REPO_TOKEN (push access to db-dump),
+#          SUPABASE_SERVICE_ROLE_KEY (to read Storage files).
 
 on:
   schedule:
-    - cron: '0 20 * * *' # 20:00 UTC daily (~1:30 AM IST)
-  workflow_dispatch: {} # lets you trigger a backup manually from the Actions tab
+    - cron: '*/15 * * * *'
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - '.github/workflows/backup.yml'
+      - '.github/scripts/backup-storage.mjs'
+      - '.github/backup/**'
+  workflow_dispatch: {}
+
+# Never two backups pushing at once; a queued one waits for the running one.
+concurrency:
+  group: supabase-backup
+  cancel-in-progress: false
+
+env:
+  SUPABASE_URL: https://qdoonmneblwmkxnbxqxq.supabase.co
 
 jobs:
   backup:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
       - name: Install PostgreSQL client
         # ubuntu-latest's default postgresql-client is older than Supabase's
         # Postgres version, and pg_dump refuses to dump from a server newer
@@ -22,30 +61,75 @@ jobs:
         # the latest major version PGDG offers rather than pinning one, so
         # this keeps working across future Supabase Postgres upgrades.
         run: |
-          sudo apt-get install -y postgresql-common
-          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -qq postgresql-common > /dev/null
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y > /dev/null
           latest=$(apt-cache search '^postgresql-client-[0-9]+$' | grep -oE '[0-9]+' | sort -n | tail -1)
-          sudo apt-get install -y "postgresql-client-$latest"
+          sudo apt-get install -y -qq "postgresql-client-$latest" > /dev/null
+          # Plain `pg_dump` on PATH still resolves to the runner's older client.
+          echo "PG_BIN=$(ls -d /usr/lib/postgresql/*/bin | sort -V | tail -1)" >> "$GITHUB_ENV"
 
-      - name: Dump the public schema
-        env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-        # Call the newest installed pg_dump explicitly — plain `pg_dump` on
-        # PATH still resolves to the runner's older preinstalled client,
-        # which refuses to dump a server newer than itself.
-        run: |
-          pg_dump_bin=$(ls -d /usr/lib/postgresql/*/bin/pg_dump | sort -V | tail -1)
-          "$pg_dump_bin" --schema=public --no-owner --no-privileges -F p -f backup.sql "$SUPABASE_DB_URL"
-
-      - name: Push to the private backups repo
+      - name: Clone the private backups repo
         env:
           TOKEN: ${{ secrets.BACKUP_REPO_TOKEN }}
         run: |
-          git clone https://x-access-token:${TOKEN}@github.com/Bharadhwaj18/db-dump.git backups-repo
-          cp backup.sql backups-repo/latest.sql
+          git clone -q "https://x-access-token:${TOKEN}@github.com/Bharadhwaj18/db-dump.git" backups-repo
+          mkdir -p backups-repo/db backups-repo/storage
+
+      - name: Dump the database
+        id: dump
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          out=backups-repo/db
+
+          # Structure of everything we own. Grants are kept (column-level grants matter for RLS);
+          # owners are not, so it restores into any project.
+          "$PG_BIN/pg_dump" "$SUPABASE_DB_URL" --schema-only --schema=public --no-owner -f "$out/schema.sql"
+          # A new Supabase project already has the public schema.
+          sed -i -e '/^CREATE SCHEMA public;$/d' -e '/^COMMENT ON SCHEMA public IS /d' "$out/schema.sql"
+
+          # Every row: our tables, user accounts, bucket and file records.
+          "$PG_BIN/pg_dump" "$SUPABASE_DB_URL" --data-only --no-owner --no-privileges \
+            --schema=public --schema=auth --schema=storage \
+            --exclude-table-data='auth.schema_migrations' \
+            --exclude-table-data='storage.migrations' \
+            --exclude-table-data='auth.sessions' \
+            --exclude-table-data='auth.refresh_tokens' \
+            --exclude-table-data='auth.mfa_amr_claims' \
+            --exclude-table-data='auth.flow_state' \
+            --exclude-table-data='auth.one_time_tokens' \
+            -f "$out/data.sql"
+
+          "$PG_BIN/psql" "$SUPABASE_DB_URL" -X -q -At -v ON_ERROR_STOP=1 -f .github/backup/extras-query.sql > "$out/extras.sql"
+
+          # Server version, for restoring into a matching Postgres.
+          "$PG_BIN/psql" "$SUPABASE_DB_URL" -X -q -At -c 'show server_version' > "$out/server_version.txt"
+
+          echo "Database: schema $(wc -c < "$out/schema.sql") bytes, data $(wc -c < "$out/data.sql") bytes"
+
+      - name: Back up Storage files
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          OUT_DIR: backups-repo/storage
+        run: node .github/scripts/backup-storage.mjs
+
+      - name: Push to the private backups repo
+        # Still push the database snapshot if only the Storage step failed; the run stays failed
+        # (and GitHub emails) so it gets noticed.
+        if: ${{ !cancelled() && steps.dump.outcome == 'success' }}
+        run: |
+          cp .github/backup/RESTORE.md backups-repo/RESTORE.md
           cd backups-repo
+          # The old single-file backup; its history stays in git.
+          git rm -q --ignore-unmatch latest.sql
           git config user.name "tarana-backup-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add latest.sql
-          git commit -m "Backup $(date -u +%Y-%m-%dT%H:%M:%SZ)" || echo "No changes since last backup"
-          git push
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes since the last backup"
+            exit 0
+          fi
+          git commit -q -m "Backup $(date -u +%Y-%m-%dT%H:%M:%SZ) (${{ github.event_name }})"
+          git push -q
+          echo "Backup pushed"
