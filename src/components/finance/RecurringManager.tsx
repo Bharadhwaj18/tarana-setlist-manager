@@ -16,6 +16,7 @@ import { StatusPill } from '@/components/ui/StatusPill'
 import { useToast } from '@/components/ui/Toaster'
 import { cn } from '@/lib/utils'
 import type { FinanceProject, FinanceRecurring } from '@/types/finance'
+import { Select } from '@/components/ui/Select'
 
 interface Member { id: string; name: string }
 
@@ -89,9 +90,9 @@ function RecurringForm({ existing, open, onOpenChange, members, projects, today 
           </div>
           <div>
             <label htmlFor="rec-freq" className={label}>How often</label>
-            <select id="rec-freq" className={select} value={frequency} onChange={e => setFrequency(e.target.value as RecurringFrequency)}>
+            <Select id="rec-freq" className={select} value={frequency} onChange={e => setFrequency(e.target.value as RecurringFrequency)}>
               {(Object.keys(FREQUENCY_LABELS) as RecurringFrequency[]).map(f => <option key={f} value={f}>{FREQUENCY_LABELS[f]}</option>)}
-            </select>
+            </Select>
           </div>
         </div>
         <div>
@@ -113,18 +114,18 @@ function RecurringForm({ existing, open, onOpenChange, members, projects, today 
         <div className={cn('grid gap-3', projectOptions.length > 0 && 'grid-cols-2')}>
           <div>
             <label htmlFor="rec-member" className={label}>{dir === 'in' ? 'Received by' : 'Paid by'}</label>
-            <select id="rec-member" className={select} value={memberId} onChange={e => setMemberId(e.target.value)}>
+            <Select id="rec-member" className={select} value={memberId} onChange={e => setMemberId(e.target.value)}>
               <option value="">Whoever set it up</option>
               {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
+            </Select>
           </div>
           {projectOptions.length > 0 && (
             <div>
               <label htmlFor="rec-project" className={label}>Project</label>
-              <select id="rec-project" className={select} value={projectId} onChange={e => setProjectId(e.target.value)}>
+              <Select id="rec-project" className={select} value={projectId} onChange={e => setProjectId(e.target.value)}>
                 <option value="">No project</option>
                 {projectOptions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+              </Select>
             </div>
           )}
         </div>

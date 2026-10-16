@@ -17,6 +17,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Button } from '@/components/ui/Button'
 import { BarList, ShowsDashboard, type ShowsInsights } from './ShowsDashboard'
 import type { Show } from '@/types'
+import { Select } from '@/components/ui/Select'
 
 interface ShowSearchListProps {
   shows: Show[]
@@ -182,7 +183,7 @@ export function ShowSearchList({ shows, netByShow, setlistByShow, today, eventMa
             />
           </div>
           {formats.length > 0 && (
-            <select
+            <Select
               value={format}
               onChange={e => setFormat(e.target.value)}
               aria-label="Filter by format"
@@ -190,7 +191,7 @@ export function ShowSearchList({ shows, netByShow, setlistByShow, today, eventMa
             >
               <option value="">All formats</option>
               {formats.map(f => <option key={f} value={f}>{f}</option>)}
-            </select>
+            </Select>
           )}
         </div>
       )}

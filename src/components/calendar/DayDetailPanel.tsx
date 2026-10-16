@@ -19,6 +19,7 @@ import { parseISODate } from '@/lib/dates'
 import { cn } from '@/lib/utils'
 import { externalLabel, type DayItems } from '@/lib/calendar'
 import { HATCH_ROW, KIND_BAR, type CalendarKind } from './calendarStyles'
+import { Select } from '@/components/ui/Select'
 
 interface Member { id: string; name: string }
 
@@ -227,9 +228,9 @@ export function DayDetailPanel({ date, items, members, boards = [], nameById, re
         <form onSubmit={handleAddUnavailable} className="space-y-3">
           <div>
             <Label htmlFor={`unavail-member-${layout}`}>Who&apos;s unavailable</Label>
-            <select id={`unavail-member-${layout}`} className={selectCls} value={memberId} onChange={e => setMemberId(e.target.value)}>
+            <Select id={`unavail-member-${layout}`} className={selectCls} value={memberId} onChange={e => setMemberId(e.target.value)}>
               {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
+            </Select>
           </div>
           <div>
             <Label htmlFor={`unavail-end-${layout}`}>Until</Label>

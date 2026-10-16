@@ -15,6 +15,7 @@ import { CREDIT_TEXT, DEBIT_TEXT } from './money'
 import type { FinanceTransaction } from '@/types/finance'
 import type { Show } from '@/types/shows'
 import type { Budget } from '@/types/budget'
+import { Select } from '@/components/ui/Select'
 
 interface Member { id: string; name: string }
 interface Props {
@@ -216,33 +217,33 @@ export function FinanceHistoryList({ transactions, members, shows, budgets, show
           <Chip active={dirFilter === 'credit'} onClick={() => setDirFilter('credit')}>Money in</Chip>
           <Chip active={dirFilter === 'debit'} onClick={() => setDirFilter('debit')}>Money out</Chip>
         </div>
-        <select value={memberFilter} onChange={e => setMemberFilter(e.target.value)} className={cn(fieldCls, 'shrink-0')} aria-label="Member">
+        <Select value={memberFilter} onChange={e => setMemberFilter(e.target.value)} className={cn(fieldCls, 'shrink-0')} aria-label="Member">
           <option value="all">Everyone</option>
           <option value="fund">Unattributed</option>
           {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-        </select>
-        <select value={typeFilter} onChange={e => setTypeFilter(e.target.value as typeof typeFilter)} className={cn(fieldCls, 'shrink-0')} aria-label="Type">
+        </Select>
+        <Select value={typeFilter} onChange={e => setTypeFilter(e.target.value as typeof typeFilter)} className={cn(fieldCls, 'shrink-0')} aria-label="Type">
           <option value="all">All types</option>
           <option value="misc">General</option>
           <option value="show">Shows</option>
-        </select>
+        </Select>
         {categoryKeys.length > 0 && (
-          <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className={cn(fieldCls, 'shrink-0')} aria-label="Category">
+          <Select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className={cn(fieldCls, 'shrink-0')} aria-label="Category">
             <option value="all">All categories</option>
             {categoryKeys.map(c => <option key={c} value={c}>{categoryLabel(moneySettings, c)}</option>)}
-          </select>
+          </Select>
         )}
         {usedTags.length > 0 && (
-          <select value={tagFilter} onChange={e => setTagFilter(e.target.value)} className={cn(fieldCls, 'shrink-0')} aria-label="Tag">
+          <Select value={tagFilter} onChange={e => setTagFilter(e.target.value)} className={cn(fieldCls, 'shrink-0')} aria-label="Tag">
             <option value="all">All tags</option>
             {usedTags.map(t => <option key={t} value={t}>#{t}</option>)}
-          </select>
+          </Select>
         )}
         {moneySettings.features.projects && usedProjects.length > 0 && (
-          <select value={projectFilter} onChange={e => setProjectFilter(e.target.value)} className={cn(fieldCls, 'shrink-0')} aria-label="Project">
+          <Select value={projectFilter} onChange={e => setProjectFilter(e.target.value)} className={cn(fieldCls, 'shrink-0')} aria-label="Project">
             <option value="all">All projects</option>
             {usedProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
+          </Select>
         )}
         <div className="relative order-first min-w-0 basis-full sm:order-none sm:ml-auto sm:basis-56">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-brand-300" />

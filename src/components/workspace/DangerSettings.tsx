@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/Input'
 import { useToast } from '@/components/ui/Toaster'
 import { deleteWorkspace, leaveWorkspace, transferOwnership } from '@/actions/workspace'
 import type { MemberRow } from './settings-types'
+import { Select } from '@/components/ui/Select'
 
 interface Props {
   workspaceName: string
@@ -64,10 +65,10 @@ export function DangerSettings({ workspaceName, members, isAdmin, isOwner }: Pro
             <p className="text-sm text-gray-400">There’s no one else in the workspace to hand it to yet.</p>
           ) : (
             <div className="flex flex-wrap items-center gap-2">
-              <select value={newOwner} onChange={e => setNewOwner(e.target.value)} aria-label="New owner" className="rounded-lg border border-brand-200 bg-white px-3 py-2 text-sm text-gray-900">
+              <Select value={newOwner} onChange={e => setNewOwner(e.target.value)} aria-label="New owner" className="rounded-lg border border-brand-200 bg-white px-3 py-2 text-sm text-gray-900">
                 <option value="">Choose a member…</option>
                 {candidates.map(m => <option key={m.userId} value={m.userId}>{m.name}</option>)}
-              </select>
+              </Select>
               <Button
                 variant="secondary"
                 loading={pending}

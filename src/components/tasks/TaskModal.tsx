@@ -16,6 +16,7 @@ import {
   TASK_PRIORITIES, TASK_PROGRESS, TASK_RECURRENCE, labelStyle,
   type LabelColor, type Member, type TaskBucket, type TaskLabel, type TaskPriority, type TaskProgress, type TaskRecurrence, type Task,
 } from '@/types/tasks'
+import { Select } from '@/components/ui/Select'
 
 interface Props {
   task: Task
@@ -141,21 +142,21 @@ export function TaskModal({ task, buckets, labels, members, onClose }: Props) {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
             <Label htmlFor="task-bucket">Bucket</Label>
-            <select id="task-bucket" className={selectClass} value={fields.bucketId} onChange={e => set('bucketId', e.target.value)}>
+            <Select id="task-bucket" className={selectClass} value={fields.bucketId} onChange={e => set('bucketId', e.target.value)}>
               {buckets.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
+            </Select>
           </div>
           <div>
             <Label htmlFor="task-progress">Progress</Label>
-            <select id="task-progress" className={selectClass} value={fields.progress} onChange={e => set('progress', e.target.value as TaskProgress)}>
+            <Select id="task-progress" className={selectClass} value={fields.progress} onChange={e => set('progress', e.target.value as TaskProgress)}>
               {TASK_PROGRESS.map(p => <option key={p} value={p}>{PROGRESS_LABELS[p]}</option>)}
-            </select>
+            </Select>
           </div>
           <div>
             <Label htmlFor="task-priority">Priority</Label>
-            <select id="task-priority" className={selectClass} value={fields.priority} onChange={e => set('priority', e.target.value as TaskPriority)}>
+            <Select id="task-priority" className={selectClass} value={fields.priority} onChange={e => set('priority', e.target.value as TaskPriority)}>
               {TASK_PRIORITIES.map(p => <option key={p} value={p}>{PRIORITY_LABELS[p]}</option>)}
-            </select>
+            </Select>
           </div>
         </div>
 
@@ -174,21 +175,21 @@ export function TaskModal({ task, buckets, labels, members, onClose }: Props) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="task-remind">Remind assignees</Label>
-              <select id="task-remind" className={selectClass} value={fields.remindPreset} onChange={e => set('remindPreset', e.target.value)}>
+              <Select id="task-remind" className={selectClass} value={fields.remindPreset} onChange={e => set('remindPreset', e.target.value)}>
                 <option value="">No reminder</option>
                 {REMINDER_PRESETS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                 <option value={CUSTOM}>Custom...</option>
-              </select>
+              </Select>
               {fields.remindPreset === CUSTOM && (
                 <Input type="number" min="0" step="1" placeholder="Days before" className="mt-1.5" value={fields.remindCustom} onChange={e => set('remindCustom', e.target.value)} />
               )}
             </div>
             <div>
               <Label htmlFor="task-repeat">Repeat</Label>
-              <select id="task-repeat" className={selectClass} value={fields.recurrence} onChange={e => set('recurrence', e.target.value as TaskRecurrence | '')}>
+              <Select id="task-repeat" className={selectClass} value={fields.recurrence} onChange={e => set('recurrence', e.target.value as TaskRecurrence | '')}>
                 <option value="">Doesn&apos;t repeat</option>
                 {TASK_RECURRENCE.map(r => <option key={r} value={r}>{RECURRENCE_LABELS[r]}</option>)}
-              </select>
+              </Select>
             </div>
             {fields.recurrence && (
               <p className="col-span-2 text-xs text-gray-500">

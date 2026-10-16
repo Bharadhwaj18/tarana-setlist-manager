@@ -6,6 +6,7 @@ import { Chip } from '@/components/ui/Chip'
 import { SongRow } from './SongRow'
 import type { Song } from '@/types'
 import type { CoverLink, PlayableSong } from '@/lib/song-references'
+import { Select } from '@/components/ui/Select'
 
 interface SongSearchListProps {
   songs: Song[]
@@ -65,7 +66,7 @@ export function SongSearchList({ songs, setlistCounts, playables, coverLinks }: 
           <Chip active={needsChart} onClick={() => setNeedsChart(v => !v)}>Needs chart {needChartCount}</Chip>
         )}
         {keys.length > 0 && (
-          <select
+          <Select
             value={key}
             onChange={e => setKey(e.target.value)}
             aria-label="Filter by key"
@@ -73,7 +74,7 @@ export function SongSearchList({ songs, setlistCounts, playables, coverLinks }: 
           >
             <option value="">Key</option>
             {keys.map(k => <option key={k} value={k}>{k}</option>)}
-          </select>
+          </Select>
         )}
       </div>
 

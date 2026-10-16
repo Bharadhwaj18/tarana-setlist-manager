@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/Textarea'
 import { Modal } from '@/components/ui/Modal'
 import { sendNotification, sendNotificationToAll } from '@/actions/notifications'
 import { useToast } from '@/components/ui/Toaster'
+import { Select } from '@/components/ui/Select'
 
 interface Member { id: string; name: string }
 
@@ -60,7 +61,7 @@ export function SendNotificationModal({ members }: Props) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="recipient">To</Label>
-            <select
+            <Select
               id="recipient"
               className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm transition-colors focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
               value={recipientId}
@@ -68,7 +69,7 @@ export function SendNotificationModal({ members }: Props) {
             >
               {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
               <option value={ALL}>Everyone</option>
-            </select>
+            </Select>
           </div>
           <div>
             <Label htmlFor="title">Title</Label>

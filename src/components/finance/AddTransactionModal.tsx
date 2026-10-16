@@ -14,6 +14,7 @@ import { todayISO } from '@/lib/shows'
 import type { FinanceProject, FinanceTransaction } from '@/types/finance'
 import type { Show } from '@/types/shows'
 import type { Budget } from '@/types/budget'
+import { Select } from '@/components/ui/Select'
 
 interface Member { id: string; name: string }
 interface Props {
@@ -321,10 +322,10 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
           {isReimbursement && (
             <div>
               <label htmlFor="entry-reimburse" className={labelCls}>Who gets this back?</label>
-              <select id="entry-reimburse" value={memberId === AUTO ? '' : memberId} onChange={e => set('memberId', e.target.value)} className={inputCls} required>
+              <Select id="entry-reimburse" value={memberId === AUTO ? '' : memberId} onChange={e => set('memberId', e.target.value)} className={inputCls} required>
                 <option value="" disabled>Choose a person</option>
                 {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-              </select>
+              </Select>
               <p className="mt-1 text-xs text-gray-500">
                 Paid back to them in full when the show is split — never taken from their {settings.fundName} balance.
               </p>
@@ -335,11 +336,11 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
           {!lockedShow && (
             <div>
               <label htmlFor="entry-show" className={labelCls}>Is it for a show? <span className="font-normal text-gray-500">(optional)</span></label>
-              <select id="entry-show" value={showId} onChange={e => set('showId', e.target.value)} className={inputCls}>
+              <Select id="entry-show" value={showId} onChange={e => set('showId', e.target.value)} className={inputCls}>
                 <option value={NO_SHOW}>No, not for a show</option>
                 {availableShows.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
                 <option value={NEW_SHOW}>+ A new show…</option>
-              </select>
+              </Select>
               {showId === NEW_SHOW && (
                 <input
                   type="text"
@@ -360,10 +361,10 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
             {!isReimbursement && (
               <div>
                 <label htmlFor="entry-member" className={labelCls}>{dir === 'credit' ? 'Who got the money?' : 'Who paid?'}</label>
-                <select id="entry-member" value={memberId} onChange={e => set('memberId', e.target.value)} className={inputCls}>
+                <Select id="entry-member" value={memberId} onChange={e => set('memberId', e.target.value)} className={inputCls}>
                   <option value={AUTO}>Me</option>
                   {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                </select>
+                </Select>
               </div>
             )}
             <div className={cn(isReimbursement && 'col-span-2')}>
@@ -425,20 +426,20 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
                 {projectOptions.length > 0 && (
                   <div>
                     <label htmlFor="entry-project" className={labelCls}>Project</label>
-                    <select id="entry-project" value={projectId} onChange={e => set('projectId', e.target.value)} className={inputCls}>
+                    <Select id="entry-project" value={projectId} onChange={e => set('projectId', e.target.value)} className={inputCls}>
                       <option value="">No project</option>
                       {projectOptions.map(p => <option key={p.id} value={p.id}>{p.name}{p.archived_at ? ' (finished)' : ''}</option>)}
-                    </select>
+                    </Select>
                   </div>
                 )}
 
                 {showBudgetField && (
                   <div>
                     <label htmlFor="entry-budget" className={labelCls}>Budget</label>
-                    <select id="entry-budget" value={budgetId} onChange={e => set('budgetId', e.target.value)} className={inputCls}>
+                    <Select id="entry-budget" value={budgetId} onChange={e => set('budgetId', e.target.value)} className={inputCls}>
                       <option value={NO_BUDGET}>No budget</option>
                       {budgetOptions.map(b => <option key={b.id} value={b.id}>{b.name}{b.status === 'closed' ? ' (closed)' : ''}</option>)}
-                    </select>
+                    </Select>
                   </div>
                 )}
               </div>

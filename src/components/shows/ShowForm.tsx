@@ -15,6 +15,7 @@ import { computeTds } from '@/lib/finance/tds'
 import type { ShowFormData } from '@/lib/validators'
 import type { Show, EventManagement } from '@/types'
 import { BOOKING_STATUSES, SHOW_FORMATS } from '@/types/shows'
+import { Select } from '@/components/ui/Select'
 
 interface ShowFormProps {
   show?: Show
@@ -193,7 +194,7 @@ export function ShowForm({ show, eventManagementCompanies = [], onSubmit, initia
         <SectionLabel>Booking &amp; contact</SectionLabel>
         <div>
           <Label htmlFor="event_management_id">Booked through</Label>
-          <select
+          <Select
             id="event_management_id"
             className={selectClass}
             value={fields.event_management_id}
@@ -201,7 +202,7 @@ export function ShowForm({ show, eventManagementCompanies = [], onSubmit, initia
           >
             <option value={DIRECT_BOOKING}>Direct booking</option>
             {eventManagementCompanies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          </Select>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>

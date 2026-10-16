@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useToast } from '@/components/ui/Toaster'
 import { cn } from '@/lib/utils'
+import { Select } from '@/components/ui/Select'
 
 interface Member { id: string; name: string }
 
@@ -171,9 +172,9 @@ export function MoneySettings({ initial, members, canEdit, usedTags = [] }: Prop
           </div>
           <div>
             <label htmlFor="currency" className={label}>Currency</label>
-            <select id="currency" className={select} value={s.currency} disabled={!canEdit} onChange={e => set('currency', e.target.value as FinanceSettings['currency'])}>
+            <Select id="currency" className={select} value={s.currency} disabled={!canEdit} onChange={e => set('currency', e.target.value as FinanceSettings['currency'])}>
               {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
-            </select>
+            </Select>
             <p className="mt-1 text-xs text-gray-500">Only changes how amounts are shown. Nothing is converted.</p>
           </div>
         </div>
@@ -193,11 +194,11 @@ export function MoneySettings({ initial, members, canEdit, usedTags = [] }: Prop
                 <div key={c.id} className="grid grid-cols-[1fr_1fr_88px_36px] items-center gap-2">
                   <Input aria-label="What is this cut for" value={c.label} maxLength={40} disabled={!canEdit} placeholder="Manager"
                     onChange={e => set('cuts', s.cuts.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} />
-                  <select aria-label="Who gets it" className={select} value={c.memberId} disabled={!canEdit}
+                  <Select aria-label="Who gets it" className={select} value={c.memberId} disabled={!canEdit}
                     onChange={e => set('cuts', s.cuts.map((x, j) => (j === i ? { ...x, memberId: e.target.value } : x)))}>
                     <option value="">Who gets it?</option>
                     {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                  </select>
+                  </Select>
                   <div className="relative">
                     <Input aria-label="Percent" type="number" min={0} max={100} step="any" value={c.percent} disabled={!canEdit} className="pr-7"
                       onChange={e => set('cuts', s.cuts.map((x, j) => (j === i ? { ...x, percent: Math.max(0, Math.min(100, Number(e.target.value) || 0)) } : x)))} />

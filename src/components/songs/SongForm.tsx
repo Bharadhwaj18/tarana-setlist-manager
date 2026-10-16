@@ -6,6 +6,7 @@ import { useForm, useWatch, Controller, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { songSchema, type SongFormData } from '@/lib/validators'
 import { Button } from '@/components/ui/Button'
+import { Select } from '@/components/ui/Select'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -104,10 +105,12 @@ export function SongForm({ song, onSubmit, title, backHref, backLabel }: SongFor
         </div>
         <div className="sm:col-span-2">
           <Label htmlFor="song_key">Key</Label>
-          <select id="song_key" className={selectClass} {...register('song_key')}>
-            <option value="">—</option>
-            {MUSICAL_KEYS.map(k => <option key={k} value={k}>{k}</option>)}
-          </select>
+          <Controller name="song_key" control={control} render={({ field }) => (
+            <Select id="song_key" className={selectClass} value={field.value ?? ''} onChange={e => field.onChange(e.target.value)}>
+              <option value="">—</option>
+              {MUSICAL_KEYS.map(k => <option key={k} value={k}>{k}</option>)}
+            </Select>
+          )} />
         </div>
         <div className="sm:col-span-2">
           <Label htmlFor="bpm">Tempo (BPM)</Label>
@@ -115,9 +118,11 @@ export function SongForm({ song, onSubmit, title, backHref, backLabel }: SongFor
         </div>
         <div className="col-span-2 sm:col-span-2">
           <Label htmlFor="time_signature">Time signature</Label>
-          <select id="time_signature" className={selectClass} {...register('time_signature')}>
-            {TIME_SIGNATURES.map(ts => <option key={ts} value={ts}>{ts}</option>)}
-          </select>
+          <Controller name="time_signature" control={control} render={({ field }) => (
+            <Select id="time_signature" className={selectClass} value={field.value ?? '4/4'} onChange={e => field.onChange(e.target.value)}>
+              {TIME_SIGNATURES.map(ts => <option key={ts} value={ts}>{ts}</option>)}
+            </Select>
+          )} />
         </div>
         <div className="col-span-2 sm:col-span-6">
           <Label htmlFor="notes">Band notes</Label>

@@ -16,6 +16,7 @@ import { AddTransactionModal } from '@/components/finance/AddTransactionModal'
 import type { FinanceTransaction } from '@/types/finance'
 import type { Show } from '@/types/shows'
 import type { SplitRunReport } from '@/types/split-run'
+import { Select } from '@/components/ui/Select'
 
 interface Member { id: string; name: string }
 interface Props {
@@ -666,7 +667,7 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
                       <div className="mt-2 space-y-1.5 pl-0 sm:pl-11">
                         {rows.map((row, i) => (
                           <div key={i} className="flex items-center gap-1.5">
-                            <select
+                            <Select
                               value={row.payerId}
                               onChange={e => updateAssignment(id, i, { payerId: e.target.value })}
                               className="min-w-0 flex-1 rounded-lg border border-brand-200 bg-white px-2 py-2 text-xs text-gray-900 focus:border-brand-400 focus:outline-none"
@@ -675,7 +676,7 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
                               {members.map(m => (
                                 <option key={m.id} value={m.id}>{m.id === id ? `${m.name} (self, from ${moneySettings.fundName})` : m.name}</option>
                               ))}
-                            </select>
+                            </Select>
                             <input
                               type="number"
                               value={row.amount || ''}

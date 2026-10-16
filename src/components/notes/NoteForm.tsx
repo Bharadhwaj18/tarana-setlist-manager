@@ -6,6 +6,7 @@ import type { ChecklistItemInput, NoteFormData } from '@/actions/notes'
 import { cn } from '@/lib/utils'
 import { NOTE_COLORS, NOTE_COLOR_CLASSES, NOTE_TEMPLATES, type NoteTemplate, type NoteVisibility } from '@/types/notes'
 import type { Note, ChecklistItem } from '@/types'
+import { Select } from '@/components/ui/Select'
 
 export interface NoteFields {
   title: string
@@ -197,14 +198,14 @@ export function NoteForm({ fields, onChange, links, canChangeVisibility = true, 
 
       {linkOpen && (
         <div className="grid gap-2 sm:grid-cols-2">
-          <select aria-label="Show" value={fields.showId} onChange={e => set('showId', e.target.value)} className="compact-field rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-sm text-gray-800">
+          <Select aria-label="Show" value={fields.showId} onChange={e => set('showId', e.target.value)} className="compact-field rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-sm text-gray-800">
             <option value="">No show</option>
             {links.shows.map(s => <option key={s.id} value={s.id}>{s.title}{s.date ? ` · ${s.date}` : ''}</option>)}
-          </select>
-          <select aria-label="Song" value={fields.songId} onChange={e => set('songId', e.target.value)} className="compact-field rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-sm text-gray-800">
+          </Select>
+          <Select aria-label="Song" value={fields.songId} onChange={e => set('songId', e.target.value)} className="compact-field rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-sm text-gray-800">
             <option value="">No song</option>
             {links.songs.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
-          </select>
+          </Select>
         </div>
       )}
 

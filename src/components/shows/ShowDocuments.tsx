@@ -12,6 +12,7 @@ import {
   DOCUMENT_ACCEPT, DOCUMENT_BUCKET, DOCUMENT_KINDS, DOCUMENT_KIND_LABELS, DOCUMENT_MAX_BYTES,
   type DocumentKind, type ShowDocument,
 } from '@/types/show-document'
+import { Select } from '@/components/ui/Select'
 
 interface Props {
   showId: string
@@ -110,14 +111,14 @@ export function ShowDocuments({ showId, userId, documents }: Props) {
       )}
 
       <div className="flex flex-wrap items-center gap-2">
-        <select
+        <Select
           value={kind}
           onChange={e => setKind(e.target.value as DocumentKind)}
           aria-label="Document type"
           className="rounded-md border border-gray-300 bg-white px-2 py-2 text-sm text-gray-900"
         >
           {DOCUMENT_KINDS.map(k => <option key={k} value={k}>{DOCUMENT_KIND_LABELS[k]}</option>)}
-        </select>
+        </Select>
         <Button type="button" variant="secondary" loading={busy} onClick={() => fileRef.current?.click()}>
           <Upload className="mr-1.5 h-4 w-4" /> Add file
         </Button>

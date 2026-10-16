@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils'
 import type { SectionLevels } from '@/lib/workspace-sections'
 import { SectionAccessGrid, accessSummary, allSections } from './SectionAccessGrid'
 import type { InviteRow } from './settings-types'
+import { Select } from '@/components/ui/Select'
 
 const fieldCls = 'mt-1 block w-full rounded-lg border border-brand-200 bg-white px-3 py-2 text-sm text-gray-900'
 const label = 'mb-1.5 block text-sm font-bold text-gray-800'
@@ -153,9 +154,9 @@ export function InvitesSettings({ invites, workspaceName }: { invites: InviteRow
           <div className="grid max-w-md grid-cols-2 gap-3">
             <label className="text-xs font-semibold text-gray-600">
               Expires in
-              <select value={days} onChange={e => setDays(Number(e.target.value))} className={fieldCls}>
+              <Select value={days} onChange={e => setDays(Number(e.target.value))} className={fieldCls}>
                 {[1, 3, 7, 14, 30].map(d => <option key={d} value={d}>{d} {d === 1 ? 'day' : 'days'}</option>)}
-              </select>
+              </Select>
             </label>
             <label className="text-xs font-semibold text-gray-600">
               How many people

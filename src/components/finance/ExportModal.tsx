@@ -11,6 +11,7 @@ import { useToast } from '@/components/ui/Toaster'
 import { buildTransactionStatementPdf } from '@/lib/pdf/financeReports'
 import { todayISO } from '@/lib/shows'
 import { addDaysISO } from '@/lib/dates'
+import { Select } from '@/components/ui/Select'
 
 interface Member { id: string; name: string }
 
@@ -129,11 +130,11 @@ export function ExportModal({ members }: { members: Member[] }) {
           {/* Member filter */}
           <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-700">Member</label>
-            <select value={memberId} onChange={e => setMemberId(e.target.value)} className={inputCls}>
+            <Select value={memberId} onChange={e => setMemberId(e.target.value)} className={inputCls}>
               <option value="all">All members</option>
               <option value="fund">{settings.fundName} only</option>
               {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
+            </Select>
           </div>
 
           {/* Format */}

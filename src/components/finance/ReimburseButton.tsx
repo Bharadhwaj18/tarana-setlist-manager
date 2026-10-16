@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/Button'
 import { requestBalanceReimbursement } from '@/actions/pending-payments'
 import { useToast } from '@/components/ui/Toaster'
+import { Select } from '@/components/ui/Select'
 
 interface Props {
   memberId: string
@@ -35,14 +36,14 @@ export function ReimburseButton({ memberId, payers }: Props) {
 
   return (
     <div className="mt-1.5 flex items-center gap-2">
-      <select
+      <Select
         value={payerId}
         onChange={e => setPayerId(e.target.value)}
         className="compact-field min-w-0 flex-1 rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-[11px]"
       >
         <option value="">Who pays?</option>
         {options.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-      </select>
+      </Select>
       <Button size="sm" loading={isPending} disabled={!payerId} onClick={submit}>Assign</Button>
       <button type="button" onClick={() => setOpen(false)} className="text-[11px] text-gray-500">Cancel</button>
     </div>

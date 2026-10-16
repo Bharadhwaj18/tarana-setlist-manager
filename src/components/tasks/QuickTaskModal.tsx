@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/Toaster'
 import { createTask } from '@/actions/tasks'
 import { AssigneePicker } from './AssigneePicker'
 import type { Member } from '@/types/tasks'
+import { Select } from '@/components/ui/Select'
 
 interface Props {
   boards: { id: string; name: string }[]
@@ -77,9 +78,9 @@ export function QuickTaskModal({ boards, members, open, onOpenChange, dueDate }:
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="qt-board">Board</Label>
-              <select id="qt-board" className={selectClass} value={boardId} onChange={e => setBoardId(e.target.value)}>
+              <Select id="qt-board" className={selectClass} value={boardId} onChange={e => setBoardId(e.target.value)}>
                 {boards.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
+              </Select>
             </div>
             <div>
               <Label htmlFor="qt-due">Due date</Label>
