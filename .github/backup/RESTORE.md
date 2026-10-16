@@ -44,11 +44,13 @@ project.
      bucket="${f%%/*}"; path="${f#*/}"
      curl -sf -X POST "$NEW_SUPABASE_URL/storage/v1/object/$bucket/$path" \
        -H "Authorization: Bearer $NEW_SERVICE_ROLE_KEY" -H "x-upsert: true" \
+       -H "Content-Type: $(file -b --mime-type "$f")" \
        --data-binary @"$f" > /dev/null || echo "FAILED: $f"
    done
    ```
 
-   The buckets themselves came back with `db/data.sql`. The file records in `storage.objects` also
+   The real content type matters: the avatar buckets only accept images. The buckets themselves came
+   back with `db/data.sql`. The file records in `storage.objects` also
    came back; uploading with `x-upsert` puts the real bytes behind them.
 
 5. Point the app at the new project: update `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
@@ -56,6 +58,14 @@ project.
    `SUPABASE_SERVICE_ROLE_KEY` secrets in GitHub so backups follow it.
 6. In the new project's Auth settings, copy over the Site URL, redirect URLs, email templates and any
    sign-in providers. Those live in the Supabase dashboard, not the database.
+
+## Last tested
+
+2026-10-16, into a local Supabase (`npx supabase start`, Postgres 17). Every table's row count, the
+user accounts, all permissions and access rules, and the Storage files matched the live project, and
+a restored user could sign in and saw exactly what they see live. To re-test the same way, point the
+steps above at a local stack: `NEW_DB_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres`,
+and the URL and service-role key from `npx supabase status`.
 
 ## Getting back a single row or file
 
