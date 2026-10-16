@@ -348,7 +348,7 @@ function PhoneRow({ task: t, c, fields, open, onToggle, last, onPatch }: { task:
               {t.due_date ? `${overdue ? 'Overdue · ' : 'Due '}${shortDate(t.due_date)}` : 'No date'}
             </span>
           </span>
-          {t.assignee_ids.length > 0 && <Faces ids={t.assignee_ids.slice(0, 1)} c={c} size={26} />}
+          {t.assignee_ids.length > 0 && <Faces ids={t.assignee_ids} c={c} size={26} />}
           <span className="flex h-9 w-9 shrink-0 items-center justify-center text-gray-400">{open ? <ChevronDown className="h-4 w-4 rotate-180" /> : <ChevronDown className="h-4 w-4" />}</span>
         </button>
       </div>
