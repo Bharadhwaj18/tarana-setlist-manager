@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { todayISO } from '@/lib/shows'
 import { sendNotification } from '@/actions/notifications'
-import { hasWorkspacePermission, requireWorkspaceId } from '@/lib/workspace'
+import { requireWorkspaceId } from '@/lib/workspace'
 
 const BALANCE_REIMBURSEMENT = 'balance_reimbursement'
 
@@ -105,48 +105,11 @@ export async function markPendingPaymentPaid(id: string): Promise<{ error?: stri
   if (!pending) return { error: 'This payment no longer exists.' }
   if (pending.paid_at) return { error: 'Already marked paid.' }
 
-  if (pending.from_member !== user.id) {
-    const wsId = pending.workspace_id ?? (await requireWorkspaceId())
-    if (!(await hasWorkspacePermission(user.id, wsId, 'treasurer'))) return { error: 'Only the payer (or a treasurer) can mark this paid.' }
-  }
-
-  const { data: txn, error: txErr } = await supabase
-    .from('finance_transactions')
-    .insert({
-      member_id: pending.from_member,
-      amount: -pending.amount,
-      description: pending.description,
-      category: pending.category,
-      show_id: pending.show_id,
-      date: todayISO(),
-      recorded_by: user.id,
-      workspace_id: pending.workspace_id,
-    })
-    .select('id')
-    .single()
-  if (txErr) return { error: txErr.message }
-
-  // A balance reimbursement isn't a split share: the recipient's negative
-  // balance only returns to 0 if they're credited what the payer hands over.
-  if (pending.category === BALANCE_REIMBURSEMENT) {
-    const { error: creditErr } = await supabase.from('finance_transactions').insert({
-      member_id: pending.to_member,
-      amount: pending.amount,
-      description: pending.description,
-      category: pending.category,
-      show_id: null,
-      date: todayISO(),
-      recorded_by: user.id,
-      workspace_id: pending.workspace_id,
-    })
-    if (creditErr) return { error: creditErr.message }
-  }
-
-  const { error: updateErr } = await supabase
-    .from('pending_payments')
-    .update({ paid_at: new Date().toISOString(), paid_transaction_id: txn.id })
-    .eq('id', id)
-  if (updateErr) return { error: updateErr.message }
+  // One database call does the debit, the recipient's credit for a balance
+  // reimbursement, and the paid stamp together — and checks payer-or-treasurer
+  // itself, so it works even with treasurer approval switched on.
+  const { error: payErr } = await supabase.rpc('mark_pending_payment_paid', { p_id: id, p_date: todayISO() })
+  if (payErr) return { error: payErr.message }
 
   if (pending.to_member !== user.id) {
     const { data: actor } = await supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle()

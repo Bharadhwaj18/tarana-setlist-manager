@@ -1317,6 +1317,8 @@ export type Database = {
       rename_finance_tag: { Args: { p_ws: string; p_old: string; p_new?: string | null }; Returns: undefined }
       approve_finance_request: { Args: { p_id: string }; Returns: string }
       approve_all_finance_requests: { Args: { p_ws: string }; Returns: number }
+      mark_pending_payment_paid: { Args: { p_id: string; p_date?: string }; Returns: string }
+      save_push_subscription: { Args: { p_endpoint: string; p_p256dh: string; p_auth: string }; Returns: undefined }
       transfer_workspace_ownership: { Args: { p_ws: string; p_new_owner: string }; Returns: undefined }
       workspace_attention: {
         Args: Record<string, never>

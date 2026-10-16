@@ -16,15 +16,13 @@ export async function subscribeToPush(subscription: PushSubscriptionData): Promi
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
-  const { error } = await supabase.from('push_subscriptions').upsert(
-    {
-      profile_id: user.id,
-      endpoint: subscription.endpoint,
-      p256dh: subscription.keys.p256dh,
-      auth: subscription.keys.auth,
-    },
-    { onConflict: 'endpoint' }
-  )
+  // Through a function, not an upsert: RLS keeps other people's rows invisible,
+  // so an endpoint last used by someone else on this browser couldn't be taken over.
+  const { error } = await supabase.rpc('save_push_subscription', {
+    p_endpoint: subscription.endpoint,
+    p_p256dh: subscription.keys.p256dh,
+    p_auth: subscription.keys.auth,
+  })
   if (error) return { error: error.message }
   return {}
 }
@@ -68,7 +66,7 @@ export async function sendNotification({ recipientId, title, body, link, type }:
   if (error) return { error: error.message }
 
   try {
-    await sendPushToProfile(supabase, recipientId, { title, body, link })
+    await sendPushToProfile(recipientId, { title, body, link })
   } catch {
     // Push is a bonus on top of the in-app notification — never fail the
     // action just because a push send hiccupped.
@@ -121,7 +119,7 @@ export async function sendNotificationToAll({ title, body, link, type }: SendNot
   if (error) return { error: error.message }
 
   await Promise.allSettled(
-    profiles.map(p => sendPushToProfile(supabase, p.id, { title, body, link }))
+    profiles.map(p => sendPushToProfile(p.id, { title, body, link }))
   )
 
   revalidatePath('/', 'layout')

@@ -1,6 +1,5 @@
 import webpush from 'web-push'
-import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Database } from '@/types/database'
+import { createServiceClient } from '@/lib/supabase/service'
 
 // Server-only — imports web-push, which needs Node's crypto for VAPID
 // signing. Never import this from a client component, and never move
@@ -47,12 +46,14 @@ export function findDeadEndpoints<T extends { endpoint: string }>(
  * the source of truth; push is just a bonus alert on top of it. Any
  * subscription that comes back 404/410 (the browser unsubscribed or the
  * endpoint expired) is pruned so it stops being retried forever.
+ *
+ * Reads the recipient's subscriptions with the service-role client: RLS only
+ * lets a user see their own devices. Call this only after the notifications
+ * row was written, so the RLS check on that insert is what decides who may
+ * be pushed to.
  */
-export async function sendPushToProfile(
-  supabase: SupabaseClient<Database>,
-  profileId: string,
-  payload: PushPayload
-) {
+export async function sendPushToProfile(profileId: string, payload: PushPayload) {
+  const supabase = createServiceClient()
   const { data: subscriptions } = await supabase
     .from('push_subscriptions')
     .select('*')

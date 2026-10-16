@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
       })
       if (!error) {
         sent++
-        await sendPushToProfile(supabase, recipientId, { title: `"${task.title}" is due ${dueLabel}`, link })
+        await sendPushToProfile(recipientId, { title: `"${task.title}" is due ${dueLabel}`, link })
       }
     }
   }
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
         })
         if (!error) {
           sent++
-          await sendPushToProfile(supabase, profile.id, { title, body, link: `/shows/${show.id}` })
+          await sendPushToProfile(profile.id, { title, body, link: `/shows/${show.id}` })
         }
       }
     }
