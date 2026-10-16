@@ -10,7 +10,7 @@ import { DeleteSetlistButton } from '@/components/setlists/DeleteSetlistButton'
 import { ActiveSetlistSync } from '@/components/setlists/ActiveSetlistSync'
 import { SetlistPdfExport } from '@/components/pdf/SetlistPdfExport'
 import { SaveOfflineButton } from '@/components/setlists/SaveOfflineButton'
-import { RehearseButton } from '@/components/references/Rehearse'
+import { RehearseCard } from '@/components/references/Rehearse'
 import { getCachedReferenceRows } from '@/lib/data'
 import { coverLinksBySong, firstReferenceBySong } from '@/lib/song-references'
 import { Button } from '@/components/ui/Button'
@@ -102,6 +102,8 @@ export default async function SetlistPage({ params }: Props) {
         </div>
       </div>
 
+      <RehearseCard songs={rehearsal} />
+
       <div className="grid gap-5 lg:h-[calc(100vh-14rem)] lg:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)]">
         {/* Songs */}
         <div className="no-scrollbar min-w-0 lg:overflow-y-auto lg:pb-6">
@@ -137,7 +139,6 @@ export default async function SetlistPage({ params }: Props) {
           <div className="rounded-2xl bg-hero p-5 text-hero-fg">
             <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-sidebar-accent">Show night</p>
             <div className="mt-3 flex flex-wrap gap-2">
-              <RehearseButton songs={rehearsal} />
               <SaveOfflineButton
                 setlistId={id}
                 setlistTitle={setlist.title}

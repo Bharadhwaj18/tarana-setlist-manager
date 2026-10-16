@@ -21,6 +21,8 @@ export interface YTPlayer {
   playVideo(): void
   pauseVideo(): void
   getCurrentTime(): number
+  /** 1 = playing, 2 = paused, 0 = ended. */
+  getPlayerState(): number
   destroy(): void
 }
 interface YTNamespace {
@@ -38,10 +40,11 @@ export interface SCWidget {
   seekTo(ms: number): void
   play(): void
   pause(): void
+  toggle(): void
   bind(event: string, cb: (e?: { currentPosition?: number }) => void): void
 }
 interface SCNamespace {
-  Widget: ((el: HTMLIFrameElement) => SCWidget) & { Events: { FINISH: string; PLAY_PROGRESS: string } }
+  Widget: ((el: HTMLIFrameElement) => SCWidget) & { Events: { FINISH: string; PLAY_PROGRESS: string; PLAY: string; PAUSE: string } }
 }
 
 declare global {

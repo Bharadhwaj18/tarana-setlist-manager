@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, ExternalLink, Headphones, SkipBack, SkipForward } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import { ChevronDown, ExternalLink, Headphones, Pause, Play, SkipBack, SkipForward } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SOURCE_NAMES, formatTime, type PlayableSong } from '@/lib/song-references'
 import { usePlayer } from '@/components/player/PlayerProvider'
@@ -11,19 +10,34 @@ import { EmbedPlayer, type EmbedHandle } from './EmbedPlayer'
 import { ServiceMark } from './ServiceMark'
 import { Cover } from './Cover'
 
-/** "Rehearse" on a setlist: plays each song's reference in setlist order, skipping songs without one. */
-export function RehearseButton({ songs }: { songs: PlayableSong[] }) {
+/**
+ * Rehearse, at the top of a setlist: plays each song's reference in set order, skipping songs without one.
+ * With no references yet it says how to get some, rather than hiding.
+ */
+export function RehearseCard({ songs }: { songs: PlayableSong[] }) {
   const [open, setOpen] = useState(false)
   const { close } = usePlayer()
-  const playable = songs.filter(s => s.reference).length
-  if (playable === 0) return null
+  const ready = songs.filter(s => s.reference).length
+  if (songs.length === 0) return null
   return (
-    <>
-      <Button variant="secondary" size="sm" onClick={() => { close(); setOpen(true) }}>
-        <Headphones className="h-4 w-4" /> Rehearse
-      </Button>
+    <section aria-label="Rehearse this set" className="mb-6 flex items-center gap-3 rounded-2xl bg-hero p-4 text-hero-fg sm:gap-4 sm:p-5">
+      <span aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-hero-fg/10"><Headphones className="h-6 w-6" /></span>
+      <div className="min-w-0 flex-1">
+        <h2 className="font-display text-lg font-bold leading-tight">Rehearse this set</h2>
+        <p className="mt-0.5 text-sm text-hero-muted">
+          {ready > 0
+            ? `Plays each song’s reference in order · ${ready} of ${songs.length} ${songs.length === 1 ? 'song' : 'songs'} ready`
+            : 'Add a Spotify or YouTube link to a song in this set to rehearse along with it.'}
+        </p>
+      </div>
+      {ready > 0 && (
+        <button type="button" onClick={() => { close(); setOpen(true) }}
+          className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full bg-hero-fg px-5 text-sm font-extrabold text-hero transition-opacity hover:opacity-90">
+          <Play className="h-4 w-4" />Start
+        </button>
+      )}
       {open && <RehearseView songs={songs} onClose={() => setOpen(false)} />}
-    </>
+    </section>
   )
 }
 
@@ -33,13 +47,14 @@ function RehearseView({ songs, onClose }: { songs: PlayableSong[]; onClose: () =
   // Only after the first song has been started by hand do later songs try to start on their own.
   const [started, setStarted] = useState(false)
   const [activeMoment, setActiveMoment] = useState<number | null>(null)
+  const [playing, setPlaying] = useState(false)
   const player = useRef<EmbedHandle>(null)
   const song = songs[index]
   const ref = song?.reference
 
   const step = (dir: 1 | -1) => {
     for (let i = index + dir; i >= 0 && i < songs.length; i += dir) {
-      if (songs[i].reference) { setIndex(i); setActiveMoment(null); return }
+      if (songs[i].reference) { setIndex(i); setActiveMoment(null); setPlaying(false); return }
     }
   }
   const nextPlayable = songs.findIndex((s, i) => i > index && s.reference)
@@ -83,13 +98,17 @@ function RehearseView({ songs, onClose }: { songs: PlayableSong[]; onClose: () =
           </div>
         </div>
 
-        <EmbedPlayer key={ref.id} ref={player} reference={ref} autoPlay={started} onEnded={() => { setStarted(true); step(1) }} />
+        <EmbedPlayer key={ref.id} ref={player} reference={ref} autoPlay={started} onEnded={() => { setStarted(true); step(1) }} onPlayingChange={setPlaying} />
 
         <div className="flex items-center justify-center gap-6">
           <button type="button" onClick={() => step(-1)} disabled={prevPlayable < 0} aria-label="Previous song"
             className="flex h-12 w-12 items-center justify-center rounded-full text-gray-800 hover:bg-brand-100 disabled:opacity-30"><SkipBack className="h-6 w-6" /></button>
-          <button type="button" onClick={() => { setStarted(true); step(1) }} disabled={nextPlayable < 0}
-            className="inline-flex min-h-12 items-center gap-2 rounded-full bg-brand-600 px-6 text-sm font-extrabold text-white hover:bg-brand-700 disabled:opacity-40">Next song<SkipForward className="h-4 w-4" /></button>
+          <button type="button" onClick={() => { setStarted(true); player.current?.toggle() }} aria-label={playing ? 'Pause' : 'Play'}
+            className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-600 text-white shadow-md transition-transform hover:bg-brand-700 active:scale-95">
+            {playing ? <Pause className="h-7 w-7" fill="currentColor" /> : <Play className="h-7 w-7 translate-x-0.5" fill="currentColor" />}
+          </button>
+          <button type="button" onClick={() => { setStarted(true); step(1) }} disabled={nextPlayable < 0} aria-label="Next song"
+            className="flex h-12 w-12 items-center justify-center rounded-full text-gray-800 hover:bg-brand-100 disabled:opacity-30"><SkipForward className="h-6 w-6" /></button>
         </div>
 
         {ref.moments.length > 0 && (
@@ -108,7 +127,7 @@ function RehearseView({ songs, onClose }: { songs: PlayableSong[]; onClose: () =
           {songs.slice(index + 1).map((s, offset) => {
             const i = index + 1 + offset
             return (
-              <button key={`${s.songId}-${i}`} type="button" disabled={!s.reference} onClick={() => { setIndex(i); setActiveMoment(null) }}
+              <button key={`${s.songId}-${i}`} type="button" disabled={!s.reference} onClick={() => { setIndex(i); setActiveMoment(null); setPlaying(false) }}
                 className="flex min-h-14 w-full items-center gap-3 rounded-xl px-1 text-left hover:bg-brand-100 disabled:opacity-50 disabled:hover:bg-transparent">
                 <span className="w-6 text-center font-mono text-sm text-gray-400">{i + 1}</span>
                 <Cover url={s.coverUrl ?? s.reference?.thumbnailUrl} title={s.title} size={40} />

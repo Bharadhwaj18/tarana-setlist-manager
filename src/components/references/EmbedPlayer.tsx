@@ -11,6 +11,8 @@ export interface EmbedHandle {
   seek(seconds: number): void
   /** Where playback is now, in seconds (0 if unknown). */
   position(): number
+  /** Play if paused, pause if playing. */
+  toggle(): void
 }
 
 interface Props {
@@ -20,27 +22,31 @@ interface Props {
   /** Try to start playing once loaded. Phones may still need a tap on the player itself. */
   autoPlay?: boolean
   onEnded?: () => void
+  /** Told whenever the player starts or stops, so outside buttons can show play or pause. */
+  onPlayingChange?: (playing: boolean) => void
   className?: string
 }
 
-interface Driver { seek(s: number): void; position(): number }
+interface Driver { seek(s: number): void; position(): number; toggle(): void }
 
 /**
  * The service's own player (Spotify, YouTube or SoundCloud), driven through its player API so the app
  * can jump to moments and notice when a song ends. Apple Music has no player API; callers link out instead.
  */
-export const EmbedPlayer = forwardRef<EmbedHandle, Props>(function EmbedPlayer({ reference, size = 'full', autoPlay = false, onEnded, className }, ref) {
+export const EmbedPlayer = forwardRef<EmbedHandle, Props>(function EmbedPlayer({ reference, size = 'full', autoPlay = false, onEnded, onPlayingChange, className }, ref) {
   const host = useRef<HTMLDivElement>(null)
   const driver = useRef<Driver | null>(null)
   const ended = useRef(onEnded)
+  const playingChange = useRef(onPlayingChange)
   const [failed, setFailed] = useState(false)
   const { source, externalId, url, title } = reference
 
-  useLayoutEffect(() => { ended.current = onEnded })
+  useLayoutEffect(() => { ended.current = onEnded; playingChange.current = onPlayingChange })
 
   useImperativeHandle(ref, () => ({
     seek: s => driver.current?.seek(s),
     position: () => driver.current?.position() ?? 0,
+    toggle: () => driver.current?.toggle(),
   }), [])
 
   useEffect(() => {
@@ -62,14 +68,16 @@ export const EmbedPlayer = forwardRef<EmbedHandle, Props>(function EmbedPlayer({
           if (cancelled) { c.destroy(); return }
           let pos = 0
           let done = false
+          let playing = false
           c.addListener('playback_update', e => {
-            const { position, duration } = e.data
+            const { position, duration, isPaused } = e.data
             pos = position / 1000
+            if (playing === isPaused) { playing = !isPaused; playingChange.current?.(playing) }
             const atEnd = duration > 0 && position >= duration - 800
             if (atEnd && !done) { done = true; ended.current?.() } else if (!atEnd) done = false
           })
           if (autoPlay) c.addListener('ready', () => c.play())
-          driver.current = { seek: s => { c.seek(s); c.resume() }, position: () => pos }
+          driver.current = { seek: s => { c.seek(s); c.resume() }, position: () => pos, toggle: () => c.togglePlay() }
           teardown = () => c.destroy()
         })
       }).catch(fail)
@@ -82,11 +90,18 @@ export const EmbedPlayer = forwardRef<EmbedHandle, Props>(function EmbedPlayer({
           height: '100%',
           host: 'https://www.youtube-nocookie.com',
           playerVars: { playsinline: 1, rel: 0, autoplay: autoPlay ? 1 : 0 },
-          events: { onStateChange: e => { if (e.data === 0) ended.current?.() } },
+          events: {
+            onStateChange: e => {
+              if (e.data === 1) playingChange.current?.(true)
+              else if (e.data === 2 || e.data === 0) playingChange.current?.(false)
+              if (e.data === 0) ended.current?.()
+            },
+          },
         })
         driver.current = {
           seek: s => { p.seekTo(s, true); p.playVideo() },
           position: () => { try { return p.getCurrentTime() } catch { return 0 } },
+          toggle: () => { if (p.getPlayerState() === 1) p.pauseVideo(); else p.playVideo() },
         }
         teardown = () => p.destroy()
       }).catch(fail)
@@ -104,8 +119,10 @@ export const EmbedPlayer = forwardRef<EmbedHandle, Props>(function EmbedPlayer({
         const w = SC.Widget(frame)
         let pos = 0
         w.bind(SC.Widget.Events.PLAY_PROGRESS, e => { pos = (e?.currentPosition ?? 0) / 1000 })
-        w.bind(SC.Widget.Events.FINISH, () => ended.current?.())
-        driver.current = { seek: s => { w.seekTo(s * 1000); w.play() }, position: () => pos }
+        w.bind(SC.Widget.Events.PLAY, () => playingChange.current?.(true))
+        w.bind(SC.Widget.Events.PAUSE, () => playingChange.current?.(false))
+        w.bind(SC.Widget.Events.FINISH, () => { playingChange.current?.(false); ended.current?.() })
+        driver.current = { seek: s => { w.seekTo(s * 1000); w.play() }, position: () => pos, toggle: () => w.toggle() }
       }).catch(fail)
     }
 
@@ -127,7 +144,9 @@ export const EmbedPlayer = forwardRef<EmbedHandle, Props>(function EmbedPlayer({
   }
 
   const box = source === 'youtube'
-    ? (size === 'compact' ? 'aspect-video w-32 shrink-0' : 'aspect-video w-full')
+    ? (size === 'compact' ? 'aspect-video w-32' : 'aspect-video w-full rounded-2xl bg-black shadow-sm')
     : size === 'compact' ? 'h-20 w-full' : source === 'spotify' ? 'h-[152px] w-full' : 'h-[166px] w-full'
-  return <div ref={host} className={cn('overflow-hidden rounded-xl bg-gray-100', box, className)} />
+  // shrink-0: inside a flex column (rehearsal, mini player) the box must keep its size; it only holds an iframe,
+  // so without it the layout squeezes the player down to a thin bar.
+  return <div ref={host} className={cn('shrink-0 overflow-hidden rounded-xl bg-gray-100', box, className)} />
 })

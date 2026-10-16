@@ -1,10 +1,10 @@
 'use client'
 
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useContext, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Pause, Play, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SOURCE_NAMES, type PlayableSong } from '@/lib/song-references'
-import { EmbedPlayer } from '@/components/references/EmbedPlayer'
+import { EmbedPlayer, type EmbedHandle } from '@/components/references/EmbedPlayer'
 import { ServiceMark } from '@/components/references/ServiceMark'
 
 interface PlayerContextValue {
@@ -40,11 +40,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
 function MiniPlayer({ song, onClose }: { song: PlayableSong; onClose: () => void }) {
   const ref = song.reference!
+  const player = useRef<EmbedHandle>(null)
+  const [playing, setPlaying] = useState(false)
   return (
     <div role="region" aria-label={`Now playing: ${song.title}`}
       className="animate-sheet-up fixed inset-x-2 bottom-[calc(4.4rem+env(safe-area-inset-bottom))] z-40 overflow-hidden rounded-2xl bg-hero p-2 text-hero-fg shadow-xl lg:inset-x-auto lg:bottom-4 lg:right-4 lg:w-[400px]">
       <div className="flex items-center gap-2">
-        {ref.source === 'youtube' && <EmbedPlayer key={ref.id} reference={ref} size="compact" autoPlay />}
+        {ref.source === 'youtube' && <EmbedPlayer key={ref.id} ref={player} reference={ref} size="compact" autoPlay onPlayingChange={setPlaying} />}
         {ref.source === 'youtube' && (
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-extrabold">{song.title}</span>
@@ -53,11 +55,15 @@ function MiniPlayer({ song, onClose }: { song: PlayableSong; onClose: () => void
         )}
         {ref.source !== 'youtube' && (
           <div className="min-w-0 flex-1">
-            <EmbedPlayer key={ref.id} reference={ref} size="compact" autoPlay className="bg-black/20" />
+            <EmbedPlayer key={ref.id} ref={player} reference={ref} size="compact" autoPlay onPlayingChange={setPlaying} className="bg-black/20" />
           </div>
         )}
+        <button type="button" onClick={() => player.current?.toggle()} aria-label={playing ? 'Pause' : 'Play'}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-hero-fg text-hero transition-opacity hover:opacity-90">
+          {playing ? <Pause className="h-4 w-4" fill="currentColor" /> : <Play className="h-4 w-4 translate-x-px" fill="currentColor" />}
+        </button>
         <button type="button" onClick={onClose} aria-label="Close player"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl opacity-80 hover:bg-white/10 hover:opacity-100">
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl opacity-80 hover:bg-hero-fg/10 hover:opacity-100">
           <X className="h-5 w-5" />
         </button>
       </div>
