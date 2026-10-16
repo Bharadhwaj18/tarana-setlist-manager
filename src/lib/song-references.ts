@@ -41,7 +41,14 @@ export interface PlayableSong {
   artist: string | null
   songKey: string | null
   coverUrl: string | null
+  /** Where the cover came from, so it can link back to it (Spotify requires that for its artwork). */
+  coverLink?: CoverLink | null
   reference: PlayableReference | null
+}
+
+export interface CoverLink {
+  source: ReferenceSource
+  url: string
 }
 
 export interface ParsedLink {
@@ -152,6 +159,17 @@ export function firstReferenceBySong(rows: ReferenceRow[]): Record<string, Playa
     if (out[row.song_id]) continue
     const p = toPlayable(row)
     if (p && canPlayInApp(p.source)) out[row.song_id] = p
+  }
+  return out
+}
+
+/** For each song whose cover is a reference's artwork, that reference's link. */
+export function coverLinksBySong(rows: ReferenceRow[], songs: { id: string; cover_url: string | null }[]): Record<string, CoverLink> {
+  const cover = new Map(songs.filter(s => s.cover_url).map(s => [s.id, s.cover_url]))
+  const out: Record<string, CoverLink> = {}
+  for (const r of rows) {
+    if (out[r.song_id] || !r.thumbnail_url || cover.get(r.song_id) !== r.thumbnail_url) continue
+    if ((REFERENCE_SOURCES as readonly string[]).includes(r.source)) out[r.song_id] = { source: r.source as ReferenceSource, url: r.url }
   }
   return out
 }

@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { sectionGuard } from '@/lib/section-guard'
 import { Plus, Music2 } from 'lucide-react'
 import { getCachedSongs, getCachedSetlistSongCounts, getCachedReferenceRows } from '@/lib/data'
-import { firstReferenceBySong, type PlayableSong } from '@/lib/song-references'
+import { coverLinksBySong, firstReferenceBySong, type PlayableSong } from '@/lib/song-references'
 import { SongSearchList } from '@/components/songs/SongSearchList'
 import { Button } from '@/components/ui/Button'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -24,6 +24,7 @@ export default async function SongsPage() {
     if (reference) playables[s.id] = { songId: s.id, title: s.title, artist: s.artist, songKey: s.song_key, coverUrl: s.cover_url, reference }
   }
   const withRef = new Set(referenceRows.map(r => r.song_id)).size
+  const coverLinks = coverLinksBySong(referenceRows, songs)
 
   const needChart = songs.filter(s => !s.chord_chart).length
   const subtitle = `${songs.length} ${songs.length === 1 ? 'song' : 'songs'}${withRef ? ` · ${withRef} with a reference` : ''}${needChart ? ` · ${needChart} still need a chord chart` : ''}`
@@ -48,7 +49,7 @@ export default async function SongsPage() {
           action={<Button asChild><Link href="/songs/new"><Plus className="h-4 w-4" /> Add a song</Link></Button>}
         />
       ) : (
-        <SongSearchList songs={songs} setlistCounts={setlistCounts} playables={playables} />
+        <SongSearchList songs={songs} setlistCounts={setlistCounts} playables={playables} coverLinks={coverLinks} />
       )}
     </div>
   )

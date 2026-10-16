@@ -77,3 +77,13 @@ describe('titleFromAppleLink', () => {
     expect(titleFromAppleLink('https://music.apple.com/in')).toBeNull()
   })
 })
+
+describe('isoDurationMs (YouTube durations)', () => {
+  it('reads hours, minutes and seconds', async () => {
+    const { isoDurationMs } = await import('./reference-lookup')
+    expect(isoDurationMs('PT4M18S')).toBe(258000)
+    expect(isoDurationMs('PT1H2M5S')).toBe(3725000)
+    expect(isoDurationMs('PT45S')).toBe(45000)
+    expect(isoDurationMs('P1D')).toBeNull()
+  })
+})

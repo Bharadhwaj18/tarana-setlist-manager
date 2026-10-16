@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireWorkspaceId } from '@/lib/workspace'
-import { lookupReference, searchSpotify, spotifyConfigured, type ReferenceDetails, type SpotifyResult } from '@/lib/reference-lookup'
+import { availableSearchSources, lookupReference, searchSource, type ReferenceDetails, type SearchResult, type SearchSource } from '@/lib/reference-lookup'
 import { MAX_LABEL_LENGTH, cleanMoments, type Moment } from '@/lib/song-references'
 import type { Json } from '@/types/database'
 
@@ -27,12 +27,20 @@ export async function previewReference(link: string): Promise<{ details?: Refere
   return details ? { details } : { error: NOT_A_LINK }
 }
 
-export async function searchSpotifyTracks(query: string): Promise<{ results?: SpotifyResult[]; error?: string; notSetUp?: boolean }> {
-  if (!spotifyConfigured()) return { notSetUp: true, error: 'Spotify search isn’t switched on yet, so paste a Spotify link instead.' }
+const SEARCH_NAMES: Record<SearchSource, string> = { youtube: 'YouTube', spotify: 'Spotify' }
+
+/** Search YouTube or Spotify for the add-reference sheet. Only offered for services whose keys are set. */
+export async function searchReferences(source: SearchSource, query: string): Promise<{ results?: SearchResult[]; error?: string }> {
+  if (!availableSearchSources().includes(source)) return { error: `${SEARCH_NAMES[source]} search isn’t switched on. Paste a link instead.` }
   const q = query.trim().slice(0, 100)
   if (q.length < 2) return { results: [] }
-  const results = await searchSpotify(q)
-  return results ? { results } : { error: 'Spotify didn’t answer. Try again in a moment.' }
+  const results = await searchSource(source, q)
+  if (results) return { results }
+  return {
+    error: source === 'youtube'
+      ? 'YouTube search isn’t answering right now. It may have used up today’s searches, so paste a link instead.'
+      : 'Spotify search isn’t answering right now, so paste a link instead.',
+  }
 }
 
 interface AddInput {

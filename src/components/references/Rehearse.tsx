@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, Headphones, SkipBack, SkipForward } from 'lucide-react'
+import { ChevronDown, ExternalLink, Headphones, SkipBack, SkipForward } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
-import { formatTime, type PlayableSong } from '@/lib/song-references'
+import { SOURCE_NAMES, formatTime, type PlayableSong } from '@/lib/song-references'
 import { usePlayer } from '@/components/player/PlayerProvider'
 import { EmbedPlayer, type EmbedHandle } from './EmbedPlayer'
 import { ServiceMark } from './ServiceMark'
@@ -72,7 +72,14 @@ function RehearseView({ songs, onClose }: { songs: PlayableSong[]; onClose: () =
           <div className="min-w-0">
             <h2 className="font-display text-2xl font-bold leading-tight text-gray-900">{song.title}</h2>
             <p className="truncate font-semibold text-gray-500">{[song.artist, song.songKey && `Key of ${song.songKey}`].filter(Boolean).join(' · ')}</p>
-            <p className="mt-1 inline-flex items-center gap-1.5 text-xs font-extrabold text-gray-700"><ServiceMark source={ref.source} size={14} />{ref.label}</p>
+            <a href={ref.url} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1.5 text-xs font-extrabold text-gray-700 hover:underline">
+              <ServiceMark source={ref.source} size={14} />{ref.label} · Open in {SOURCE_NAMES[ref.source]}<ExternalLink className="h-3 w-3" />
+            </a>
+            {song.coverLink && song.coverLink.url !== ref.url && (
+              <a href={song.coverLink.url} target="_blank" rel="noopener noreferrer" className="mt-0.5 flex items-center gap-1 text-xs font-bold text-gray-500 hover:underline">
+                <ServiceMark source={song.coverLink.source} size={12} />Cover from {SOURCE_NAMES[song.coverLink.source]}
+              </a>
+            )}
           </div>
         </div>
 

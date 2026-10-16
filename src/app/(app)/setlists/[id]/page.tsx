@@ -12,7 +12,7 @@ import { SetlistPdfExport } from '@/components/pdf/SetlistPdfExport'
 import { SaveOfflineButton } from '@/components/setlists/SaveOfflineButton'
 import { RehearseButton } from '@/components/references/Rehearse'
 import { getCachedReferenceRows } from '@/lib/data'
-import { firstReferenceBySong } from '@/lib/song-references'
+import { coverLinksBySong, firstReferenceBySong } from '@/lib/song-references'
 import { Button } from '@/components/ui/Button'
 import { SectionLabel } from '@/components/ui/SectionLabel'
 import type { SetlistSongWithSong } from '@/types'
@@ -54,10 +54,12 @@ export default async function SetlistPage({ params }: Props) {
   )]
 
   // Rehearse plays each song's first playable reference, in set order.
-  const firstRef = firstReferenceBySong(await getCachedReferenceRows())
+  const referenceRows = await getCachedReferenceRows()
+  const firstRef = firstReferenceBySong(referenceRows)
+  const coverLinks = coverLinksBySong(referenceRows, setlistSongs.map(ss => ({ id: ss.song_id, cover_url: ss.song.cover_url ?? null })))
   const rehearsal = setlistSongs.map(ss => ({
     songId: ss.song_id, title: ss.song.title, artist: ss.song.artist ?? null, songKey: ss.song.song_key ?? null,
-    coverUrl: ss.song.cover_url ?? null, reference: firstRef[ss.song_id] ?? null,
+    coverUrl: ss.song.cover_url ?? null, coverLink: coverLinks[ss.song_id] ?? null, reference: firstRef[ss.song_id] ?? null,
   }))
   const songCount = setlistSongs.length
   const estimatedMinutes = Math.round(songCount * AVG_SONG_MINUTES)

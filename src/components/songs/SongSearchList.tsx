@@ -5,13 +5,15 @@ import { Search } from 'lucide-react'
 import { Chip } from '@/components/ui/Chip'
 import { SongRow } from './SongRow'
 import type { Song } from '@/types'
-import type { PlayableSong } from '@/lib/song-references'
+import type { CoverLink, PlayableSong } from '@/lib/song-references'
 
 interface SongSearchListProps {
   songs: Song[]
   setlistCounts: Record<string, number>
   /** Songs that can play in the app, keyed by song id. */
   playables?: Record<string, PlayableSong>
+  /** Where each song's cover art came from, for the link back to it. */
+  coverLinks?: Record<string, CoverLink>
 }
 
 const letterOf = (title: string) => {
@@ -19,7 +21,7 @@ const letterOf = (title: string) => {
   return /[A-Z]/.test(c) ? c : '#'
 }
 
-export function SongSearchList({ songs, setlistCounts, playables }: SongSearchListProps) {
+export function SongSearchList({ songs, setlistCounts, playables, coverLinks }: SongSearchListProps) {
   const [query, setQuery] = useState('')
   const [needsChart, setNeedsChart] = useState(false)
   const [key, setKey] = useState('')
@@ -85,7 +87,7 @@ export function SongSearchList({ songs, setlistCounts, playables }: SongSearchLi
                 <h2 id={`songs-letter-${letter}`} className="scroll-mt-4 border-y border-brand-200 bg-gray-50 px-4 py-1.5 font-display text-sm font-bold text-brand-600 first:border-t-0">
                   {letter}
                 </h2>
-                {items.map(song => <SongRow key={song.id} song={song} setlistCount={setlistCounts[song.id] ?? 0} playable={playables?.[song.id]} />)}
+                {items.map(song => <SongRow key={song.id} song={song} setlistCount={setlistCounts[song.id] ?? 0} playable={playables?.[song.id]} coverLink={coverLinks?.[song.id]} />)}
               </section>
             ))}
           </div>

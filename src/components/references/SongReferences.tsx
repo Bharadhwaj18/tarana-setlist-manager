@@ -10,15 +10,18 @@ import { MAX_LABEL_LENGTH, MAX_MOMENTS, SOURCE_NAMES, canPlayInApp, formatTime, 
 import { EmbedPlayer, type EmbedHandle } from './EmbedPlayer'
 import { ReferenceSheet } from './ReferenceSheet'
 import { ServiceMark } from './ServiceMark'
+import type { SearchSource } from '@/lib/reference-lookup'
 
 interface Props {
   songId: string
   references: PlayableReference[]
   canEdit: boolean
+  /** Search tabs to offer in the add sheet (services whose keys are set). */
+  searchSources: SearchSource[]
 }
 
 /** A song's references: each one plays right here, and its moments jump straight to that point. */
-export function SongReferences({ songId, references, canEdit }: Props) {
+export function SongReferences({ songId, references, canEdit, searchSources }: Props) {
   const [sheet, setSheet] = useState<{ editing: PlayableReference | null } | null>(null)
 
   return (
@@ -53,7 +56,7 @@ export function SongReferences({ songId, references, canEdit }: Props) {
         ))
       )}
 
-      <ReferenceSheet songId={songId} open={!!sheet} onOpenChange={o => { if (!o) setSheet(null) }} editing={sheet?.editing} />
+      <ReferenceSheet songId={songId} open={!!sheet} onOpenChange={o => { if (!o) setSheet(null) }} editing={sheet?.editing} searchSources={searchSources} />
     </section>
   )
 }

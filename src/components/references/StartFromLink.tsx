@@ -60,7 +60,7 @@ export function StartFromLink({ onFound }: { onFound: (details: ReferenceDetails
                 {[details.artist, details.album, details.durationMs ? formatTime(details.durationMs / 1000) : null].filter(Boolean).join(' · ')}
               </span>
             </span>
-            <span className="inline-flex items-center gap-1 text-xs font-extrabold text-emerald-700"><ServiceMark source={details.source} size={16} />Found</span>
+            <a href={details.url} target="_blank" rel="noopener noreferrer" className="inline-flex shrink-0 items-center gap-1 rounded-lg px-1.5 py-1 text-xs font-extrabold text-emerald-800 hover:bg-emerald-100"><ServiceMark source={details.source} size={16} />Open</a>
           </div>
           <p className="text-xs text-gray-500">Saved as this song’s Original reference{details.thumbnailUrl ? ', with its cover' : ''}.</p>
           {details.source === 'spotify' && (

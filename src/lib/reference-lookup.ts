@@ -1,8 +1,9 @@
-// Server only: looks up a reference link's title, artist and cover, and searches Spotify.
-// Spotify's Web API needs SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET (app keys, no user sign-in).
-// Without them, Spotify links fall back to Spotify's public oEmbed (title and cover only).
+// Server only: looks up a reference link's title, artist and cover, and searches Spotify and YouTube.
+// Spotify's Web API needs SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET (app keys, no user sign-in; since
+// February 2026 the app owner needs Spotify Premium). Without them, Spotify links fall back to Spotify's
+// public oEmbed (title and cover only). YouTube search needs YOUTUBE_API_KEY (free, YouTube Data API v3).
 
-import { SOURCE_NAMES, parseReferenceLink, titleFromAppleLink, type ReferenceSource } from '@/lib/song-references'
+import { parseReferenceLink, titleFromAppleLink, type ReferenceSource } from '@/lib/song-references'
 
 export interface ReferenceDetails {
   source: ReferenceSource
@@ -15,14 +16,18 @@ export interface ReferenceDetails {
   durationMs: number | null
 }
 
-export interface SpotifyResult {
+/** Services the add-reference sheet can search. */
+export type SearchSource = 'youtube' | 'spotify'
+
+export interface SearchResult {
+  source: SearchSource
   id: string
   url: string
   title: string
   artist: string
-  album: string
+  album: string | null
   thumbnailUrl: string | null
-  durationMs: number
+  durationMs: number | null
 }
 
 const TIMEOUT_MS = 6000
@@ -40,6 +45,16 @@ async function getJson<T>(url: string, init?: RequestInit): Promise<T | null> {
 export function spotifyConfigured() {
   return !!process.env.SPOTIFY_CLIENT_ID && !!process.env.SPOTIFY_CLIENT_SECRET
 }
+export function youtubeConfigured() {
+  return !!process.env.YOUTUBE_API_KEY
+}
+
+/** Which search tabs to offer: only services whose keys are set. YouTube first, since it needs no paid account. */
+export function availableSearchSources(): SearchSource[] {
+  return [youtubeConfigured() && 'youtube', spotifyConfigured() && 'spotify'].filter((s): s is SearchSource => !!s)
+}
+
+// ---------------- Spotify ----------------
 
 // One app token, reused until shortly before it expires (they last an hour).
 let token: { value: string; expiresAt: number } | null = null
@@ -66,7 +81,8 @@ interface SpotifyTrack {
   album: { name: string; images: { url: string; width: number }[] }
 }
 
-const toResult = (t: SpotifyTrack): SpotifyResult => ({
+const fromSpotify = (t: SpotifyTrack): SearchResult => ({
+  source: 'spotify',
   id: t.id,
   url: `https://open.spotify.com/track/${t.id}`,
   title: t.name,
@@ -77,22 +93,79 @@ const toResult = (t: SpotifyTrack): SpotifyResult => ({
   durationMs: t.duration_ms,
 })
 
-export async function searchSpotify(query: string): Promise<SpotifyResult[] | null> {
+async function searchSpotify(query: string): Promise<SearchResult[] | null> {
   const bearer = await spotifyToken()
   if (!bearer) return null
+  // Development Mode apps get at most 10 results per search.
   const data = await getJson<{ tracks: { items: SpotifyTrack[] } }>(
     `https://api.spotify.com/v1/search?type=track&limit=8&q=${encodeURIComponent(query)}`,
     { headers: { Authorization: `Bearer ${bearer}` } },
   )
-  return data ? data.tracks.items.map(toResult) : []
+  return data ? data.tracks.items.map(fromSpotify) : null
 }
 
-async function spotifyTrack(id: string): Promise<SpotifyResult | null> {
+async function spotifyTrack(id: string): Promise<SearchResult | null> {
   const bearer = await spotifyToken()
   if (!bearer) return null
   const data = await getJson<SpotifyTrack>(`https://api.spotify.com/v1/tracks/${id}`, { headers: { Authorization: `Bearer ${bearer}` } })
-  return data ? toResult(data) : null
+  return data ? fromSpotify(data) : null
 }
+
+// ---------------- YouTube ----------------
+
+interface YouTubeSearch {
+  items: { id: { videoId?: string }; snippet: { title: string; channelTitle: string; thumbnails: { medium?: { url: string }; default?: { url: string } } } }[]
+}
+
+/** YouTube returns titles with HTML entities ("Don&#39;t"); turn them back into text. */
+function decodeEntities(text: string) {
+  return text
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+}
+
+/** "PT4M18S" -> 258000. */
+export function isoDurationMs(iso: string): number | null {
+  const m = iso.match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/)
+  if (!m) return null
+  return ((Number(m[1] ?? 0) * 60 + Number(m[2] ?? 0)) * 60 + Number(m[3] ?? 0)) * 1000
+}
+
+// Each search costs 100 of the default 10,000 daily quota units (about 100 searches a day); durations cost 1 more.
+async function searchYouTube(query: string): Promise<SearchResult[] | null> {
+  const key = process.env.YOUTUBE_API_KEY
+  if (!key) return null
+  const data = await getJson<YouTubeSearch>(
+    `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&maxResults=8&q=${encodeURIComponent(query)}&key=${key}`,
+  )
+  if (!data) return null
+  const items = data.items.filter(i => i.id.videoId)
+  const ids = items.map(i => i.id.videoId!).join(',')
+  const details = ids
+    ? await getJson<{ items: { id: string; contentDetails: { duration: string } }[] }>(`https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${ids}&key=${key}`)
+    : null
+  const durations = new Map((details?.items ?? []).map(v => [v.id, isoDurationMs(v.contentDetails.duration)]))
+  return items.map(i => {
+    const id = i.id.videoId!
+    return {
+      source: 'youtube',
+      id,
+      url: `https://www.youtube.com/watch?v=${id}`,
+      title: decodeEntities(i.snippet.title),
+      // Album versions come from "Artist - Topic" channels; the rest is the uploader's name.
+      artist: decodeEntities(i.snippet.channelTitle).replace(/ - Topic$/, ''),
+      album: null,
+      thumbnailUrl: i.snippet.thumbnails.medium?.url ?? i.snippet.thumbnails.default?.url ?? null,
+      durationMs: durations.get(id) ?? null,
+    }
+  })
+}
+
+export async function searchSource(source: SearchSource, query: string): Promise<SearchResult[] | null> {
+  return source === 'spotify' ? searchSpotify(query) : searchYouTube(query)
+}
+
+// ---------------- link lookup ----------------
 
 interface OEmbed { title?: string; author_name?: string; thumbnail_url?: string }
 
@@ -110,15 +183,13 @@ export async function lookupReference(link: string): Promise<ReferenceDetails | 
   }
   if (parsed.source === 'youtube') {
     const o = await getJson<OEmbed>(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(parsed.url)}`)
-    return { ...base, title: o?.title ?? null, artist: o?.author_name ?? null, thumbnailUrl: o?.thumbnail_url ?? null }
+    return { ...base, title: o?.title ?? null, artist: o?.author_name?.replace(/ - Topic$/, '') ?? null, thumbnailUrl: o?.thumbnail_url ?? null }
   }
   if (parsed.source === 'soundcloud') {
     const o = await getJson<OEmbed>(`https://soundcloud.com/oembed?format=json&url=${encodeURIComponent(parsed.url)}`)
     // SoundCloud titles read "Track by Artist"; keep just the track.
-    const title = o?.title && o.author_name ? o.title.replace(new RegExp(` by ${o.author_name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`), '') : o?.title ?? null
+    const title = o?.title && o.author_name && o.title.endsWith(` by ${o.author_name}`) ? o.title.slice(0, -` by ${o.author_name}`.length) : o?.title ?? null
     return { ...base, title, artist: o?.author_name ?? null, thumbnailUrl: o?.thumbnail_url ?? null }
   }
   return { ...base, title: titleFromAppleLink(parsed.url) }
 }
-
-export const sourceName = (s: ReferenceSource) => SOURCE_NAMES[s]

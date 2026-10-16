@@ -2,14 +2,14 @@
 
 import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, Link2, Plus, Search, X } from 'lucide-react'
+import { Check, ExternalLink, Link2, Plus, Search, X } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toaster'
 import { cn } from '@/lib/utils'
-import { addSongReference, previewReference, searchSpotifyTracks, updateSongReference } from '@/actions/song-references'
-import type { ReferenceDetails, SpotifyResult } from '@/lib/reference-lookup'
-import { MAX_LABEL_LENGTH, MAX_MOMENTS, REFERENCE_LABELS, formatTime, parseTime, type Moment, type PlayableReference } from '@/lib/song-references'
+import { addSongReference, previewReference, searchReferences, updateSongReference } from '@/actions/song-references'
+import type { ReferenceDetails, SearchResult, SearchSource } from '@/lib/reference-lookup'
+import { MAX_LABEL_LENGTH, MAX_MOMENTS, REFERENCE_LABELS, SOURCE_NAMES, formatTime, parseTime, type Moment, type PlayableReference } from '@/lib/song-references'
 import { ServiceMark } from './ServiceMark'
 import { Cover } from './Cover'
 
@@ -19,33 +19,36 @@ interface Props {
   onOpenChange: (open: boolean) => void
   /** Set to edit a saved reference's label and moments; the link itself stays. */
   editing?: PlayableReference | null
+  /** Search tabs to offer, only for services whose keys are set. Empty: paste a link only. */
+  searchSources: SearchSource[]
 }
 
-/** Add a reference by pasting a link or searching Spotify, or edit one's label and moments. */
-export function ReferenceSheet({ songId, open, onOpenChange, editing }: Props) {
+/** Add a reference by pasting a link or searching YouTube / Spotify, or edit one's label and moments. */
+export function ReferenceSheet({ songId, open, onOpenChange, editing, searchSources }: Props) {
   return (
     <Modal open={open} onOpenChange={onOpenChange} title={editing ? 'Edit reference' : 'Add a reference'} className="max-w-[480px] rounded-2xl">
       {/* Mounted only while open, so every opening starts fresh. */}
-      {open && <ReferenceForm songId={songId} editing={editing ?? null} onDone={() => onOpenChange(false)} />}
+      {open && <ReferenceForm songId={songId} editing={editing ?? null} searchSources={searchSources} onDone={() => onOpenChange(false)} />}
     </Modal>
   )
 }
 
 interface DraftMoment { key: number; label: string; time: string }
+type Mode = 'link' | SearchSource
 
 const eyebrow = 'text-[11px] font-extrabold uppercase tracking-[0.12em] text-gray-500'
 const field = 'w-full rounded-xl border border-brand-200 bg-white px-3 text-[15px] text-gray-900 placeholder-gray-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400/30'
 
-function ReferenceForm({ songId, editing, onDone }: { songId: string; editing: PlayableReference | null; onDone: () => void }) {
+function ReferenceForm({ songId, editing, searchSources, onDone }: { songId: string; editing: PlayableReference | null; searchSources: SearchSource[]; onDone: () => void }) {
   const router = useRouter()
   const toast = useToast()
-  const [mode, setMode] = useState<'link' | 'search'>('link')
+  const [mode, setMode] = useState<Mode>('link')
   const [link, setLink] = useState('')
   const [details, setDetails] = useState<ReferenceDetails | null>(null)
   const [lookupError, setLookupError] = useState<string | null>(null)
   const [looking, setLooking] = useState(false)
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<SpotifyResult[]>([])
+  const [results, setResults] = useState<SearchResult[]>([])
   const [searchNote, setSearchNote] = useState<string | null>(null)
   const [searching, setSearching] = useState(false)
   const [label, setLabel] = useState(editing?.label ?? 'Original')
@@ -56,6 +59,16 @@ function ReferenceForm({ songId, editing, onDone }: { songId: string; editing: P
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   // Only the newest lookup or search may land, so a slow older answer can't overwrite a newer one.
   const latest = useRef(0)
+
+  const switchMode = (next: Mode) => {
+    clearTimeout(timer.current)
+    latest.current++
+    setMode(next)
+    setQuery('')
+    setResults([])
+    setSearchNote(null)
+    setSearching(false)
+  }
 
   const onLinkChange = (value: string) => {
     setLink(value)
@@ -75,23 +88,26 @@ function ReferenceForm({ songId, editing, onDone }: { songId: string; editing: P
   }
 
   const onQueryChange = (value: string) => {
+    if (mode === 'link') return
+    const source = mode
     setQuery(value)
     clearTimeout(timer.current)
     if (value.trim().length < 2) { setResults([]); return }
     const ticket = ++latest.current
+    // A longer pause than the link lookup: each YouTube search uses up part of a daily allowance.
     timer.current = setTimeout(async () => {
       setSearching(true)
-      const res = await searchSpotifyTracks(value)
+      const res = await searchReferences(source, value)
       if (ticket !== latest.current) return
       setSearching(false)
       setResults(res.results ?? [])
       setSearchNote(res.error ?? null)
-    }, 350)
+    }, 600)
   }
 
-  const pick = (r: SpotifyResult) => {
+  const pick = (r: SearchResult) => {
     setLink(r.url)
-    setDetails({ source: 'spotify', url: r.url, externalId: r.id, title: r.title, artist: r.artist, album: r.album, thumbnailUrl: r.thumbnailUrl, durationMs: r.durationMs })
+    setDetails({ source: r.source, url: r.url, externalId: r.id, title: r.title, artist: r.artist, album: r.album, thumbnailUrl: r.thumbnailUrl, durationMs: r.durationMs })
   }
 
   const addMoment = () => {
@@ -123,21 +139,24 @@ function ReferenceForm({ songId, editing, onDone }: { songId: string; editing: P
     })
   }
 
+  const tabs: [Mode, string][] = [['link', 'Paste a link'], ...searchSources.map(s => [s, SOURCE_NAMES[s]] as [Mode, string])]
+
   return (
     <div className="space-y-5">
-      {!editing && (
+      {!editing && tabs.length > 1 && (
         <div role="tablist" aria-label="How to add" className="flex rounded-xl bg-brand-100/70 p-1">
-          {([['link', 'Paste a link', Link2], ['search', 'Search Spotify', Search]] as const).map(([key, text, Icon]) => (
-            <button key={key} type="button" role="tab" aria-selected={mode === key} onClick={() => setMode(key)}
-              className={cn('flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg text-sm font-extrabold', mode === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600')}>
-              <Icon className="h-4 w-4" />{text}
+          {tabs.map(([key, text]) => (
+            <button key={key} type="button" role="tab" aria-selected={mode === key} onClick={() => switchMode(key)}
+              className={cn('flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg px-1 text-sm font-extrabold', mode === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600')}>
+              {key === 'link' ? <Link2 className="h-4 w-4 shrink-0" /> : <ServiceMark source={key} size={16} />}
+              <span className="truncate">{text}</span>
             </button>
           ))}
         </div>
       )}
 
       {editing ? (
-        <Found title={editing.title ?? 'Reference'} sub={editing.artist ?? ''} thumbnailUrl={editing.thumbnailUrl} source={editing.source} />
+        <Found title={editing.title ?? 'Reference'} sub={editing.artist ?? ''} thumbnailUrl={editing.thumbnailUrl} source={editing.source} url={editing.url} />
       ) : mode === 'link' ? (
         <div className="space-y-2">
           <div className="relative">
@@ -146,39 +165,48 @@ function ReferenceForm({ songId, editing, onDone }: { songId: string; editing: P
               placeholder="Paste a Spotify or YouTube link" className={cn(field, 'min-h-12 pl-9')} />
           </div>
           {looking && <p className="text-sm text-gray-500">Looking it up…</p>}
-          {details && <Found title={details.title ?? 'Song'} sub={[details.artist, details.album, details.durationMs ? formatTime(details.durationMs / 1000) : null].filter(Boolean).join(' · ')} thumbnailUrl={details.thumbnailUrl} source={details.source} />}
+          {details && <Found title={details.title ?? 'Song'} sub={[details.artist, details.album, details.durationMs ? formatTime(details.durationMs / 1000) : null].filter(Boolean).join(' · ')} thumbnailUrl={details.thumbnailUrl} source={details.source} url={details.url} />}
           {lookupError && <p className="text-sm font-semibold text-red-700">{lookupError}</p>}
-          {!details && !lookupError && !looking && <p className="text-xs text-gray-500">Works with Spotify, YouTube, Apple Music and SoundCloud links.</p>}
+          {!details && !lookupError && !looking && <p className="text-xs text-gray-500">Works with Spotify, YouTube, YouTube Music, Apple Music and SoundCloud links.</p>}
         </div>
       ) : (
         <div className="space-y-2">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <input autoFocus value={query} onChange={e => onQueryChange(e.target.value)} type="search" aria-label="Search Spotify"
-              placeholder="Song or artist" className={cn(field, 'min-h-12 pl-9')} />
+            <input autoFocus value={query} onChange={e => onQueryChange(e.target.value)} type="search" aria-label={`Search ${SOURCE_NAMES[mode]}`}
+              placeholder="Song and artist" className={cn(field, 'min-h-12 pl-9')} />
           </div>
           {searchNote && <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">{searchNote}</p>}
-          {searching && results.length === 0 && <p className="text-sm text-gray-500">Searching Spotify…</p>}
+          {searching && results.length === 0 && <p className="text-sm text-gray-500">Searching {SOURCE_NAMES[mode]}…</p>}
           <div className="max-h-64 space-y-0.5 overflow-y-auto">
             {results.map(r => {
               const picked = details?.externalId === r.id
               return (
-                <button key={r.id} type="button" aria-pressed={picked} onClick={() => pick(r)}
-                  className={cn('flex min-h-[60px] w-full items-center gap-3 rounded-xl px-2 text-left', picked ? 'bg-brand-100 ring-2 ring-brand-400' : 'hover:bg-brand-50')}>
-                  <Cover url={r.thumbnailUrl} title={r.title} size={44} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-bold text-gray-900">{r.title}</span>
-                    <span className="block truncate text-xs font-semibold text-gray-500">{r.artist} · {r.album}</span>
-                  </span>
-                  <span className="font-mono text-xs text-gray-400">{formatTime(r.durationMs / 1000)}</span>
-                  <span className={cn('flex h-7 w-7 items-center justify-center rounded-full', picked ? 'bg-brand-600 text-white' : 'border border-brand-200 text-gray-500')}>
-                    {picked ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-                  </span>
-                </button>
+                <div key={r.id} className={cn('flex items-center gap-1 rounded-xl', picked ? 'bg-brand-100 ring-2 ring-brand-400' : 'hover:bg-brand-50')}>
+                  <button type="button" aria-pressed={picked} onClick={() => pick(r)} className="flex min-h-[60px] min-w-0 flex-1 items-center gap-3 px-2 text-left">
+                    <Cover url={r.thumbnailUrl} title={r.title} size={44} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-bold text-gray-900">{r.title}</span>
+                      <span className="block truncate text-xs font-semibold text-gray-500">{[r.artist, r.album].filter(Boolean).join(' · ')}</span>
+                    </span>
+                    {r.durationMs !== null && <span className="font-mono text-xs text-gray-400">{formatTime(r.durationMs / 1000)}</span>}
+                    <span className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-full', picked ? 'bg-brand-600 text-white' : 'border border-brand-200 text-gray-500')}>
+                      {picked ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                    </span>
+                  </button>
+                  <a href={r.url} target="_blank" rel="noopener noreferrer" aria-label={`Open “${r.title}” in ${SOURCE_NAMES[r.source]}`}
+                    className="flex h-10 w-9 shrink-0 items-center justify-center rounded-lg text-gray-400 hover:text-gray-700">
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
+                </div>
               )
             })}
           </div>
-          {results.length > 0 && <p className="flex items-center gap-1.5 text-xs text-gray-500"><ServiceMark source="spotify" size={14} />Results from Spotify. Picking one also fills an empty artist and cover.</p>}
+          {results.length > 0 && (
+            <p className="flex items-center gap-1.5 text-xs text-gray-500">
+              <ServiceMark source={mode} size={14} />Results from {SOURCE_NAMES[mode]}. Picking one also fills an empty {mode === 'spotify' ? 'artist and cover' : 'cover'}.
+            </p>
+          )}
         </div>
       )}
 
@@ -232,7 +260,8 @@ function ReferenceForm({ songId, editing, onDone }: { songId: string; editing: P
   )
 }
 
-function Found({ title, sub, thumbnailUrl, source }: { title: string; sub: string; thumbnailUrl: string | null; source: ReferenceDetails['source'] }) {
+/** The matched song, with a link back to where its details and artwork came from. */
+function Found({ title, sub, thumbnailUrl, source, url }: { title: string; sub: string; thumbnailUrl: string | null; source: ReferenceDetails['source']; url: string }) {
   return (
     <div className="flex items-center gap-3 rounded-xl bg-emerald-50 p-2.5">
       <Cover url={thumbnailUrl} title={title} size={48} />
@@ -240,7 +269,9 @@ function Found({ title, sub, thumbnailUrl, source }: { title: string; sub: strin
         <span className="block truncate font-extrabold text-gray-900">{title}</span>
         {sub && <span className="block truncate text-xs font-semibold text-gray-500">{sub}</span>}
       </span>
-      <span className="inline-flex items-center gap-1 text-xs font-extrabold text-emerald-700"><ServiceMark source={source} size={16} />Found</span>
+      <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex shrink-0 items-center gap-1 rounded-lg px-1.5 py-1 text-xs font-extrabold text-emerald-800 hover:bg-emerald-100">
+        <ServiceMark source={source} size={16} />Open
+      </a>
     </div>
   )
 }

@@ -9,6 +9,9 @@ import { getWorkspaceContext } from '@/lib/workspace'
 import { toPlayable, type PlayableReference } from '@/lib/song-references'
 import { SongReferences } from '@/components/references/SongReferences'
 import { Cover } from '@/components/references/Cover'
+import { ServiceMark } from '@/components/references/ServiceMark'
+import { availableSearchSources } from '@/lib/reference-lookup'
+import { SOURCE_NAMES } from '@/lib/song-references'
 import { ChordViewer } from '@/components/songs/ChordViewer'
 import { ActiveSetlistSync } from '@/components/setlists/ActiveSetlistSync'
 import { RecordingsList } from '@/components/recordings/RecordingsList'
@@ -57,6 +60,8 @@ export default async function SongPage({ params, searchParams }: Props) {
 
   const references = referenceRows.map(toPlayable).filter((r): r is PlayableReference => !!r)
   const canEditSongs = ctx?.current.sections.songs !== 'view'
+  // The reference the cover art came from, linked under the title (Spotify requires a link back for its artwork).
+  const coverFrom = song.cover_url ? references.find(r => r.thumbnailUrl === song.cover_url) : undefined
 
   const taggedRecordings = (recordings as RecordingWithSong[]).filter(r => r.song_id === id)
 
@@ -101,6 +106,11 @@ export default async function SongPage({ params, searchParams }: Props) {
           <div className="min-w-0">
           <h1 className="text-3xl font-bold text-gray-900">{song.title}</h1>
           {song.artist && <p className="mt-0.5 text-gray-500">{song.artist}</p>}
+          {coverFrom && (
+            <a href={coverFrom.url} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-gray-500 hover:text-gray-800">
+              <ServiceMark source={coverFrom.source} size={12} />Cover from {SOURCE_NAMES[coverFrom.source]}
+            </a>
+          )}
           <div className="mt-3 flex flex-wrap gap-2">
             {song.song_key && (
               <span className="inline-flex items-center rounded-full bg-hero px-3 py-1 text-xs font-bold text-hero-fg">Key of {song.song_key}</span>
@@ -146,7 +156,7 @@ export default async function SongPage({ params, searchParams }: Props) {
         />
 
         <aside className="contents lg:block lg:space-y-4">
-          <div className="order-first lg:order-none"><SongReferences songId={id} references={references} canEdit={canEditSongs} /></div>
+          <div className="order-first lg:order-none"><SongReferences songId={id} references={references} canEdit={canEditSongs} searchSources={availableSearchSources()} /></div>
           {song.notes && (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
               <SectionLabel className="mb-1.5 text-amber-700">Band notes</SectionLabel>
