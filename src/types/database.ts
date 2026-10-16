@@ -33,6 +33,60 @@ export type Database = {
         }
         Relationships: []
       }
+      song_references: {
+        Row: {
+          id: string
+          workspace_id: string
+          song_id: string
+          source: string
+          url: string
+          external_id: string | null
+          label: string
+          title: string | null
+          artist: string | null
+          thumbnail_url: string | null
+          duration_ms: number | null
+          moments: Json
+          position: number
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          song_id: string
+          source: string
+          url: string
+          external_id?: string | null
+          label?: string
+          title?: string | null
+          artist?: string | null
+          thumbnail_url?: string | null
+          duration_ms?: number | null
+          moments?: Json
+          position?: number
+          created_by?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          song_id?: string
+          source?: string
+          url?: string
+          external_id?: string | null
+          label?: string
+          title?: string | null
+          artist?: string | null
+          thumbnail_url?: string | null
+          duration_ms?: number | null
+          moments?: Json
+          position?: number
+          created_by?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       songs: {
         Row: {
           workspace_id: string | null
@@ -45,6 +99,7 @@ export type Database = {
           bpm: number | null
           time_signature: string | null
           chord_chart: string | null
+          cover_url: string | null
           notes: string | null
           created_at: string
           updated_at: string
@@ -60,6 +115,7 @@ export type Database = {
           bpm?: number | null
           time_signature?: string | null
           chord_chart?: string | null
+          cover_url?: string | null
           notes?: string | null
           created_at?: string
           updated_at?: string
@@ -75,6 +131,7 @@ export type Database = {
           bpm?: number | null
           time_signature?: string | null
           chord_chart?: string | null
+          cover_url?: string | null
           notes?: string | null
           created_at?: string
           updated_at?: string

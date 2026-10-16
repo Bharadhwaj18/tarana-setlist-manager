@@ -4,7 +4,11 @@ import { LinkedNotes } from '@/components/notes/LinkedNotes'
 import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight, Pencil } from 'lucide-react'
-import { getCachedSong, getCachedSetlist, getCachedAllProfiles, getCachedSetlistSongs, getCachedUser, getCachedRecordings, getCachedSongs } from '@/lib/data'
+import { getCachedSong, getCachedSetlist, getCachedAllProfiles, getCachedSetlistSongs, getCachedUser, getCachedRecordings, getCachedSongs, getCachedSongReferences } from '@/lib/data'
+import { getWorkspaceContext } from '@/lib/workspace'
+import { toPlayable, type PlayableReference } from '@/lib/song-references'
+import { SongReferences } from '@/components/references/SongReferences'
+import { Cover } from '@/components/references/Cover'
 import { ChordViewer } from '@/components/songs/ChordViewer'
 import { ActiveSetlistSync } from '@/components/setlists/ActiveSetlistSync'
 import { RecordingsList } from '@/components/recordings/RecordingsList'
@@ -37,7 +41,7 @@ export default async function SongPage({ params, searchParams }: Props) {
   const setlistId = explicitSetlistId ?? cookieSetlistId
   const canonicalFrom = setlistId ? `/setlists/${setlistId}` : null
 
-  const [song, setlist, profiles, { data: { user } }, setlistSongs, recordings, allSongs] = await Promise.all([
+  const [song, setlist, profiles, { data: { user } }, setlistSongs, recordings, allSongs, referenceRows, ctx] = await Promise.all([
     getCachedSong(id),
     setlistId ? getCachedSetlist(setlistId) : Promise.resolve(null),
     getCachedAllProfiles(),
@@ -45,9 +49,14 @@ export default async function SongPage({ params, searchParams }: Props) {
     setlistId ? getCachedSetlistSongs(setlistId) : Promise.resolve([]),
     getCachedRecordings(),
     getCachedSongs(),
+    getCachedSongReferences(id),
+    getWorkspaceContext(),
   ])
 
   if (!song) notFound()
+
+  const references = referenceRows.map(toPlayable).filter((r): r is PlayableReference => !!r)
+  const canEditSongs = ctx?.current.sections.songs !== 'view'
 
   const taggedRecordings = (recordings as RecordingWithSong[]).filter(r => r.song_id === id)
 
@@ -87,7 +96,9 @@ export default async function SongPage({ params, searchParams }: Props) {
 
       {/* Header */}
       <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
+        <div className="flex min-w-0 items-center gap-4">
+          {song.cover_url && <Cover url={song.cover_url} title={song.title} size={72} />}
+          <div className="min-w-0">
           <h1 className="text-3xl font-bold text-gray-900">{song.title}</h1>
           {song.artist && <p className="mt-0.5 text-gray-500">{song.artist}</p>}
           <div className="mt-3 flex flex-wrap gap-2">
@@ -96,6 +107,7 @@ export default async function SongPage({ params, searchParams }: Props) {
             )}
             {song.bpm && <StatusPill className="px-3 py-1 text-xs">{song.bpm} BPM</StatusPill>}
             {song.time_signature && <StatusPill className="px-3 py-1 text-xs">{song.time_signature}</StatusPill>}
+          </div>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -106,7 +118,8 @@ export default async function SongPage({ params, searchParams }: Props) {
         </div>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
+      {/* Phone: references, then the chord chart, then the rest. Desktop: chart on the left, references heading the right column. */}
+      <div className="flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
         {/* Chord chart — keyed by song id so navigating between songs (e.g. via
             setlist prev/next, which reuse this same route) remounts with fresh
             state instead of needing an effect to manually reset it. */}
@@ -132,7 +145,8 @@ export default async function SongPage({ params, searchParams }: Props) {
           }))}
         />
 
-        <aside className="space-y-4">
+        <aside className="contents lg:block lg:space-y-4">
+          <div className="order-first lg:order-none"><SongReferences songId={id} references={references} canEdit={canEditSongs} /></div>
           {song.notes && (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
               <SectionLabel className="mb-1.5 text-amber-700">Band notes</SectionLabel>

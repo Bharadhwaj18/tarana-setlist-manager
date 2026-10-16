@@ -1,0 +1,123 @@
+'use client'
+
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { ChevronDown, Headphones, SkipBack, SkipForward } from 'lucide-react'
+import { Button } from '@/components/ui/Button'
+import { cn } from '@/lib/utils'
+import { formatTime, type PlayableSong } from '@/lib/song-references'
+import { usePlayer } from '@/components/player/PlayerProvider'
+import { EmbedPlayer, type EmbedHandle } from './EmbedPlayer'
+import { ServiceMark } from './ServiceMark'
+import { Cover } from './Cover'
+
+/** "Rehearse" on a setlist: plays each song's reference in setlist order, skipping songs without one. */
+export function RehearseButton({ songs }: { songs: PlayableSong[] }) {
+  const [open, setOpen] = useState(false)
+  const { close } = usePlayer()
+  const playable = songs.filter(s => s.reference).length
+  if (playable === 0) return null
+  return (
+    <>
+      <Button variant="secondary" size="sm" onClick={() => { close(); setOpen(true) }}>
+        <Headphones className="h-4 w-4" /> Rehearse
+      </Button>
+      {open && <RehearseView songs={songs} onClose={() => setOpen(false)} />}
+    </>
+  )
+}
+
+function RehearseView({ songs, onClose }: { songs: PlayableSong[]; onClose: () => void }) {
+  const firstPlayable = songs.findIndex(s => s.reference)
+  const [index, setIndex] = useState(firstPlayable)
+  // Only after the first song has been started by hand do later songs try to start on their own.
+  const [started, setStarted] = useState(false)
+  const [activeMoment, setActiveMoment] = useState<number | null>(null)
+  const player = useRef<EmbedHandle>(null)
+  const song = songs[index]
+  const ref = song?.reference
+
+  const step = (dir: 1 | -1) => {
+    for (let i = index + dir; i >= 0 && i < songs.length; i += dir) {
+      if (songs[i].reference) { setIndex(i); setActiveMoment(null); return }
+    }
+  }
+  const nextPlayable = songs.findIndex((s, i) => i > index && s.reference)
+  let prevPlayable = -1
+  for (let i = index - 1; i >= 0; i--) if (songs[i].reference) { prevPlayable = i; break }
+
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', key)
+    const overflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.removeEventListener('keydown', key); document.body.style.overflow = overflow }
+  }, [onClose])
+
+  if (!song || !ref) return null
+
+  return createPortal(
+    <div role="dialog" aria-modal="true" aria-label="Rehearse" className="animate-sheet-up fixed inset-0 z-[150] flex flex-col bg-brand-50 dark:bg-[#0b0b0c]">
+      <div className="flex items-center justify-between px-3 pb-1 pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <button type="button" onClick={onClose} aria-label="Close rehearsal" className="flex h-11 w-11 items-center justify-center rounded-xl text-gray-600 hover:bg-brand-100">
+          <ChevronDown className="h-6 w-6" />
+        </button>
+        <span className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-gray-500">Rehearsing · {index + 1} of {songs.length}</span>
+        <span className="w-11" />
+      </div>
+
+      <div className="mx-auto flex w-full max-w-xl min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <div key={song.songId} className="animate-fade-up flex items-center gap-4">
+          <Cover url={song.coverUrl ?? ref.thumbnailUrl} title={song.title} size={88} />
+          <div className="min-w-0">
+            <h2 className="font-display text-2xl font-bold leading-tight text-gray-900">{song.title}</h2>
+            <p className="truncate font-semibold text-gray-500">{[song.artist, song.songKey && `Key of ${song.songKey}`].filter(Boolean).join(' · ')}</p>
+            <p className="mt-1 inline-flex items-center gap-1.5 text-xs font-extrabold text-gray-700"><ServiceMark source={ref.source} size={14} />{ref.label}</p>
+          </div>
+        </div>
+
+        <EmbedPlayer key={ref.id} ref={player} reference={ref} autoPlay={started} onEnded={() => { setStarted(true); step(1) }} />
+
+        <div className="flex items-center justify-center gap-6">
+          <button type="button" onClick={() => step(-1)} disabled={prevPlayable < 0} aria-label="Previous song"
+            className="flex h-12 w-12 items-center justify-center rounded-full text-gray-800 hover:bg-brand-100 disabled:opacity-30"><SkipBack className="h-6 w-6" /></button>
+          <button type="button" onClick={() => { setStarted(true); step(1) }} disabled={nextPlayable < 0}
+            className="inline-flex min-h-12 items-center gap-2 rounded-full bg-brand-600 px-6 text-sm font-extrabold text-white hover:bg-brand-700 disabled:opacity-40">Next song<SkipForward className="h-4 w-4" /></button>
+        </div>
+
+        {ref.moments.length > 0 && (
+          <div className="flex flex-wrap justify-center gap-1.5">
+            {ref.moments.map((m, i) => (
+              <button key={`${m.at}-${m.label}`} type="button" aria-pressed={activeMoment === i} onClick={() => { setStarted(true); setActiveMoment(i); player.current?.seek(m.at) }}
+                className={cn('inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-sm font-extrabold', activeMoment === i ? 'bg-brand-600 text-white' : 'bg-brand-100 text-gray-800 hover:bg-brand-200')}>
+                <span className="font-mono text-xs opacity-80">{formatTime(m.at)}</span>{m.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="border-t border-brand-200 pt-2">
+          <p className="px-1 pb-1 text-[11px] font-extrabold uppercase tracking-[0.12em] text-gray-500">Up next</p>
+          {songs.slice(index + 1).map((s, offset) => {
+            const i = index + 1 + offset
+            return (
+              <button key={`${s.songId}-${i}`} type="button" disabled={!s.reference} onClick={() => { setIndex(i); setActiveMoment(null) }}
+                className="flex min-h-14 w-full items-center gap-3 rounded-xl px-1 text-left hover:bg-brand-100 disabled:opacity-50 disabled:hover:bg-transparent">
+                <span className="w-6 text-center font-mono text-sm text-gray-400">{i + 1}</span>
+                <Cover url={s.coverUrl ?? s.reference?.thumbnailUrl} title={s.title} size={40} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-extrabold text-gray-900">{s.title}</span>
+                  <span className="flex items-center gap-1 text-xs font-semibold text-gray-500">
+                    {s.reference ? <><ServiceMark source={s.reference.source} size={12} />{s.reference.label}</> : 'No reference, skipped'}
+                  </span>
+                </span>
+              </button>
+            )
+          })}
+          {index === songs.length - 1 && <p className="px-1 py-3 text-sm text-gray-500">That’s the last song in the set.</p>}
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )
+}

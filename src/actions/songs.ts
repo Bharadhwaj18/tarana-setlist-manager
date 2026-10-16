@@ -5,6 +5,13 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { requireWorkspaceId } from '@/lib/workspace'
 import type { SongFormData } from '@/lib/validators'
+import { addSongReference } from '@/actions/song-references'
+
+/** Just the song's own columns from the form (the link and cover are handled separately). */
+function songColumns(data: SongFormData) {
+  const { title, artist, song_key, bpm, time_signature, chord_chart, notes } = data
+  return { title, artist, song_key, bpm: bpm ?? null, time_signature, chord_chart, notes }
+}
 
 export async function createSong(data: SongFormData) {
   const supabase = await createClient()
@@ -14,8 +21,8 @@ export async function createSong(data: SongFormData) {
   const { data: song, error } = await supabase
     .from('songs')
     .insert({
-      ...data,
-      bpm: data.bpm ?? null,
+      ...songColumns(data),
+      ...(data.cover_url ? { cover_url: data.cover_url } : {}),
       created_by: user.id,
       workspace_id: await requireWorkspaceId(),
     })
@@ -23,6 +30,9 @@ export async function createSong(data: SongFormData) {
     .single()
 
   if (error) throw new Error(error.message)
+
+  // A link pasted on New song becomes the Original reference. The song is saved either way.
+  if (data.reference_url) await addSongReference({ songId: song.id, link: data.reference_url, label: 'Original', moments: [] })
 
   revalidatePath('/songs')
   redirect(`/songs/${song.id}`)
@@ -36,8 +46,7 @@ export async function updateSong(id: string, data: SongFormData, redirectTo?: st
   const { error } = await supabase
     .from('songs')
     .update({
-      ...data,
-      bpm: data.bpm ?? null,
+      ...songColumns(data),
       updated_by: user.id,
     })
     .eq('id', id)

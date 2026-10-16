@@ -10,6 +10,9 @@ import { DeleteSetlistButton } from '@/components/setlists/DeleteSetlistButton'
 import { ActiveSetlistSync } from '@/components/setlists/ActiveSetlistSync'
 import { SetlistPdfExport } from '@/components/pdf/SetlistPdfExport'
 import { SaveOfflineButton } from '@/components/setlists/SaveOfflineButton'
+import { RehearseButton } from '@/components/references/Rehearse'
+import { getCachedReferenceRows } from '@/lib/data'
+import { firstReferenceBySong } from '@/lib/song-references'
 import { Button } from '@/components/ui/Button'
 import { SectionLabel } from '@/components/ui/SectionLabel'
 import type { SetlistSongWithSong } from '@/types'
@@ -50,6 +53,12 @@ export default async function SetlistPage({ params }: Props) {
     setlistSongs.map(ss => ss.section).filter((s): s is string => !!s)
   )]
 
+  // Rehearse plays each song's first playable reference, in set order.
+  const firstRef = firstReferenceBySong(await getCachedReferenceRows())
+  const rehearsal = setlistSongs.map(ss => ({
+    songId: ss.song_id, title: ss.song.title, artist: ss.song.artist ?? null, songKey: ss.song.song_key ?? null,
+    coverUrl: ss.song.cover_url ?? null, reference: firstRef[ss.song_id] ?? null,
+  }))
   const songCount = setlistSongs.length
   const estimatedMinutes = Math.round(songCount * AVG_SONG_MINUTES)
   const songsWithoutChart = setlistSongs.filter(ss => !ss.song.chord_chart?.trim()).map(ss => ss.song.title)
@@ -126,6 +135,7 @@ export default async function SetlistPage({ params }: Props) {
           <div className="rounded-2xl bg-hero p-5 text-hero-fg">
             <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-sidebar-accent">Show night</p>
             <div className="mt-3 flex flex-wrap gap-2">
+              <RehearseButton songs={rehearsal} />
               <SaveOfflineButton
                 setlistId={id}
                 setlistTitle={setlist.title}

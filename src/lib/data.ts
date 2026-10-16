@@ -46,6 +46,20 @@ export const getCachedSong = cache(async (id: string) => {
   return data
 })
 
+// One song's references (Spotify, YouTube, ...), in the order they were added.
+export const getCachedSongReferences = cache(async (songId: string) => {
+  const supabase = await createClient()
+  const { data } = await supabase.from('song_references').select('*').eq('song_id', songId).order('position')
+  return data ?? []
+})
+
+// Every reference in the workspace, light columns only: the song list's play buttons and setlist rehearsal.
+export const getCachedReferenceRows = cache(() =>
+  inWorkspace((supabase, ws) =>
+    supabase.from('song_references').select('id, song_id, source, url, external_id, label, title, artist, thumbnail_url, moments').eq('workspace_id', ws).order('position')
+  )
+)
+
 export const getCachedSetlist = cache(async (id: string) => {
   const supabase = await createClient()
   const { data } = await supabase.from('setlists').select('*').eq('id', id).single()

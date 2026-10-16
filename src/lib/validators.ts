@@ -24,6 +24,9 @@ export const songSchema = z.object({
   time_signature: z.string().optional(),
   chord_chart: z.string().optional(),
   notes: z.string().optional(),
+  // New song only: a pasted Spotify / YouTube link, saved as the Original reference, and its cover.
+  reference_url: z.string().max(600).optional(),
+  cover_url: z.string().max(1000).optional(),
 })
 
 export const setlistSchema = z.object({

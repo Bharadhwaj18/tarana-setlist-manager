@@ -15,7 +15,9 @@ import { ChordPreview } from './ChordPreview'
 import { DeleteSongButton } from './DeleteSongButton'
 import { MUSICAL_KEYS, TIME_SIGNATURES } from '@/lib/utils'
 import type { Song } from '@/types'
-import { useTransition } from 'react'
+import { useRef, useTransition } from 'react'
+import { StartFromLink } from '@/components/references/StartFromLink'
+import type { ReferenceDetails } from '@/lib/reference-lookup'
 
 interface SongFormProps {
   song?: Song
@@ -31,7 +33,7 @@ const selectClass =
 export function SongForm({ song, onSubmit, title, backHref, backLabel }: SongFormProps) {
   const [isPending, startTransition] = useTransition()
 
-  const { register, handleSubmit, control, formState: { errors } } = useForm<SongFormData>({
+  const { register, handleSubmit, control, setValue, getValues, formState: { errors } } = useForm<SongFormData>({
     resolver: zodResolver(songSchema) as Resolver<SongFormData>,
     defaultValues: {
       title: song?.title ?? '',
@@ -44,6 +46,19 @@ export function SongForm({ song, onSubmit, title, backHref, backLabel }: SongFor
     },
   })
   const chart = useWatch({ control, name: 'chord_chart' }) ?? ''
+
+  // What a pasted link last filled in, so a different link can replace it but never overwrite typed text.
+  const filled = useRef<{ title?: string; artist?: string }>({})
+  const fillFromLink = (d: ReferenceDetails | null) => {
+    setValue('reference_url', d?.url ?? '')
+    setValue('cover_url', d?.thumbnailUrl ?? '')
+    if (!d) return
+    const title = getValues('title')?.trim() ?? ''
+    if (d.title && (!title || title === filled.current.title)) { setValue('title', d.title, { shouldValidate: true }); filled.current.title = d.title }
+    // Only Spotify knows the artist; a YouTube or SoundCloud name is whoever uploaded it.
+    const artist = getValues('artist')?.trim() ?? ''
+    if (d.source === 'spotify' && d.artist && (!artist || artist === filled.current.artist)) { setValue('artist', d.artist); filled.current.artist = d.artist }
+  }
 
   const handleFormSubmit = (data: SongFormData) => {
     startTransition(async () => {
@@ -68,6 +83,14 @@ export function SongForm({ song, onSubmit, title, backHref, backLabel }: SongFor
           }
         />
       </div>
+
+      {!song && (
+        <>
+          <StartFromLink onFound={fillFromLink} />
+          <input type="hidden" {...register('reference_url')} />
+          <input type="hidden" {...register('cover_url')} />
+        </>
+      )}
 
       {/* Details */}
       <div className="grid grid-cols-2 gap-4 rounded-2xl border border-brand-200 bg-white p-4 sm:grid-cols-6 sm:p-5">

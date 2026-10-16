@@ -7,13 +7,18 @@ import { LongPressMenu, type MenuItem } from '@/components/ui/LongPressMenu'
 import { deleteSong } from '@/actions/songs'
 import { StatusPill } from '@/components/ui/StatusPill'
 import type { Song } from '@/types'
+import type { PlayableSong } from '@/lib/song-references'
+import { Cover } from '@/components/references/Cover'
+import { PlayButton } from '@/components/player/PlayerProvider'
 
 interface SongRowProps {
   song: Song
   setlistCount: number
+  /** Set when the song has a reference the app can play. */
+  playable?: PlayableSong
 }
 
-export function SongRow({ song, setlistCount }: SongRowProps) {
+export function SongRow({ song, setlistCount, playable }: SongRowProps) {
   const router = useRouter()
   const menu: MenuItem[] = [
     { label: 'Open', href: `/songs/${song.id}`, icon: Music2 },
@@ -21,11 +26,12 @@ export function SongRow({ song, setlistCount }: SongRowProps) {
     { label: 'Delete', icon: Trash2, danger: true, onSelect: () => { if (window.confirm(`Delete "${song.title}"? This can’t be undone.`)) void deleteSong(song.id).then(r => { if (r.error) window.alert(r.error); else router.refresh() }) } },
   ]
   return (
-    <LongPressMenu title={song.title} items={menu}>
+    <LongPressMenu title={song.title} items={menu} className="flex items-center border-b border-gray-100 transition-colors last:border-b-0 hover:bg-gray-50">
     <Link
       href={`/songs/${song.id}`}
-      className="flex items-center gap-3 border-b border-gray-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-gray-50"
+      className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3"
     >
+      <Cover url={song.cover_url} title={song.title} size={44} />
       <div className="min-w-0 flex-1">
         <p className="truncate font-bold text-gray-900">{song.title}</p>
         {song.artist && <p className="truncate text-xs text-gray-500">{song.artist}</p>}
@@ -39,6 +45,7 @@ export function SongRow({ song, setlistCount }: SongRowProps) {
         {setlistCount} {setlistCount === 1 ? 'setlist' : 'setlists'}
       </span>
     </Link>
+    {playable && <PlayButton song={playable} className="mr-3" />}
     </LongPressMenu>
   )
 }

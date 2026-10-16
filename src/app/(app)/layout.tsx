@@ -13,6 +13,7 @@ import type { ReactNode } from 'react'
 import { hiddenSectionsOf } from '@/lib/workspace-sections'
 import { getWorkspaceContext, isFinanceApprover } from '@/lib/workspace'
 import { PageFade } from '@/components/layout/PageFade'
+import { PlayerProvider, PlayerSpacer } from '@/components/player/PlayerProvider'
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const supabase = await createClient()
@@ -66,6 +67,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const financeSettings = await getCachedFinanceSettings()
 
   return (
+    <PlayerProvider>
     <div className="flex h-screen">
       <OfflineUserSync email={effectiveUser.email ?? ''} displayName={profile?.display_name ?? ''} />
       <IdentifyUser userId={effectiveUser.id} email={effectiveUser.email} name={profile?.display_name} />
@@ -74,9 +76,10 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         currentWorkspaceId={currentWorkspaceId} hiddenSections={hiddenSections} />
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-5xl px-4 pb-28 pt-16 sm:px-6 lg:px-8 lg:pb-8 lg:pt-8">
-          <FinanceSettingsProvider settings={financeSettings} canApprove={!!ctx && isFinanceApprover(ctx.current)}><PageFade>{children}</PageFade></FinanceSettingsProvider>
+          <FinanceSettingsProvider settings={financeSettings} canApprove={!!ctx && isFinanceApprover(ctx.current)}><PageFade>{children}</PageFade><PlayerSpacer /></FinanceSettingsProvider>
         </div>
       </main>
     </div>
+    </PlayerProvider>
   )
 }
