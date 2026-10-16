@@ -14,6 +14,7 @@ import type { Member, Task, TaskBoard, TaskBucket, TaskField } from '@/types/tas
 import { CellMenu } from './CellMenu'
 import { AddColumnDialog } from './AddColumnDialog'
 import { FilterSheet } from './FilterSheet'
+import { RepeatBadge } from '../RepeatBadge'
 import { TaskExtras } from './TaskExtras'
 import {
   BucketCell, CustomCell, DateCell, DoneToggle, Faces, GroupCell, InlineText, PeopleCell, PriorityCell, StatusCell, recentTick, shortDate,
@@ -261,7 +262,7 @@ export function TasksView(props: Props) {
                         {col.key === 'status' && <StatusCell task={t} c={c} />}
                         {col.key === 'priority' && <PriorityCell task={t} c={c} />}
                         {col.key === 'who' && <PeopleCell task={t} c={c} />}
-                        {col.key === 'due' && <DateCell value={t.due_date} label="Due date" readOnly={readOnly} overdue={t.progress !== 'completed' && !!t.due_date && t.due_date < today} onChange={v => onPatch(t, { dueDate: v })} />}
+                        {col.key === 'due' && <span className="flex min-w-0 items-center gap-1.5"><RepeatBadge recurrence={t.recurrence} /><DateCell value={t.due_date} label="Due date" readOnly={readOnly} overdue={t.progress !== 'completed' && !!t.due_date && t.due_date < today} onChange={v => onPatch(t, { dueDate: v })} /></span>}
                         {col.key === 'group' && <GroupCell task={t} c={c} />}
                         {col.key === 'bucket' && <BucketCell task={t} c={c} />}
                       </span>
@@ -345,7 +346,7 @@ function PhoneRow({ task: t, c, fields, open, onToggle, last, onPatch }: { task:
           <span className="min-w-0 flex-1">
             <span className={cn('block truncate text-[15px] font-bold', t.progress === 'completed' ? cn('strike-draw text-gray-400', recentTick(t.id) && 'animate-strike-draw') : 'text-gray-900')}>{t.title}</span>
             <span className={cn('block text-xs font-bold', overdue ? 'text-red-600' : t.due_date ? 'text-gray-500' : 'text-gray-400')}>
-              {t.due_date ? `${overdue ? 'Overdue · ' : 'Due '}${shortDate(t.due_date)}` : 'No date'}
+              <span className="inline-flex flex-wrap items-center gap-x-2">{t.due_date ? `${overdue ? 'Overdue · ' : 'Due '}${shortDate(t.due_date)}` : 'No date'}<RepeatBadge recurrence={t.recurrence} /></span>
             </span>
           </span>
           {t.assignee_ids.length > 0 && <Faces ids={t.assignee_ids} c={c} size={26} />}

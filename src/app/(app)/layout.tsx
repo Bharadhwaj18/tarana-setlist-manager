@@ -14,6 +14,7 @@ import { hiddenSectionsOf } from '@/lib/workspace-sections'
 import { getWorkspaceContext, isFinanceApprover } from '@/lib/workspace'
 import { PageFade } from '@/components/layout/PageFade'
 import { PlayerProvider, PlayerSpacer } from '@/components/player/PlayerProvider'
+import { TooltipLayer } from '@/components/ui/TooltipLayer'
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const supabase = await createClient()
@@ -79,6 +80,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           <FinanceSettingsProvider settings={financeSettings} canApprove={!!ctx && isFinanceApprover(ctx.current)}><PageFade>{children}</PageFade><PlayerSpacer /></FinanceSettingsProvider>
         </div>
       </main>
+      <TooltipLayer />
     </div>
     </PlayerProvider>
   )

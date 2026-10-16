@@ -8,6 +8,7 @@ import { Avatar } from './AssigneePicker'
 import { cn } from '@/lib/utils'
 import { formatDateDMY } from '@/lib/dates'
 import { PRIORITY_CHIP, PRIORITY_LABELS, PROGRESS_LABELS, labelStyle, type TaskLabel, type TaskPriority, type TaskProgress, type Task } from '@/types/tasks'
+import { RepeatBadge } from './RepeatBadge'
 
 const STATUS_CHIP: Record<string, string> = {
   not_started: 'bg-gray-100 text-gray-700',
@@ -81,6 +82,7 @@ export function TaskCard({ task, labelsById, nameById, today, onOpen }: Props) {
         )}
         <span className={cn('inline-flex items-center gap-1 rounded px-1.5 py-0.5', overdue ? 'bg-red-50 font-medium text-red-600' : task.due_date ? 'bg-gray-50' : 'text-gray-400')}>
           <CalendarDays className="h-3 w-3" /> {task.due_date ? (overdue ? `Overdue · ${formatDateDMY(task.due_date)}` : formatDateDMY(task.due_date)) : 'No deadline'}
+          <RepeatBadge recurrence={task.recurrence} className="ml-0.5" />
         </span>
         <span className={cn('rounded-full px-2 py-0.5 font-bold', STATUS_CHIP[task.progress] ?? STATUS_CHIP.not_started)}>{PROGRESS_LABELS[task.progress as TaskProgress] ?? task.progress}</span>
         {task.checklist.length > 0 && (

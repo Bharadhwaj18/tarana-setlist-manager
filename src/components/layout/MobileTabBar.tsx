@@ -55,7 +55,7 @@ export function MobileTabBar({ pendingPaymentCount = 0, hiddenSections = [] }: {
             <span key={isActive ? 'on' : 'off'} className={cn('relative flex h-7 w-14 items-center justify-center rounded-full transition-colors', isActive ? 'text-brand-700' : 'text-gray-500', isActive && 'animate-pop-tap')}>
               <Icon className="h-[22px] w-[22px]" />
               {href === '/finance' && pendingPaymentCount > 0 && (
-                <span key={pendingPaymentCount} className="animate-badge-bounce absolute right-2 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                <span key={pendingPaymentCount} data-tip={`${pendingPaymentCount} payment${pendingPaymentCount === 1 ? '' : 's'} you owe`} className="animate-badge-bounce absolute right-2 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
                   {pendingPaymentCount}
                 </span>
               )}
