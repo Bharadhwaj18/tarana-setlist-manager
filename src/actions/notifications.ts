@@ -5,6 +5,11 @@ import { createClient } from '@/lib/supabase/server'
 import { sendPushToProfile } from '@/lib/push'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { chooseWorkspace } from '@/lib/workspace-cookies'
+import { safeNextPath } from '@/lib/safe-redirect'
+
+// A notification only ever links inside the app. Anything else (another site, a protocol URL) is dropped,
+// so tapping a notification can't send someone off-site.
+const inAppLink = (link: string | null | undefined) => (link && safeNextPath(link, '')) || null
 
 export interface PushSubscriptionData {
   endpoint: string
@@ -60,13 +65,13 @@ export async function sendNotification({ recipientId, title, body, link, type }:
     workspace_id: ctx?.current.workspace.id ?? null,
     title,
     body: body ?? null,
-    link: link ?? null,
+    link: inAppLink(link),
     type: type ?? 'custom',
   })
   if (error) return { error: error.message }
 
   try {
-    await sendPushToProfile(recipientId, { title, body, link })
+    await sendPushToProfile(recipientId, { title, body, link: inAppLink(link) })
   } catch {
     // Push is a bonus on top of the in-app notification — never fail the
     // action just because a push send hiccupped.
@@ -112,14 +117,14 @@ export async function sendNotificationToAll({ title, body, link, type }: SendNot
       workspace_id: ctx.current.workspace.id,
       title,
       body: body ?? null,
-      link: link ?? null,
+      link: inAppLink(link),
       type: type ?? 'custom',
     }))
   )
   if (error) return { error: error.message }
 
   await Promise.allSettled(
-    profiles.map(p => sendPushToProfile(p.id, { title, body, link }))
+    profiles.map(p => sendPushToProfile(p.id, { title, body, link: inAppLink(link) }))
   )
 
   revalidatePath('/', 'layout')
@@ -179,5 +184,5 @@ export async function openNotification(id: string): Promise<{ link: string | nul
     if (!ctx.memberships.some(m => m.workspace.id === workspaceId)) return { link: null, error: 'You’re no longer in that workspace.' }
     await chooseWorkspace(workspaceId)
   }
-  return { link: n.link }
+  return { link: inAppLink(n.link) }
 }

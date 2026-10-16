@@ -13,11 +13,12 @@ interface ChordEditorProps {
 
 // Extract text from PDF preserving horizontal spacing (for chord alignment)
 async function extractPdfText(file: File): Promise<string> {
-  // Dynamic import avoids SSR issues; CDN worker avoids bundler complexity
+  // Dynamic import avoids SSR issues. The worker is bundled with the app (not loaded from a CDN),
+  // so the code that parses PDFs always matches the installed, patched pdfjs-dist.
   const pdfjs = await import('pdfjs-dist')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ;(pdfjs as any).GlobalWorkerOptions.workerSrc =
-    `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.mjs`
+    new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString()
 
   const arrayBuffer = await file.arrayBuffer()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

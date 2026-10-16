@@ -9,6 +9,9 @@ import { createRecording } from '@/actions/recordings'
 import { useAudioRecorder, extensionForMimeType, formatDuration } from '@/lib/audio-recorder'
 
 const BUCKET = 'recordings'
+// Matches the bucket's limit (supabase/migrations/20261026000000_recordings_limits.sql).
+// About 55 minutes at the recorder's usual quality.
+const MAX_BYTES = 50 * 1024 * 1024
 
 export function RecordButton({ userId }: { userId: string }) {
   const { status, elapsedSeconds, start, stop } = useAudioRecorder()
@@ -22,6 +25,10 @@ export function RecordButton({ userId }: { userId: string }) {
   const handleStop = async () => {
     const clip = await stop()
     if (!clip) return
+    if (clip.blob.size > MAX_BYTES) {
+      toast('That recording is over 50 MB (about 55 minutes), too long to save. Keep memos shorter.', 'error')
+      return
+    }
 
     setSaving(true)
     try {
@@ -31,7 +38,8 @@ export function RecordButton({ userId }: { userId: string }) {
 
       const { error: uploadError } = await supabase.storage
         .from(BUCKET)
-        .upload(filePath, clip.blob, { contentType: clip.mimeType })
+        // Base type only ('audio/webm', not 'audio/webm;codecs=opus'): the bucket accepts audio/* types.
+        .upload(filePath, clip.blob, { contentType: clip.mimeType.split(';')[0] })
       if (uploadError) {
         toast('Failed to upload recording', 'error')
         return

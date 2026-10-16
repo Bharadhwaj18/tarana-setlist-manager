@@ -15,6 +15,13 @@ describe('safeNextPath', () => {
     expect(safeNextPath('/\\evil.com')).toBe('/')
     expect(safeNextPath('/a\nb')).toBe('/')
   })
+  it('keeps every link format notifications use', () => {
+    const id = '1ebc818f-c1ea-438f-a49d-10b769c95582'
+    for (const link of ['/', '/calendar', '/finance/history', `/shows/${id}`, `/setlists/${id}`, `/tasks?task=${id}`]) {
+      expect(safeNextPath(link, '')).toBe(link)
+    }
+    expect(safeNextPath('javascript:alert(1)', '')).toBe('')
+  })
   it('uses a custom fallback', () => {
     expect(safeNextPath('nope', '/x')).toBe('/x')
   })
