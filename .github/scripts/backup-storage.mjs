@@ -12,8 +12,10 @@ import { mkdir, readFile, writeFile, readdir, rm } from 'node:fs/promises'
 import { dirname, join, relative, sep } from 'node:path'
 
 const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OUT_DIR } = process.env
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !OUT_DIR) {
-  console.error('SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and OUT_DIR are required')
+const missing = Object.entries({ SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OUT_DIR }).filter(([, v]) => !v).map(([k]) => k)
+if (missing.length) {
+  console.error(`Missing: ${missing.join(', ')}. SUPABASE_SERVICE_ROLE_KEY must be a repository secret ` +
+    '(Settings → Secrets and variables → Actions → Repository secrets), not an environment, Dependabot or Codespaces secret.')
   process.exit(1)
 }
 
