@@ -2,6 +2,7 @@ import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { getWorkspaceContext } from '@/lib/workspace'
 import type { TaskData } from '@/types/tasks'
+import { seesFrom, type GroupNote, type WorkspaceGroup } from '@/lib/groups'
 import { normaliseFinanceSettings } from '@/lib/finance/settings'
 
 export { getCachedUser } from '@/lib/auth-cache'
@@ -59,6 +60,29 @@ export const getCachedReferenceRows = cache(() =>
     supabase.from('song_references').select('id, song_id, source, url, external_id, label, title, artist, thumbnail_url, moments').eq('workspace_id', ws).order('position')
   )
 )
+
+// The workspace's groups, each with who's in it. Members who have left are dropped by the database.
+export const getCachedWorkspaceGroups = cache(async (): Promise<WorkspaceGroup[]> => {
+  const ctx = await getWorkspaceContext()
+  if (!ctx) return []
+  const supabase = await createClient()
+  const ws = ctx.current.workspace.id
+  const [{ data: groups }, { data: members }] = await Promise.all([
+    supabase.from('workspace_groups').select('id, name, color, sees').eq('workspace_id', ws).order('position').order('created_at'),
+    supabase.from('workspace_group_members').select('group_id, user_id').eq('workspace_id', ws),
+  ])
+  return (groups ?? []).map(g => ({
+    id: g.id, name: g.name, color: g.color, sees: seesFrom(g.sees),
+    memberIds: (members ?? []).filter(m => m.group_id === g.id).map(m => m.user_id),
+  }))
+})
+
+// Each group's notes on one song, keyed by group id.
+export const getCachedSongGroupNotes = cache(async (songId: string): Promise<Record<string, GroupNote>> => {
+  const supabase = await createClient()
+  const { data } = await supabase.from('song_group_notes').select('group_id, content, updated_by, updated_at').eq('song_id', songId)
+  return Object.fromEntries((data ?? []).map(n => [n.group_id, { content: n.content, updatedBy: n.updated_by, updatedAt: n.updated_at }]))
+})
 
 export const getCachedSetlist = cache(async (id: string) => {
   const supabase = await createClient()

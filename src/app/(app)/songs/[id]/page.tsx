@@ -4,7 +4,8 @@ import { LinkedNotes } from '@/components/notes/LinkedNotes'
 import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight, Pencil } from 'lucide-react'
-import { getCachedSong, getCachedSetlist, getCachedAllProfiles, getCachedSetlistSongs, getCachedUser, getCachedRecordings, getCachedSongs, getCachedSongReferences } from '@/lib/data'
+import { getCachedSong, getCachedSetlist, getCachedAllProfiles, getCachedSetlistSongs, getCachedUser, getCachedRecordings, getCachedSongs, getCachedSongReferences, getCachedWorkspaceGroups, getCachedSongGroupNotes } from '@/lib/data'
+import { SongViews, type NoteView } from '@/components/groups/SongViews'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { toPlayable, type PlayableReference } from '@/lib/song-references'
 import { SongReferences } from '@/components/references/SongReferences'
@@ -44,7 +45,7 @@ export default async function SongPage({ params, searchParams }: Props) {
   const setlistId = explicitSetlistId ?? cookieSetlistId
   const canonicalFrom = setlistId ? `/setlists/${setlistId}` : null
 
-  const [song, setlist, profiles, { data: { user } }, setlistSongs, recordings, allSongs, referenceRows, ctx] = await Promise.all([
+  const [song, setlist, profiles, { data: { user } }, setlistSongs, recordings, allSongs, referenceRows, ctx, groups, groupNotes] = await Promise.all([
     getCachedSong(id),
     setlistId ? getCachedSetlist(setlistId) : Promise.resolve(null),
     getCachedAllProfiles(),
@@ -54,6 +55,8 @@ export default async function SongPage({ params, searchParams }: Props) {
     getCachedSongs(),
     getCachedSongReferences(id),
     getWorkspaceContext(),
+    getCachedWorkspaceGroups(),
+    getCachedSongGroupNotes(id),
   ])
 
   if (!song) notFound()
@@ -67,6 +70,10 @@ export default async function SongPage({ params, searchParams }: Props) {
 
   const nameOf = (uid: string) =>
     uid === user?.id ? 'You' : (profiles.find(p => p.id === uid)?.display_name ?? 'Band member')
+
+  const notesForView: Record<string, NoteView> = Object.fromEntries(Object.entries(groupNotes).map(([groupId, note]) => [
+    groupId, { content: note.content, updatedAt: note.updatedAt, updatedByName: note.updatedBy ? nameOf(note.updatedBy) : null },
+  ]))
 
   // Where this song sits in the setlist we arrived from, for the previous / next bar.
   const position = setlistSongs.findIndex(ss => ss.song_id === id)
@@ -133,7 +140,14 @@ export default async function SongPage({ params, searchParams }: Props) {
         {/* Chord chart — keyed by song id so navigating between songs (e.g. via
             setlist prev/next, which reuse this same route) remounts with fresh
             state instead of needing an effect to manually reset it. */}
-        <ChordViewer
+        <SongViews
+          songId={id}
+          groups={groups}
+          myGroupIds={groups.filter(g => user && g.memberIds.includes(user.id)).map(g => g.id)}
+          isAdmin={ctx?.current.role === 'owner' || ctx?.current.role === 'admin'}
+          canEditSongs={canEditSongs}
+          notes={notesForView}
+          chart={<ChordViewer
           key={id}
           chordChart={song.chord_chart ?? ''}
           songKey={song.song_key}
@@ -153,6 +167,7 @@ export default async function SongPage({ params, searchParams }: Props) {
             notes: ss.song.notes ?? null,
             section: ss.section ?? null,
           }))}
+        />}
         />
 
         <aside className="contents lg:block lg:space-y-4">

@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { KeyRound, Link2, Trash2, UserPlus } from 'lucide-react'
+import { KeyRound, Link2, Trash2, UserPlus, Users } from 'lucide-react'
 import { setMemberRole, setMemberTreasurer, removeMember } from '@/actions/workspace'
 import { StatusPill } from '@/components/ui/StatusPill'
 import { UserAvatar } from '@/components/ui/UserAvatar'
@@ -11,6 +11,9 @@ import { cn } from '@/lib/utils'
 import type { MemberRow } from './settings-types'
 import { AccessDialog } from './AccessDialog'
 import { SECTIONS } from '@/lib/workspace-sections'
+import type { WorkspaceGroup } from '@/lib/groups'
+import { GroupTag, GroupsSection, MemberGroupsSheet } from '@/components/groups/GroupsSettings'
+import { Select } from '@/components/ui/Select'
 
 const ROLE_LABEL: Record<string, string> = { owner: 'Owner', admin: 'Admin', member: 'Member' }
 
@@ -20,13 +23,16 @@ interface Props {
   isAdmin: boolean
   isOwner: boolean
   activeInviteCount: number
+  groups: WorkspaceGroup[]
 }
 
-export function MembersSettings({ workspaceName, members, isAdmin, isOwner, activeInviteCount }: Props) {
+export function MembersSettings({ workspaceName, members, isAdmin, isOwner, activeInviteCount, groups }: Props) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const [accessFor, setAccessFor] = useState<MemberRow | null>(null)
+  const [groupsFor, setGroupsFor] = useState<MemberRow | null>(null)
+  const people = members.map(m => ({ userId: m.userId, name: m.name, avatarUrl: m.avatarUrl }))
 
   const run = (fn: () => Promise<{ error?: string }>) => {
     setError(null)
@@ -50,6 +56,8 @@ export function MembersSettings({ workspaceName, members, isAdmin, isOwner, acti
 
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
+      <GroupsSection groups={groups} people={people} isAdmin={isAdmin} />
+
       <ul className="divide-y divide-brand-100 overflow-hidden rounded-2xl border border-brand-200 bg-white shadow-sm">
         {members.map(m => {
           const manageable = isAdmin && m.role !== 'owner' && !m.isYou
@@ -66,9 +74,16 @@ export function MembersSettings({ workspaceName, members, isAdmin, isOwner, acti
                   {isAdmin && m.role === 'member' && SECTIONS.some(sec => m.sections[sec.key] === 'none') && (
                     <StatusPill tone="gray">Limited</StatusPill>
                   )}
+                  {groups.filter(g => g.memberIds.includes(m.userId)).map(g => <GroupTag key={g.id} group={g} />)}
                 </div>
               </div>
 
+              {isAdmin && groups.length > 0 && (
+                <button type="button" onClick={() => setGroupsFor(m)} aria-label={`Groups for ${m.name}`}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 px-2.5 py-1.5 text-xs font-bold text-gray-700 hover:bg-brand-50">
+                  <Users className="h-3.5 w-3.5" /> Groups
+                </button>
+              )}
               {manageable && (
                 <div className="flex items-center gap-3">
                   <label className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-gray-600">
@@ -76,7 +91,7 @@ export function MembersSettings({ workspaceName, members, isAdmin, isOwner, acti
                     Treasurer
                   </label>
                   {isOwner && (
-                    <select
+                    <Select
                       value={m.role}
                       disabled={pending}
                       aria-label={`Role for ${m.name}`}
@@ -85,7 +100,7 @@ export function MembersSettings({ workspaceName, members, isAdmin, isOwner, acti
                     >
                       <option value="member">Member</option>
                       <option value="admin">Admin</option>
-                    </select>
+                    </Select>
                   )}
                   {m.role === 'member' && (
                     <button
@@ -119,6 +134,10 @@ export function MembersSettings({ workspaceName, members, isAdmin, isOwner, acti
           <span className="flex-1">{activeInviteCount} active invite {activeInviteCount === 1 ? 'link' : 'links'}</span>
           <span className="font-bold text-brand-600">Manage</span>
         </Link>
+      )}
+      {groupsFor && (
+        <MemberGroupsSheet key={groupsFor.userId} person={{ userId: groupsFor.userId, name: groupsFor.name, avatarUrl: groupsFor.avatarUrl }}
+          groups={groups} people={people} open onOpenChange={o => { if (!o) setGroupsFor(null) }} />
       )}
       {accessFor && (
         <AccessDialog

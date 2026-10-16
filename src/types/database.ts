@@ -87,6 +87,87 @@ export type Database = {
         }
         Relationships: []
       }
+      song_group_notes: {
+        Row: {
+          id: string
+          workspace_id: string
+          song_id: string
+          group_id: string
+          content: string
+          updated_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          song_id: string
+          group_id: string
+          content?: string
+          updated_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          song_id?: string
+          group_id?: string
+          content?: string
+          updated_by?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      workspace_group_members: {
+        Row: {
+          group_id: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          group_id: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          group_id?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
+      workspace_groups: {
+        Row: {
+          id: string
+          workspace_id: string
+          name: string
+          color: string
+          sees: string
+          position: number
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          name: string
+          color?: string
+          sees?: string
+          position?: number
+          created_by?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          name?: string
+          color?: string
+          sees?: string
+          position?: number
+          created_by?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       songs: {
         Row: {
           workspace_id: string | null
