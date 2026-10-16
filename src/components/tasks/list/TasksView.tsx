@@ -305,11 +305,7 @@ export function TasksView(props: Props) {
           </section>
         ))}
         {shown.length === 0 && <p className="rounded-2xl border-2 border-dashed border-brand-200 px-4 py-10 text-center text-sm text-gray-500">No tasks match. Try clearing a filter.</p>}
-        {!readOnly && (
-          <button type="button" onClick={() => setColumnDialog({})} className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-2xl border-[1.5px] border-dashed border-brand-200 text-sm font-bold text-gray-600">
-            <Plus className="h-4 w-4" />Add a column
-          </button>
-        )}
+
       </div>
 
       <FilterSheet open={filterOpen} onOpenChange={setFilterOpen} view={view} onChange={changeView} members={members} boards={boards} currentUserId={currentUserId} shownCount={shown.length} />
