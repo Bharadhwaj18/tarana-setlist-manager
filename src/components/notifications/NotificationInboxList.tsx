@@ -3,7 +3,8 @@
 import { useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { markNotificationRead, markAllNotificationsRead } from '@/actions/notifications'
+import { markNotificationRead, markAllNotificationsRead, openNotification } from '@/actions/notifications'
+import { useToast } from '@/components/ui/Toaster'
 import { Button } from '@/components/ui/Button'
 import type { NotificationItem } from '@/types/notifications'
 
@@ -20,9 +21,10 @@ export function NotificationInboxList({ items }: Props) {
   const [, startTransition] = useTransition()
   const hasUnread = items.some(n => !n.read)
 
+  const toast = useToast()
   const handleClick = (n: NotificationItem) => {
     if (!n.read) startTransition(() => { markNotificationRead(n.id) })
-    if (n.link) router.push(n.link)
+    if (n.link) startTransition(async () => { const res = await openNotification(n.id); if (res.error) { toast(res.error, 'error'); return }; router.push(res.link ?? '/') })
   }
 
   return (

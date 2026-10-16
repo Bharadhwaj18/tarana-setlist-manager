@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { sendPushToProfile } from '@/lib/push'
 import { getWorkspaceContext } from '@/lib/workspace'
+import { chooseWorkspace } from '@/lib/workspace-cookies'
 
 export interface PushSubscriptionData {
   endpoint: string
@@ -54,9 +55,11 @@ export async function sendNotification({ recipientId, title, body, link, type }:
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
+  const ctx = await getWorkspaceContext()
   const { error } = await supabase.from('notifications').insert({
     recipient_id: recipientId,
     sender_id: user.id,
+    workspace_id: ctx?.current.workspace.id ?? null,
     title,
     body: body ?? null,
     link: link ?? null,
@@ -108,6 +111,7 @@ export async function sendNotificationToAll({ title, body, link, type }: SendNot
     profiles.map(p => ({
       recipient_id: p.id,
       sender_id: user.id,
+      workspace_id: ctx.current.workspace.id,
       title,
       body: body ?? null,
       link: link ?? null,
@@ -145,4 +149,37 @@ export async function markAllNotificationsRead(): Promise<{ error?: string }> {
   if (error) return { error: error.message }
   revalidatePath('/', 'layout')
   return {}
+}
+
+/** The workspace an entity link points at (a show, setlist or task), for notifications saved before they had one. */
+async function workspaceOfLink(supabase: Awaited<ReturnType<typeof createClient>>, link: string | null): Promise<string | null> {
+  if (!link) return null
+  const show = link.match(/^\/shows\/([0-9a-f-]{36})/)
+  if (show) return (await supabase.from('shows').select('workspace_id').eq('id', show[1]).maybeSingle()).data?.workspace_id ?? null
+  const setlist = link.match(/^\/setlists\/([0-9a-f-]{36})/)
+  if (setlist) return (await supabase.from('setlists').select('workspace_id').eq('id', setlist[1]).maybeSingle()).data?.workspace_id ?? null
+  const task = link.match(/^\/tasks\?task=([0-9a-f-]{36})/)
+  if (task) return (await supabase.from('tasks').select('workspace_id').eq('id', task[1]).maybeSingle()).data?.workspace_id ?? null
+  return null
+}
+
+/**
+ * Opens a notification: if it came from a workspace the user is in but isn't on right now, switches to it first,
+ * then the caller navigates to the returned link. A link into another workspace would otherwise 404.
+ */
+export async function openNotification(id: string): Promise<{ link: string | null; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { link: null, error: 'Not authenticated' }
+
+  const { data: n } = await supabase.from('notifications').select('link, workspace_id').eq('id', id).maybeSingle()
+  if (!n) return { link: null, error: 'That notification is no longer there.' }
+
+  const workspaceId = n.workspace_id ?? (await workspaceOfLink(supabase, n.link))
+  const ctx = await getWorkspaceContext()
+  if (workspaceId && ctx && ctx.current.workspace.id !== workspaceId) {
+    if (!ctx.memberships.some(m => m.workspace.id === workspaceId)) return { link: null, error: 'You’re no longer in that workspace.' }
+    await chooseWorkspace(workspaceId)
+  }
+  return { link: n.link }
 }

@@ -1170,6 +1170,7 @@ export type Database = {
           title: string
           body: string | null
           link: string | null
+          workspace_id: string | null
           type: string
           read_at: string | null
           created_at: string
@@ -1181,6 +1182,7 @@ export type Database = {
           title: string
           body?: string | null
           link?: string | null
+          workspace_id?: string | null
           type?: string
           read_at?: string | null
           created_at?: string
@@ -1192,6 +1194,7 @@ export type Database = {
           title?: string
           body?: string | null
           link?: string | null
+          workspace_id?: string | null
           type?: string
           read_at?: string | null
           created_at?: string

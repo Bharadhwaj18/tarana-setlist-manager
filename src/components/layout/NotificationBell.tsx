@@ -6,7 +6,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Bell, CalendarDays, CalendarX, CheckSquare, ListMusic, Users, Wallet, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { markNotificationRead, markAllNotificationsRead } from '@/actions/notifications'
+import { markNotificationRead, markAllNotificationsRead, openNotification } from '@/actions/notifications'
+import { useToast } from '@/components/ui/Toaster'
 import type { NotificationItem } from '@/types/notifications'
 
 interface Props {
@@ -78,10 +79,11 @@ export function NotificationBell({ notifications, tone = 'sidebar' }: Props) {
     setOpen(v => !v)
   }
 
+  const toast = useToast()
   const handleClick = (n: NotificationItem) => {
     setOpen(false)
     if (!n.read) startTransition(() => { markNotificationRead(n.id) })
-    if (n.link) router.push(n.link)
+    if (n.link) startTransition(async () => { const res = await openNotification(n.id); if (res.error) { toast(res.error, 'error'); return }; router.push(res.link ?? '/') })
   }
 
   return (

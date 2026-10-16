@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
 
   const { data: dueTasks } = await supabase
     .from('tasks')
-    .select('id, board_id, title, created_by, due_date, remind_days_before, assignee_ids')
+    .select('id, board_id, workspace_id, title, created_by, due_date, remind_days_before, assignee_ids')
     .not('due_date', 'is', null)
     .not('remind_days_before', 'is', null)
     .neq('progress', 'completed')
@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
       const { error } = await supabase.from('notifications').insert({
         recipient_id: recipientId,
         sender_id: null,
+        workspace_id: task.workspace_id,
         title: `"${task.title}" is due ${dueLabel}`,
         body: null,
         link,
@@ -72,6 +73,7 @@ export async function GET(request: NextRequest) {
         const { error } = await supabase.from('notifications').insert({
           recipient_id: profile.id,
           sender_id: null,
+          workspace_id: show.workspace_id,
           title,
           body,
           link: `/shows/${show.id}`,
