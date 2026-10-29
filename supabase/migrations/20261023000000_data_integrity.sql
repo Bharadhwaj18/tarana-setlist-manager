@@ -198,4 +198,9 @@ alter table public.profiles drop column if exists role;
 -- Housekeeping flagged by the advisor.
 alter function public.set_updated_at() set search_path = public;
 
+-- Grants: Supabase no longer opens new tables to the API on its own (from 2026-10-30), so say who may reach them.
+-- Row-level security above still decides which rows; logged-out visitors get nothing.
+grant select on public.finance_audit to authenticated;
+grant select, insert, update, delete on public.finance_audit to service_role;
+
 commit;

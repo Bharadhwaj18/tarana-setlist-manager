@@ -49,4 +49,9 @@ create policy ws_section_delete on public.task_fields as restrictive for delete 
 
 revoke all on public.task_fields from anon;
 
+-- Grants: Supabase no longer opens new tables to the API on its own (from 2026-10-30), so say who may reach them.
+-- Row-level security above still decides which rows; logged-out visitors get nothing.
+grant select, insert, update, delete on public.task_fields to authenticated;
+grant select, insert, update, delete on public.task_fields to service_role;
+
 commit;

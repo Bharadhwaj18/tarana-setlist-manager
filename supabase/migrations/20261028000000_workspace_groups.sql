@@ -115,4 +115,13 @@ revoke all on public.workspace_groups from anon;
 revoke all on public.workspace_group_members from anon;
 revoke all on public.song_group_notes from anon;
 
+-- Grants: Supabase no longer opens new tables to the API on its own (from 2026-10-30), so say who may reach them.
+-- Row-level security above still decides which rows; logged-out visitors get nothing.
+grant select, insert, update, delete on public.workspace_groups to authenticated;
+grant select, insert, update, delete on public.workspace_groups to service_role;
+grant select, insert, update, delete on public.workspace_group_members to authenticated;
+grant select, insert, update, delete on public.workspace_group_members to service_role;
+grant select, insert, update, delete on public.song_group_notes to authenticated;
+grant select, insert, update, delete on public.song_group_notes to service_role;
+
 commit;

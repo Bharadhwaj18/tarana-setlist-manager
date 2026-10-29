@@ -146,4 +146,11 @@ end $$;
 revoke all on function public.rename_finance_tag(uuid, text, text) from public, anon;
 grant execute on function public.rename_finance_tag(uuid, text, text) to authenticated;
 
+-- Grants: Supabase no longer opens new tables to the API on its own (from 2026-10-30), so say who may reach them.
+-- Row-level security above still decides which rows; logged-out visitors get nothing.
+grant select, insert, update, delete on public.finance_projects to authenticated;
+grant select, insert, update, delete on public.finance_projects to service_role;
+grant select, insert, update, delete on public.finance_recurring to authenticated;
+grant select, insert, update, delete on public.finance_recurring to service_role;
+
 commit;

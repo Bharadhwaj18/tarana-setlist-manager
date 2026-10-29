@@ -132,4 +132,9 @@ end $$;
 revoke all on function public.approve_all_finance_requests(uuid) from public, anon;
 grant execute on function public.approve_all_finance_requests(uuid) to authenticated;
 
+-- Grants: Supabase no longer opens new tables to the API on its own (from 2026-10-30), so say who may reach them.
+-- Row-level security above still decides which rows; logged-out visitors get nothing.
+grant select, insert, update, delete on public.finance_requests to authenticated;
+grant select, insert, update, delete on public.finance_requests to service_role;
+
 commit;

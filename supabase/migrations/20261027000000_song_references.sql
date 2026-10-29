@@ -58,4 +58,9 @@ create policy ws_section_delete on public.song_references as restrictive for del
 
 revoke all on public.song_references from anon;
 
+-- Grants: Supabase no longer opens new tables to the API on its own (from 2026-10-30), so say who may reach them.
+-- Row-level security above still decides which rows; logged-out visitors get nothing.
+grant select, insert, update, delete on public.song_references to authenticated;
+grant select, insert, update, delete on public.song_references to service_role;
+
 commit;
