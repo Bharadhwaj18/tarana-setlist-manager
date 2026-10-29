@@ -251,7 +251,7 @@ export function CalendarMonthView({
                 show: 'bg-brand-100 text-brand-700',
                 event: 'bg-amber-100 text-amber-800',
                 task: 'bg-sky-100 text-sky-800',
-                off: 'bg-red-100 text-red-700',
+                off: 'bg-transparent text-red-700',
                 else: 'bg-white text-gray-500',
               }
               return (
@@ -265,7 +265,7 @@ export function CalendarMonthView({
                 >
                   {/* Background: selected, someone away (striped) or busy in another workspace (dashed). */}
                   <span aria-hidden="true" className={cn('absolute inset-0 rounded-xl',
-                    isSelected ? 'bg-hero' : d?.away ? 'bg-red-50' : d?.elsewhere ? 'border-[1.5px] border-dashed border-gray-400' : '',
+                    isSelected ? 'bg-hero' : d?.elsewhere ? 'border-[1.5px] border-dashed border-gray-400' : '',
                     d?.away && !isSelected && 'ring-1 ring-inset ring-red-300')} />
                   <span className={cn('relative flex h-[26px] w-[26px] items-center justify-center rounded-lg text-[13px] font-extrabold',
                     d?.show ? (isSelected ? 'bg-hero-fg text-hero' : 'bg-brand-400 text-white')
@@ -294,7 +294,7 @@ export function CalendarMonthView({
             <span className="inline-flex items-center gap-1.5"><span className="h-3.5 w-3.5 rounded bg-brand-400" />Show</span>
             <span className="inline-flex items-center gap-1.5"><span className="h-[3px] w-3 rounded-full bg-amber-500" />Event</span>
             <span className="inline-flex items-center gap-1.5"><SquareCheck className="h-3 w-3 text-sky-600" strokeWidth={3} />Task due</span>
-            <span className="inline-flex items-center gap-1.5"><span className="h-3.5 w-3.5 rounded bg-red-50 ring-1 ring-inset ring-red-300" />Away</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-3.5 w-3.5 rounded ring-1 ring-inset ring-red-300" />Away</span>
             <span className="inline-flex items-center gap-1.5"><span className="h-3.5 w-3.5 rounded border-[1.5px] border-dashed border-gray-400" />Busy elsewhere</span>
           </div>
         </div>
