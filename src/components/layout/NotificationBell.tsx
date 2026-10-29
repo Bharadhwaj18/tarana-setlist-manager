@@ -7,6 +7,8 @@ import { useRouter } from 'next/navigation'
 import { Bell, CalendarDays, CalendarX, CheckSquare, ListMusic, Users, Wallet, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { markNotificationRead, markAllNotificationsRead, openNotification } from '@/actions/notifications'
+import { markPendingPaymentPaid } from '@/actions/pending-payments'
+import { paymentIdFromLink, usePayables } from './PayablesContext'
 import { useToast } from '@/components/ui/Toaster'
 import type { NotificationItem } from '@/types/notifications'
 
@@ -80,6 +82,18 @@ export function NotificationBell({ notifications, tone = 'sidebar' }: Props) {
   }
 
   const toast = useToast()
+  const payables = usePayables()
+  // Which "You owe" notification is asking "are you sure?" before it marks the payment paid.
+  const [confirming, setConfirming] = useState<string | null>(null)
+  const markPaid = (paymentId: string) => {
+    startTransition(async () => {
+      const res = await markPendingPaymentPaid(paymentId)
+      setConfirming(null)
+      if (res.error) { toast(res.error, 'error'); return }
+      toast('Marked as paid', 'success')
+      router.refresh()
+    })
+  }
   const handleClick = (n: NotificationItem) => {
     setOpen(false)
     if (!n.read) startTransition(() => { markNotificationRead(n.id) })
@@ -135,11 +149,12 @@ export function NotificationBell({ notifications, tone = 'sidebar' }: Props) {
                     <h3 className="sticky top-0 bg-white/95 px-4 pb-1 pt-3 text-[11px] font-extrabold uppercase tracking-[0.14em] text-gray-400 backdrop-blur">{label}</h3>
                     {items.map(n => {
                       const Icon = iconFor(n.type)
+                      const payable = n.type === 'payment_owed' ? payables.find(p => p.id === paymentIdFromLink(n.link)) : undefined
                       return (
+                        <div key={n.id} className={cn('hover:bg-brand-50', !n.read && 'bg-brand-50/70')}>
                         <button
-                          key={n.id}
                           onClick={() => handleClick(n)}
-                          className={cn('flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-brand-50', !n.read && 'bg-brand-50/70')}
+                          className="flex w-full items-start gap-3 px-4 py-3 text-left"
                         >
                           <span className={cn('mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl', n.read ? 'bg-brand-100 text-gray-500' : 'bg-brand-400 text-white')}>
                             <Icon className="h-4 w-4" />
@@ -151,6 +166,19 @@ export function NotificationBell({ notifications, tone = 'sidebar' }: Props) {
                           </span>
                           {!n.read && <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-brand-500" aria-label="Unread" />}
                         </button>
+                        {payable && (
+                          <div className="flex items-center gap-2 px-4 pb-3 pl-16">
+                            {confirming === n.id ? (
+                              <>
+                                <button type="button" onClick={() => markPaid(payable.id)} className="rounded-full bg-brand-600 px-3.5 py-1.5 text-xs font-extrabold text-white">Yes, I paid {payable.amountText}</button>
+                                <button type="button" onClick={() => setConfirming(null)} className="rounded-full px-3 py-1.5 text-xs font-bold text-gray-600 hover:bg-brand-100">Not yet</button>
+                              </>
+                            ) : (
+                              <button type="button" onClick={() => setConfirming(n.id)} className="rounded-full border border-brand-300 bg-white px-3.5 py-1.5 text-xs font-extrabold text-gray-800 hover:bg-brand-100">Mark paid</button>
+                            )}
+                          </div>
+                        )}
+                        </div>
                       )
                     })}
                   </section>

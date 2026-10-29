@@ -14,6 +14,7 @@ import { getWorkspaceContext } from '@/lib/workspace'
 import { hiddenSectionsOf, type SectionKey } from '@/lib/workspace-sections'
 import { infoCards, SectionTag } from '@/components/today/InfoWidgets'
 import { QuickAccess } from '@/components/today/QuickAccess'
+import { LogMoneyChip } from '@/components/finance/LogMoneyChip'
 import { packToday, spanClass, type Placed } from '@/lib/today-layout'
 
 const IST = 'Asia/Kolkata'
@@ -30,6 +31,7 @@ function headline(days: number) {
 }
 
 const eyebrow = 'text-xs font-semibold uppercase tracking-[0.12em] text-gray-500'
+const chipCls = 'transition-lift inline-flex shrink-0 items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-bold'
 const card = 'flex h-full flex-col gap-3 rounded-2xl border border-brand-200 bg-white p-5 shadow-sm'
 
 export default async function TodayPage() {
@@ -104,6 +106,8 @@ export default async function TodayPage() {
   const showShows = canSee('shows')
   const showTasks = canSee('tasks')
   const showFinance = canSee('finance')
+  // Anyone who can add money gets the shortcut; view-only members don't.
+  const canLogMoney = levels?.finance === 'edit'
 
   const quickActions = [
     showShows && { href: '/shows/new', label: 'New show', icon: CalendarDays },
@@ -305,6 +309,17 @@ export default async function TodayPage() {
         {days !== null && <p className="mt-1 text-base text-gray-600">{headline(days)}</p>}
       </header>
 
+      {(canLogMoney || quickActions.length > 0) && (
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
+          {canLogMoney && <LogMoneyChip className={`${chipCls} border-brand-400 bg-brand-400 text-white hover:bg-brand-500`} />}
+          {quickActions.map(a => (
+            <Link key={a.href} href={a.href} className={`${chipCls} border-brand-200 bg-white text-gray-700 hover:bg-brand-100`}>
+              <a.icon className="h-4 w-4" /> {a.label}
+            </Link>
+          ))}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         {placed.map((w, i) => (
           <div key={w.id} className={cn('animate-fade-up min-w-0', spanClass(w.span))} style={{ animationDelay: `${i * 70}ms` }}>
@@ -312,16 +327,6 @@ export default async function TodayPage() {
           </div>
         ))}
       </div>
-
-      {quickActions.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {quickActions.map(a => (
-            <Link key={a.href} href={a.href} className="transition-lift inline-flex items-center gap-2 rounded-lg border border-brand-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-brand-100">
-              <a.icon className="h-4 w-4" /> {a.label}
-            </Link>
-          ))}
-        </div>
-      )}
 
     </div>
   )

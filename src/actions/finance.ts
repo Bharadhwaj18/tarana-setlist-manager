@@ -102,7 +102,7 @@ async function isApprover(): Promise<boolean> {
 }
 const ACCOUNT_ONLY = 'Only an admin or treasurer can change what’s in an account.'
 
-export async function addTransaction(data: TransactionInput): Promise<{ error?: string; pending?: boolean }> {
+export async function addTransaction(data: TransactionInput): Promise<{ error?: string; pending?: boolean; id?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
@@ -120,13 +120,13 @@ export async function addTransaction(data: TransactionInput): Promise<{ error?: 
   if ((await needsApproval()) || (data.account_id && !(await isApprover()))) return submitForApproval(supabase, user.id, data)
   const { account_id: addAccountId, ...addRow } = data
 
-  const { error } = await supabase.from('finance_transactions').insert({
+  const { data: inserted, error } = await supabase.from('finance_transactions').insert({
     ...addRow,
     ...accountColumn(addAccountId, false),
     workspace_id: await requireWorkspaceId(),
     date: data.date ?? todayISO(),
     recorded_by: user.id,
-  })
+  }).select('id').single()
   if (error) return { error: error.message }
 
   // Money coming in is worth telling the whole band about — an expense
@@ -140,6 +140,37 @@ export async function addTransaction(data: TransactionInput): Promise<{ error?: 
       type: 'transaction_credit',
     })
   }
+
+  revalidatePath('/finance')
+  revalidatePath('/finance/split')
+  revalidatePath('/finance/history')
+  return { id: inserted.id }
+}
+
+/**
+ * Puts back an entry that was just deleted (the "Undo" on the delete toast). Same rules as a new entry, but it
+ * doesn't tell the band about it a second time, and it never waits for approval: only people who could delete it can undo it.
+ */
+export async function restoreTransaction(data: TransactionInput): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+  if (await needsApproval()) return { error: APPROVAL_ONLY }
+  if (data.account_id && !(await isApprover())) return { error: ACCOUNT_ONLY }
+
+  data = { ...data, account_id: data.account_id ?? null, member_id: data.account_id ? null : data.member_id ?? user.id }
+  const validationError = await validateTransactionWrite(supabase, data)
+  if (validationError) return { error: validationError }
+
+  const { account_id: restoreAccountId, ...restoreRow } = data
+  const { error } = await supabase.from('finance_transactions').insert({
+    ...restoreRow,
+    ...accountColumn(restoreAccountId, false),
+    workspace_id: await requireWorkspaceId(),
+    date: data.date ?? todayISO(),
+    recorded_by: user.id,
+  })
+  if (error) return { error: error.message }
 
   revalidatePath('/finance')
   revalidatePath('/finance/split')
@@ -308,13 +339,14 @@ export async function splitShows(shows: ShowSplitInput[], payments: SplitPayment
     if (pendingErr) return { error: pendingErr.message }
     pendingIds = (insertedPending ?? []).map(r => r.id)
 
-    for (const p of crossPayments) {
+    for (const [i, p] of crossPayments.entries()) {
       if (p.from === user.id || isAccountValue(p.from)) continue // don't ping yourself about your own debt; an account has no one to ping
       await sendNotification({
         recipientId: p.from,
         title: `You owe ${await moneyText(p.amount)}`,
         body: p.description,
-        link: '/finance',
+        // Carries the payment, so the notification itself can offer "Mark paid".
+        link: pendingIds[i] ? `/finance?pay=${pendingIds[i]}` : '/finance',
         type: 'payment_owed',
       })
     }

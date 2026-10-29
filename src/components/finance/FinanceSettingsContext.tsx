@@ -5,21 +5,21 @@ import { DEFAULT_FINANCE_SETTINGS, currencySymbol, formatMoney, type FinanceSett
 import type { FinanceProject } from '@/types/finance'
 import type { FinanceAccount } from '@/lib/finance/accounts'
 
-const FinanceSettingsContext = createContext<{ settings: FinanceSettings; canApprove: boolean }>({ settings: DEFAULT_FINANCE_SETTINGS, canApprove: false })
+const FinanceSettingsContext = createContext<{ settings: FinanceSettings; canApprove: boolean; workspaceId: string }>({ settings: DEFAULT_FINANCE_SETTINGS, canApprove: false, workspaceId: '' })
 
 /** Makes the current workspace's money settings available to every client component in the app. */
-export function FinanceSettingsProvider({ settings, canApprove = false, children }: { settings: FinanceSettings; canApprove?: boolean; children: ReactNode }) {
-  return <FinanceSettingsContext.Provider value={{ settings, canApprove }}>{children}</FinanceSettingsContext.Provider>
+export function FinanceSettingsProvider({ settings, canApprove = false, workspaceId = '', children }: { settings: FinanceSettings; canApprove?: boolean; workspaceId?: string; children: ReactNode }) {
+  return <FinanceSettingsContext.Provider value={{ settings, canApprove, workspaceId }}>{children}</FinanceSettingsContext.Provider>
 }
 
 /** The money settings plus formatters in the workspace's currency. */
 export function useMoney() {
-  const { settings, canApprove } = useContext(FinanceSettingsContext)
+  const { settings, canApprove, workspaceId } = useContext(FinanceSettingsContext)
   const money = (n: number) => formatMoney(n, settings.currency)
   const signed = (n: number) => `${n < 0 ? '−' : ''}${money(n)}`
   // With approval on, only admins and treasurers can change entries that already count.
   const canChangeEntries = !settings.features.approvals || canApprove
-  return { settings, money, signed, symbol: currencySymbol(settings.currency), canApprove, canChangeEntries, needsApproval: settings.features.approvals && !canApprove }
+  return { settings, workspaceId, money, signed, symbol: currencySymbol(settings.currency), canApprove, canChangeEntries, needsApproval: settings.features.approvals && !canApprove }
 }
 
 interface FinanceExtras {

@@ -2,13 +2,15 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Check, ChevronDown, Compass, Plus, Settings, User } from 'lucide-react'
+import { ArrowLeftRight, Check, ChevronDown, Compass, Plus, Settings, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { WorkspaceAvatar } from '@/components/ui/WorkspaceAvatar'
 import { todayISO } from '@/lib/shows'
 import { attentionBadge, isPersonal, roleLabel, workspaceLabel, type WorkspaceOption } from '@/lib/workspace-options'
 import { NotificationBell } from './NotificationBell'
 import { useSwitchWorkspace } from './useSwitchWorkspace'
+import { useRecentWorkspaces } from './useRecentWorkspaces'
+import { orderByRecent, previousWorkspace } from '@/lib/recent-workspaces'
 import type { NotificationItem } from '@/types/notifications'
 
 interface Props {
@@ -34,6 +36,11 @@ export function MobileTopBar({ workspaces, currentId, notifications }: Props) {
   const { pending, switchTo } = useSwitchWorkspace(() => setOpen(false))
   const current = workspaces.find(w => w.id === currentId) ?? workspaces[0]
   const today = todayISO()
+  // The workspace used just before this one is a single tap away, and the list puts recent ones first.
+  const recent = useRecentWorkspaces(currentId)
+  const previousId = previousWorkspace(recent, currentId, workspaces.map(w => w.id))
+  const previous = workspaces.find(w => w.id === previousId)
+  const ordered = orderByRecent(workspaces, recent, currentId)
 
   return (
     <>
@@ -52,7 +59,20 @@ export function MobileTopBar({ workspaces, currentId, notifications }: Props) {
           </button>
         ) : <span />}
 
-        <div className="flex shrink-0 items-center gap-1">
+        {previous && (
+          <button
+            type="button"
+            onClick={() => switchTo(previous.id, currentId)}
+            disabled={pending}
+            aria-label={`Switch back to ${workspaceLabel(previous)}`}
+            className="relative -ml-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-white shadow-sm disabled:opacity-60"
+          >
+            <Tile w={previous} size={28} />
+            <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-brand-400 text-white ring-2 ring-white"><ArrowLeftRight className="h-2.5 w-2.5" /></span>
+          </button>
+        )}
+
+        <div className="ml-auto flex shrink-0 items-center gap-1">
           {current && (
             <Link href="/settings" aria-label="Settings" title="Settings"
               className="flex h-10 w-10 items-center justify-center rounded-full text-gray-600 hover:bg-brand-100">
@@ -83,7 +103,7 @@ export function MobileTopBar({ workspaces, currentId, notifications }: Props) {
           </div>
 
           <ul className={cn('space-y-1.5', pending && 'opacity-70')}>
-            {workspaces.map(w => {
+            {ordered.map(w => {
               const isCurrent = w.id === currentId
               const badge = attentionBadge(w, today)
               return (

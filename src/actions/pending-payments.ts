@@ -59,6 +59,7 @@ export async function requestBalanceReimbursement(memberId: string, payerId: str
   if (amount <= 0) return { error: 'Nothing left to reimburse for this member.' }
 
   const existing = (open ?? []).find(p => fromAccount ? p.from_account === fromAccount : p.from_member === payerId)
+  let paymentId: string | null = existing?.id ?? null
   if (existing) {
     const { error } = await supabase
       .from('pending_payments')
@@ -67,7 +68,7 @@ export async function requestBalanceReimbursement(memberId: string, payerId: str
     if (error) return { error: error.message }
   } else {
     const { data: recipient } = await supabase.from('profiles').select('display_name').eq('id', memberId).maybeSingle()
-    const { error } = await supabase.from('pending_payments').insert({
+    const { data: created, error } = await supabase.from('pending_payments').insert({
       from_member: fromAccount ? null : payerId,
       from_account: fromAccount,
       to_member: memberId,
@@ -76,8 +77,9 @@ export async function requestBalanceReimbursement(memberId: string, payerId: str
       category: BALANCE_REIMBURSEMENT,
       show_id: null,
       workspace_id: workspaceId,
-    })
+    }).select('id').single()
     if (error) return { error: error.message }
+    paymentId = created.id
   }
 
   if (!fromAccount && payerId !== user.id) {
@@ -85,7 +87,7 @@ export async function requestBalanceReimbursement(memberId: string, payerId: str
       recipientId: payerId,
       title: `You owe ${await moneyText(amount)}`,
       body: 'Balance reimbursement',
-      link: '/finance',
+      link: paymentId ? `/finance?pay=${paymentId}` : '/finance',
       type: 'payment_owed',
     })
   }

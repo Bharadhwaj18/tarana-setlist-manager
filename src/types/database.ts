@@ -766,6 +766,48 @@ export type Database = {
         }
         Relationships: []
       }
+      finance_account_checks: {
+        Row: {
+          id: string
+          workspace_id: string
+          account_id: string
+          checked_on: string
+          bank_balance: number
+          recorded_balance: number
+          difference: number
+          note: string | null
+          adjustment_id: string | null
+          checked_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          account_id: string
+          checked_on?: string
+          bank_balance: number
+          recorded_balance: number
+          difference: number
+          note?: string | null
+          adjustment_id?: string | null
+          checked_by?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          account_id?: string
+          checked_on?: string
+          bank_balance?: number
+          recorded_balance?: number
+          difference?: number
+          note?: string | null
+          adjustment_id?: string | null
+          checked_by?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       finance_projects: {
         Row: {
           id: string
@@ -1514,6 +1556,7 @@ export type Database = {
       set_finance_settings: { Args: { p_ws: string; p_settings: Json }; Returns: undefined }
       rename_finance_tag: { Args: { p_ws: string; p_old: string; p_new?: string | null }; Returns: undefined }
       move_money: { Args: { p_ws: string; p_from_account?: string; p_from_member?: string; p_to_account?: string; p_to_member?: string; p_amount: number; p_from_desc: string; p_to_desc: string; p_date?: string }; Returns: string }
+      check_account_balance: { Args: { p_ws: string; p_account: string; p_bank: number; p_date?: string; p_note?: string; p_adjust?: boolean }; Returns: number }
       approve_finance_request: { Args: { p_id: string }; Returns: string }
       approve_all_finance_requests: { Args: { p_ws: string }; Returns: number }
       mark_pending_payment_paid: { Args: { p_id: string; p_date?: string; p_ref?: string }; Returns: string }

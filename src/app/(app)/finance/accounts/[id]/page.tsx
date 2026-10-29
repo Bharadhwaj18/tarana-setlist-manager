@@ -6,6 +6,9 @@ import { createClient } from '@/lib/supabase/server'
 import { requireWorkspaceId } from '@/lib/workspace'
 import { getCachedAllProfiles, getCachedFinanceAccounts, getCachedFinanceSettings, getCachedFinanceProjects, getCachedUser } from '@/lib/data'
 import { accountValue } from '@/lib/finance/accounts'
+import { checkState, toCheck } from '@/lib/finance/reconcile'
+import { todayISO } from '@/lib/shows'
+import { CheckBalanceButton, CheckChip, CheckHistory } from '@/components/finance/BalanceCheck'
 import { categoryLabel } from '@/lib/finance/settings'
 import { FinanceExtrasProvider } from '@/components/finance/FinanceSettingsContext'
 import { AddTransactionModal } from '@/components/finance/AddTransactionModal'
@@ -26,7 +29,7 @@ export default async function AccountPage({ params }: Props) {
   const supabase = await createClient()
   const ws = await requireWorkspaceId()
 
-  const [settings, allAccounts, profiles, { data: { user } }, projects, { data: txns }, { data: shows }, { data: budgets }] = await Promise.all([
+  const [settings, allAccounts, profiles, { data: { user } }, projects, { data: txns }, { data: shows }, { data: budgets }, { data: checkRows }] = await Promise.all([
     getCachedFinanceSettings(),
     getCachedFinanceAccounts(),
     getCachedAllProfiles(),
@@ -35,6 +38,7 @@ export default async function AccountPage({ params }: Props) {
     supabase.from('finance_transactions').select('*').eq('workspace_id', ws).eq('account_id', id).order('created_at', { ascending: true }),
     supabase.from('shows').select('*').eq('workspace_id', ws),
     supabase.from('budgets').select('*').eq('workspace_id', ws).order('created_at', { ascending: true }),
+    supabase.from('finance_account_checks').select('*').eq('workspace_id', ws).eq('account_id', id).order('checked_on', { ascending: false }).order('created_at', { ascending: false }).limit(10),
   ])
   const account = allAccounts.find(a => a.id === id)
   if (!settings.features.accounts || !account) notFound()
@@ -54,6 +58,9 @@ export default async function AccountPage({ params }: Props) {
   }
   const balance = running
   const rows = [...withBalance].reverse()
+  const checks = (checkRows ?? []).map(toCheck)
+  const today = todayISO()
+  const state = checkState(checks[0], today)
   const Icon = account.kind === 'cash' ? Banknote : Landmark
 
   return (
@@ -72,9 +79,18 @@ export default async function AccountPage({ params }: Props) {
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <AddTransactionModal presetHolder={accountValue(account.id)} members={members} shows={shows ?? []} budgets={budgets ?? []} />
               <MoveMoneyButton accounts={accounts} members={members} balances={{ [account.id]: balance }} from={accountValue(account.id)} />
+              <CheckBalanceButton accountId={account.id} accountName={account.name} recorded={balance} today={today} />
             </div>
           )}
+          <div className="mt-3"><CheckChip state={state} last={checks[0]} today={today} /></div>
         </section>
+
+        {checks.length > 0 && (
+          <section>
+            <SectionLabel className="mb-3">Bank checks</SectionLabel>
+            <CheckHistory checks={checks} nameById={nameById} />
+          </section>
+        )}
 
         <section>
           <SectionLabel className="mb-3">This account</SectionLabel>

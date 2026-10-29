@@ -1,15 +1,17 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import { ArrowDownLeft, ArrowUpRight, Banknote, Check, ChevronDown, Landmark, Plus, Pencil, User, X } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Chip'
-import { addTransaction, updateTransaction, addShow } from '@/actions/finance'
+import { addTransaction, deleteTransaction, updateTransaction, addShow } from '@/actions/finance'
 import { useToast } from '@/components/ui/Toaster'
 import { activeCategories, categoryLabel, REIMBURSEMENT_KEY, type FinanceSettings } from '@/lib/finance/settings'
 import { useFinanceExtras, useMoney } from '@/components/finance/FinanceSettingsContext'
 import { accountIdOf, accountValue, isAccountValue } from '@/lib/finance/accounts'
+import { loadLastEntry, resolveLastEntry, saveLastEntry } from '@/lib/finance/last-entry'
+import { enqueueEntry, isNetworkError, type EntryPayload } from '@/lib/finance/offline-queue'
 import { cn } from '@/lib/utils'
 import { todayISO } from '@/lib/shows'
 import type { FinanceProject, FinanceTransaction } from '@/types/finance'
@@ -86,7 +88,7 @@ function fieldsFrom(settings: FinanceSettings, transaction: FinanceTransaction |
 }
 
 export function AddTransactionModal({ members, shows, budgets = [], transaction, lockedShow, open: controlledOpen, onOpenChange, fab, projects: projectsProp, knownTags: knownTagsProp, presetHolder }: Props) {
-  const { settings, symbol, needsApproval, canApprove } = useMoney()
+  const { settings, symbol, needsApproval, canApprove, workspaceId } = useMoney()
   const extras = useFinanceExtras()
   const projects = projectsProp ?? extras.projects
   const knownTags = knownTagsProp ?? extras.knownTags
@@ -115,6 +117,8 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
   // Set once the entry is saved: the form swaps for a tick, then the modal closes.
   const [saved, setSaved] = useState<string | null>(null)
   const toast = useToast()
+  const amountRef = useRef<HTMLInputElement>(null)
+  const formRef = useRef<HTMLFormElement>(null)
 
   const { category, showId, memberId, amount, dir, description, date, budgetId, tags, projectId } = fields
   const forShow = showId !== NO_SHOW
@@ -128,11 +132,24 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
   // changes") rather than in an effect — it takes one extra render instead
   // of a post-commit effect pass, and never risks running before the
   // fields actually get used.
-  const [prevOpen, setPrevOpen] = useState(open)
+  // A new entry starts from what was chosen last time (in or out, kind, which account), when that's still allowed.
+  const startingFields = () => {
+    const base = fieldsFrom(settings, transaction, lockedShow, presetHolder)
+    if (isEdit) return base
+    const last = resolveLastEntry(loadLastEntry(workspaceId), {
+      categories: d => activeCategories(settings, dirKey(d)).map(c => c.key),
+      accountValues: accountChoices.map(a => accountValue(a.id)),
+    })
+    if (!last) return base
+    return { ...base, dir: last.dir, category: last.category ?? firstCategory(settings, last.dir), memberId: presetHolder ?? last.holder ?? base.memberId }
+  }
+
+  // Starts false, so a form that is mounted already open still gets its starting values.
+  const [prevOpen, setPrevOpen] = useState(false)
   if (open !== prevOpen) {
     setPrevOpen(open)
     if (open) {
-      setFields(fieldsFrom(settings, transaction, lockedShow, presetHolder))
+      setFields(startingFields())
       setMoreOpen(isEdit && !!(transaction?.tags?.length || transaction?.project_id || transaction?.budget_id))
       setNewShowTitle('')
       setTagDraft('')
@@ -169,10 +186,12 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
     && !!amount
     && (!isReimbursement || (memberId !== AUTO && memberId !== ''))
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+  // addAnother: keep the form open for the next entry, with everything but the amount and description carried over.
+  const submit = (addAnother: boolean) => {
     const amt = parseFloat(amount)
     if (!canSubmit || !amt || amt <= 0) return
+    const noSignal = () => typeof navigator !== 'undefined' && !navigator.onLine
+    if (showId === NEW_SHOW && noSignal()) { toast('Connect to the internet to add a new show.', 'error'); return }
 
     startTransition(async () => {
       let resolvedShowId: string | null = null
@@ -203,13 +222,36 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
         tags: tagDraft.trim() ? [...new Set([...tags, tagDraft.trim().slice(0, 40)])] : tags,
         project_id: projectId || null,
       }
-      const result = isEdit ? await updateTransaction(transaction.id, payload) : await addTransaction(payload)
+      // No signal, or the request never left the phone: a new entry is kept here and added once back online.
+      const queueEntry = (p: EntryPayload) => (enqueueEntry(workspaceId, p) ? { queued: true } : { error: 'No signal, and this phone can’t save it for later. Try again when you’re online.' })
+      let result: { error?: string; pending?: boolean; id?: string; queued?: boolean }
+      if (!isEdit && noSignal()) {
+        result = queueEntry(payload)
+      } else {
+        try {
+          result = isEdit ? await updateTransaction(transaction.id, payload) : await addTransaction(payload)
+        } catch (e) {
+          if (isEdit || !isNetworkError(e)) { toast('Something went wrong. Try again.', 'error'); return }
+          result = queueEntry(payload)
+        }
+      }
 
       if (result.error) {
         toast(result.error, 'error')
       } else {
-        const message = isEdit ? 'Entry updated' : 'pending' in result && result.pending ? 'Sent for approval' : 'Entry added'
-        toast(message, 'success')
+        const message = isEdit ? 'Entry updated' : result.queued ? 'Saved offline' : result.pending ? 'Sent for approval' : 'Entry added'
+        // A new entry that counted straight away can be taken back from the toast.
+        const createdId = !isEdit ? result.id : undefined
+        toast(result.queued ? 'Saved on this phone. It’ll be added when you’re back online.' : message, result.queued ? 'info' : 'success', createdId ? { label: 'Undo', onClick: () => { void deleteTransaction(createdId).then(r => { if (r.error) toast(r.error, 'error') }) } } : undefined)
+        if (!isEdit) {
+          saveLastEntry(workspaceId, { dir: effectiveDir, category: isReimbursement ? null : category, holder: !isReimbursement && isAccountValue(memberId) ? memberId : '' })
+        }
+        if (addAnother && !isEdit) {
+          setFields(prev => ({ ...prev, amount: '', description: '' }))
+          setTagDraft('')
+          window.setTimeout(() => amountRef.current?.focus(), 0)
+          return
+        }
         setSaved(message)
         window.setTimeout(() => setOpen(false), 900)
       }
@@ -259,7 +301,7 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
             <p className="animate-fade-up text-base font-extrabold text-gray-900">{saved}</p>
           </div>
         ) : (
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form ref={formRef} onSubmit={e => { e.preventDefault(); submit(false) }} className="space-y-5">
           {(needsApproval || (isAccountValue(memberId) && !canApprove)) && !isEdit && (
             <p className="rounded-xl bg-amber-50 px-3.5 py-2.5 text-sm font-semibold text-amber-900">An admin or treasurer will approve this before it counts.</p>
           )}
@@ -292,6 +334,8 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
               <span className="font-display text-2xl font-bold text-gray-500">{symbol}</span>
               <input
                 id="entry-amount"
+                ref={amountRef}
+                autoFocus={!isEdit}
                 type="number"
                 inputMode="decimal"
                 min="0.01"
@@ -491,8 +535,12 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
             )}
           </div>
 
-          <div className="flex justify-end gap-3 pt-1">
+          <div className="flex flex-wrap justify-end gap-2 pt-1">
             <Button type="button" variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
+            {!isEdit && showId !== NEW_SHOW && (
+              <Button type="button" variant="secondary" disabled={!canSubmit || isPending}
+                onClick={() => { if (formRef.current?.reportValidity()) submit(true) }}>Save and add another</Button>
+            )}
             <Button type="submit" loading={isPending} disabled={!canSubmit}>{isEdit ? 'Save' : 'Save entry'}</Button>
           </div>
         </form>

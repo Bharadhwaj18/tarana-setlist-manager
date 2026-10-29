@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
-import { WORKSPACE_CHOSEN_COOKIE } from '@/lib/workspace-shared'
+import { WORKSPACE_CHOSEN_COOKIE, WORKSPACE_COOKIE } from '@/lib/workspace-shared'
 import { ChevronLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedUser } from '@/lib/auth-cache'
@@ -33,7 +33,8 @@ export default async function ChooseWorkspacePage({ searchParams }: { searchPara
   if (!profile?.display_name?.trim()) redirect('/setup')
   const firstName = profile.display_name.trim().split(/\s+/)[0]
   // Back only when they opened this themselves; on the way in after signing in there's nowhere to go back to.
-  const cameFromApp = !!(await cookies()).get(WORKSPACE_CHOSEN_COOKIE)
+  const cookieStore = await cookies()
+  const cameFromApp = !!cookieStore.get(WORKSPACE_CHOSEN_COOKIE) || options.some(o => o.id === cookieStore.get(WORKSPACE_COOKIE)?.value)
 
   return (
     <div className="w-full max-w-5xl py-10">

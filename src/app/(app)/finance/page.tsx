@@ -3,6 +3,7 @@ import { sectionGuard } from '@/lib/section-guard'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedAllProfiles, getCachedUser, getCachedPendingPayments, getCachedFinanceSettings, getCachedFinanceProjects, getCachedRecurring, getCachedFinanceRequests, getCachedFinanceAccounts } from '@/lib/data'
 import { AccountsCard } from '@/components/finance/AccountsCard'
+import { latestChecks, toCheck } from '@/lib/finance/reconcile'
 import { accountBalances, accountPickerOptions, accountValue, holderName } from '@/lib/finance/accounts'
 import { FinanceRequests } from '@/components/finance/FinanceRequests'
 import { catchUpRecurring } from '@/lib/finance/recurring-server'
@@ -40,7 +41,7 @@ export default async function FinancePage() {
   const currency = settings.currency
   const canEditSettings = ctx?.current.role === 'owner' || ctx?.current.role === 'admin'
 
-  const [{ data: { user } }, profiles, { data: txns }, { data: shows }, pendingPayments, { data: budgets }, requests] = await Promise.all([
+  const [{ data: { user } }, profiles, { data: txns }, { data: shows }, pendingPayments, { data: budgets }, requests, { data: checkRows }] = await Promise.all([
     getCachedUser(),
     getCachedAllProfiles(),
     supabase.from('finance_transactions').select('*').eq('workspace_id', ws).order('created_at', { ascending: false }),
@@ -48,6 +49,9 @@ export default async function FinancePage() {
     getCachedPendingPayments(),
     supabase.from('budgets').select('*').eq('workspace_id', ws).order('created_at', { ascending: true }),
     getCachedFinanceRequests(),
+    settings.features.accounts
+      ? supabase.from('finance_account_checks').select('*').eq('workspace_id', ws).order('checked_on', { ascending: false }).order('created_at', { ascending: false }).limit(50)
+      : Promise.resolve({ data: null }),
   ])
 
   // Balance per member. There's no separate Band Fund bucket — whatever a
@@ -166,7 +170,7 @@ export default async function FinancePage() {
       {waiting.length > 0 && <WaitingToBePaid shows={waiting} />}
 
       {settings.features.accounts && (
-        <AccountsCard accounts={accounts} balances={acctBalances} nameById={memberNameById} currency={currency} canManage={canEditSettings} members={memberOptions} />
+        <AccountsCard accounts={accounts} balances={acctBalances} nameById={memberNameById} currency={currency} canManage={canEditSettings} members={memberOptions} checks={latestChecks((checkRows ?? []).map(toCheck))} today={todayISO()} />
       )}
 
       <div className="grid items-start gap-4 lg:grid-cols-[1.1fr_1fr]">

@@ -1,9 +1,15 @@
 import { redirect } from 'next/navigation'
 import { cookies, headers } from 'next/headers'
-import { PENDING_INVITE_COOKIE, WORKSPACE_CHOSEN_COOKIE } from '@/lib/workspace-shared'
+import { PENDING_INVITE_COOKIE, WORKSPACE_CHOSEN_COOKIE, WORKSPACE_COOKIE } from '@/lib/workspace-shared'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedUser, getCachedPendingPayments, getCachedNotifications, getCachedAllProfiles, getCachedFinanceSettings } from '@/lib/data'
 import { FinanceSettingsProvider } from '@/components/finance/FinanceSettingsContext'
+import { QuickAddMoney } from '@/components/finance/QuickAddMoney'
+import { OfflineEntrySync } from '@/components/finance/OfflineEntrySync'
+import { RememberLastPage } from '@/components/layout/RememberLastPage'
+import { PayablesProvider } from '@/components/layout/PayablesContext'
+import { formatMoney } from '@/lib/finance/settings'
+import { LAST_PAGE_COOKIE, VISIT_STARTED_COOKIE, resumeTarget } from '@/lib/last-page'
 import { resolveNotificationItems } from '@/lib/notifications'
 import { getWorkspaceOptions } from '@/lib/workspace-options-server'
 import { Sidebar } from '@/components/layout/Sidebar'
@@ -52,10 +58,13 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   // Skip the setup redirect when offline (if the profile query errors, the user has already done setup before)
   if (!profileError && !profile?.display_name?.trim()) redirect('/setup')
 
-  // Coming in fresh with more than one workspace? Pick one first, then carry on to where they were going.
+  // More than one workspace and no memory of which? Pick one first, then carry on to where they were going.
+  // Anyone who has picked before goes straight back to that workspace (the saved choice outlasts the visit).
   // Creating a workspace is one of the picker's own choices, so that page never bounces back to it.
   const path = (await headers()).get('x-pathname') ?? '/'
-  if (workspaceOptions.length > 1 && !path.startsWith('/workspace/new') && !(await cookies()).get(WORKSPACE_CHOSEN_COOKIE)) {
+  const cookieStore = await cookies()
+  const remembered = workspaceOptions.some(o => o.id === cookieStore.get(WORKSPACE_COOKIE)?.value)
+  if (workspaceOptions.length > 1 && !path.startsWith('/workspace/new') && !remembered && !cookieStore.get(WORKSPACE_CHOSEN_COOKIE)) {
     redirect(path === '/' ? '/choose-workspace' : `/choose-workspace?next=${encodeURIComponent(path)}`)
   }
 
@@ -65,11 +74,21 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   const ctx = await getWorkspaceContext()
   const hiddenSections = ctx ? hiddenSectionsOf(ctx.current.sections) : []
+
+  // Opening the app on Today? Carry on in the section they were last in. Only the first page of a visit, so
+  // choosing Today by hand later stays on Today.
+  if (path === '/' && !cookieStore.get(VISIT_STARTED_COOKIE)) {
+    const resume = resumeTarget(cookieStore.get(LAST_PAGE_COOKIE)?.value, hiddenSections)
+    if (resume) redirect(resume)
+  }
   const financeSettings = await getCachedFinanceSettings()
+  const payables = pendingPayments.filter(p => p.from_member === effectiveUser.id).map(p => ({ id: p.id, amountText: formatMoney(p.amount, financeSettings.currency) }))
 
   return (
     <PlayerProvider>
+    <PayablesProvider payables={payables}>
     <div className="flex h-screen">
+      <RememberLastPage />
       <OfflineUserSync email={effectiveUser.email ?? ''} displayName={profile?.display_name ?? ''} />
       <IdentifyUser userId={effectiveUser.id} email={effectiveUser.email} name={profile?.display_name} />
       <Sidebar user={effectiveUser} pendingPaymentCount={pendingCount} notifications={notificationItems}
@@ -77,11 +96,12 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         currentWorkspaceId={currentWorkspaceId} hiddenSections={hiddenSections} />
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-5xl px-4 pb-28 pt-16 sm:px-6 lg:px-8 lg:pb-8 lg:pt-8">
-          <FinanceSettingsProvider settings={financeSettings} canApprove={!!ctx && isFinanceApprover(ctx.current)}><PageFade>{children}</PageFade><PlayerSpacer /></FinanceSettingsProvider>
+          <FinanceSettingsProvider settings={financeSettings} canApprove={!!ctx && isFinanceApprover(ctx.current)} workspaceId={currentWorkspaceId}><PageFade>{children}</PageFade><PlayerSpacer />{ctx?.current.sections.finance === 'edit' && <><QuickAddMoney /><OfflineEntrySync /></>}</FinanceSettingsProvider>
         </div>
       </main>
       <TooltipLayer />
     </div>
+    </PayablesProvider>
     </PlayerProvider>
   )
 }

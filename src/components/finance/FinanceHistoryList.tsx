@@ -10,7 +10,8 @@ import { AddTransactionModal } from './AddTransactionModal'
 import { Chip } from '@/components/ui/Chip'
 import { CountUp } from '@/components/ui/CountUp'
 import { StatusPill } from '@/components/ui/StatusPill'
-import { deleteTransaction } from '@/actions/finance'
+import { deleteTransaction, restoreTransaction } from '@/actions/finance'
+import { canUndoDelete, transactionToInput } from '@/lib/finance/restore'
 import { useToast } from '@/components/ui/Toaster'
 import { CREDIT_TEXT, DEBIT_TEXT } from './money'
 import type { FinanceTransaction } from '@/types/finance'
@@ -59,12 +60,16 @@ function TransactionTableRow({ transaction: t, members, shows, budgets, payerNam
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!window.confirm(isMove ? 'Undo this move? Both sides of it are removed.' : 'Delete this entry? This can’t be undone.')) return
+    // A move asks first (it removes both sides); anything else deletes at once, with an Undo on the toast.
+    if (isMove && !window.confirm('Undo this move? Both sides of it are removed.')) return
     // The row fades out first, then the delete runs and the list refreshes without it.
     setLeaving(true)
     window.setTimeout(() => startDeleteTransition(async () => {
       const result = await deleteTransaction(t.id)
-      if (result.error) { toast(result.error, 'error'); setLeaving(false) }
+      if (result.error) { toast(result.error, 'error'); setLeaving(false); return }
+      if (canUndoDelete(t)) {
+        toast('Entry deleted', 'info', { label: 'Undo', onClick: () => { void restoreTransaction(transactionToInput(t)).then(r => { if (r.error) toast(r.error, 'error') }) } })
+      }
     }), 200)
   }
 
@@ -198,7 +203,7 @@ export function FinanceHistoryList({ transactions, members, shows, budgets, show
   }, [transactions, memberFilter, typeFilter, dirFilter, categoryFilter, tagFilter, projectFilter, query, showTitleById, moneySettings])
 
   // Moves shift money between places; they aren't money in or out.
-  const bandFundRows = filtered.filter(t => t.category !== 'reimbursement' && t.category !== 'transfer' && (t.member_id || t.account_id))
+  const bandFundRows = filtered.filter(t => t.category !== 'reimbursement' && t.category !== 'transfer' && t.category !== 'correction' && (t.member_id || t.account_id))
   const total = bandFundRows.reduce((s, t) => s + t.amount, 0)
   const totalCredit = bandFundRows.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0)
   const totalDebit = bandFundRows.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0)

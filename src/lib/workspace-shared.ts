@@ -4,7 +4,7 @@ import type { WorkspaceMembership } from '@/types/workspace'
 export const WORKSPACE_COOKIE = 'tarana_workspace'
 /** The invite someone opened, kept until they join or dismiss it, so signing up by any route brings them back to it. */
 export const PENDING_INVITE_COOKIE = 'tarana_pending_invite'
-/** Set (for this visit only) once someone has picked a workspace, so the picker shows each time they come in. */
+/** Set (for this visit only) once someone has picked a workspace. Coming back later, the saved WORKSPACE_COOKIE choice is used instead. */
 export const WORKSPACE_CHOSEN_COOKIE = 'tarana_ws_chosen'
 
 export function normalisePermissions(raw: Json | null | undefined): Record<string, boolean> {

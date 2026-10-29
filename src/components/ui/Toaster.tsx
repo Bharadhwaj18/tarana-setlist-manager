@@ -7,14 +7,21 @@ import { cn } from '@/lib/utils'
 
 type ToastType = 'success' | 'error' | 'info'
 
+/** A button on the toast, like "Undo". Tapping it closes the toast and runs onClick. */
+interface ToastAction {
+  label: string
+  onClick: () => void
+}
+
 interface ToastItem {
   id: string
   message: string
   type: ToastType
+  action?: ToastAction
 }
 
 interface ToastContextValue {
-  toast: (message: string, type?: ToastType) => void
+  toast: (message: string, type?: ToastType, action?: ToastAction) => void
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null)
@@ -22,13 +29,14 @@ const ToastContext = createContext<ToastContextValue | null>(null)
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([])
 
-  const addToast = useCallback((message: string, type: ToastType = 'info') => {
+  const dismiss = useCallback((id: string) => setToasts(prev => prev.filter(t => t.id !== id)), [])
+
+  const addToast = useCallback((message: string, type: ToastType = 'info', action?: ToastAction) => {
     const id = crypto.randomUUID()
-    setToasts(prev => [...prev, { id, message, type }])
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id))
-    }, 4000)
-  }, [])
+    setToasts(prev => [...prev, { id, message, type, action }])
+    // Long enough to reach for "Undo".
+    setTimeout(() => dismiss(id), action ? 7000 : 4000)
+  }, [dismiss])
 
   return (
     <ToastContext.Provider value={{ toast: addToast }}>
@@ -48,6 +56,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             )}
           >
             <Toast.Description className="text-sm font-medium">{t.message}</Toast.Description>
+            {t.action && (
+              <button type="button" onClick={() => { dismiss(t.id); t.action?.onClick() }} className="ml-auto shrink-0 rounded-md px-2 py-1 text-sm font-extrabold underline underline-offset-2">
+                {t.action.label}
+              </button>
+            )}
             <Toast.Close className="rounded p-0.5 opacity-70 hover:opacity-100">
               <X className="h-4 w-4" />
             </Toast.Close>

@@ -5,6 +5,8 @@ import { DEBIT_TEXT, fmtSigned } from '@/components/finance/money'
 import { cn } from '@/lib/utils'
 import type { FinanceAccount } from '@/lib/finance/accounts'
 import { MoveMoneyButton } from '@/components/finance/MoveMoneyButton'
+import { checkState, type BalanceCheck } from '@/lib/finance/reconcile'
+import { checkStatusText } from '@/components/finance/BalanceCheck'
 
 interface Props {
   accounts: FinanceAccount[]
@@ -15,10 +17,13 @@ interface Props {
   /** Owners and admins: can reach account settings. */
   canManage: boolean
   members: { id: string; name: string; isYou?: boolean }[]
+  /** The latest bank check per account, and today's date to measure its age. */
+  checks: Record<string, BalanceCheck>
+  today: string
 }
 
 /** "Where the money is": the band's real accounts, each opening its own page. */
-export function AccountsCard({ accounts, balances, nameById, currency, canManage, members }: Props) {
+export function AccountsCard({ accounts, balances, nameById, currency, canManage, members, checks, today }: Props) {
   // Archived accounts leave the list unless they still hold something, so the total always adds up.
   const shown = accounts.filter(a => !a.archived || (balances[a.id] ?? 0) !== 0)
 
@@ -50,6 +55,7 @@ export function AccountsCard({ accounts, balances, nameById, currency, canManage
           {shown.map(a => {
             const balance = balances[a.id] ?? 0
             const Icon = a.kind === 'cash' ? Banknote : Landmark
+            const state = checkState(checks[a.id], today)
             return (
               <li key={a.id}>
                 <Link href={`/finance/accounts/${a.id}`} className="flex min-h-16 items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-brand-50">
@@ -57,6 +63,7 @@ export function AccountsCard({ accounts, balances, nameById, currency, canManage
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-extrabold text-gray-900">{a.name}{a.archived && <span className="ml-2 text-xs font-bold text-gray-400">Archived</span>}</span>
                     <span className="block truncate text-xs font-semibold text-gray-500">{a.heldBy ? `Held by ${nameById[a.heldBy] ?? 'a member'}` : 'Held by the band'}</span>
+                    {!a.archived && <span className={cn('block truncate text-xs font-semibold', state === 'matched' || state === 'fixed' ? 'text-emerald-700' : state === 'never' ? 'text-gray-400' : 'text-amber-700')}>{checkStatusText(state, checks[a.id], today)}</span>}
                   </span>
                   <span className={cn('shrink-0 text-base font-extrabold tabular-nums', balance < 0 ? DEBIT_TEXT : 'text-gray-900')}>{fmtSigned(balance, currency)}</span>
                   <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />

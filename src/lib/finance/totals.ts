@@ -1,4 +1,4 @@
-import { PAYOUT_KEYS, TRANSFER_KEY } from './settings'
+import { CORRECTION_KEY, PAYOUT_KEYS, TRANSFER_KEY } from './settings'
 
 interface Entry { amount: number; category: string | null }
 
@@ -20,7 +20,7 @@ export function isPayout(e: Pick<Entry, 'category'>) {
 
 /** A move between an account and somewhere else: money changing place, not coming in or going out. */
 export function isTransfer(e: Pick<Entry, 'category'>) {
-  return e.category === TRANSFER_KEY
+  return e.category === TRANSFER_KEY || e.category === CORRECTION_KEY
 }
 
 export function summarise(entries: Entry[]): Totals {
