@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getWorkspaceContext } from '@/lib/workspace'
 import type { TaskData } from '@/types/tasks'
 import { seesFrom, type GroupNote, type WorkspaceGroup } from '@/lib/groups'
+import { toAccount, type FinanceAccount } from '@/lib/finance/accounts'
 import { normaliseFinanceSettings } from '@/lib/finance/settings'
 
 export { getCachedUser } from '@/lib/auth-cache'
@@ -60,6 +61,15 @@ export const getCachedReferenceRows = cache(() =>
     supabase.from('song_references').select('id, song_id, source, url, external_id, label, title, artist, thumbnail_url, moments').eq('workspace_id', ws).order('position')
   )
 )
+
+// The workspace's accounts (band account, cash box...), archived ones included; callers filter.
+export const getCachedFinanceAccounts = cache(async (): Promise<FinanceAccount[]> => {
+  const ctx = await getWorkspaceContext()
+  if (!ctx) return []
+  const supabase = await createClient()
+  const { data } = await supabase.from('finance_accounts').select('*').eq('workspace_id', ctx.current.workspace.id).order('position').order('created_at')
+  return (data ?? []).map(toAccount)
+})
 
 // The workspace's groups, each with who's in it. Members who have left are dropped by the database.
 export const getCachedWorkspaceGroups = cache(async (): Promise<WorkspaceGroup[]> => {

@@ -727,6 +727,45 @@ export type Database = {
         }
         Relationships: []
       }
+      finance_accounts: {
+        Row: {
+          id: string
+          workspace_id: string
+          name: string
+          kind: string
+          held_by: string | null
+          upi_id: string | null
+          archived_at: string | null
+          position: number
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          name: string
+          kind?: string
+          held_by?: string | null
+          upi_id?: string | null
+          archived_at?: string | null
+          position?: number
+          created_by?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          name?: string
+          kind?: string
+          held_by?: string | null
+          upi_id?: string | null
+          archived_at?: string | null
+          position?: number
+          created_by?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       finance_projects: {
         Row: {
           id: string
@@ -817,6 +856,7 @@ export type Database = {
           workspace_id: string
           submitted_by: string
           member_id: string | null
+          account_id: string | null
           amount: number
           description: string
           category: string | null
@@ -832,6 +872,7 @@ export type Database = {
           workspace_id: string
           submitted_by?: string
           member_id?: string | null
+          account_id?: string | null
           amount: number
           description: string
           category?: string | null
@@ -847,6 +888,7 @@ export type Database = {
           workspace_id?: string
           submitted_by?: string
           member_id?: string | null
+          account_id?: string | null
           amount?: number
           description?: string
           category?: string | null
@@ -864,6 +906,7 @@ export type Database = {
           workspace_id: string | null
           id: string
           member_id: string | null
+          account_id: string | null
           amount: number
           description: string
           category: string | null
@@ -880,6 +923,7 @@ export type Database = {
           workspace_id?: string | null
           id?: string
           member_id?: string | null
+          account_id?: string | null
           amount: number
           description: string
           category?: string | null
@@ -896,6 +940,7 @@ export type Database = {
           workspace_id?: string | null
           id?: string
           member_id?: string | null
+          account_id?: string | null
           amount?: number
           description?: string
           category?: string | null

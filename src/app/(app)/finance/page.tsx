@@ -1,7 +1,9 @@
 import Link from 'next/link'
 import { sectionGuard } from '@/lib/section-guard'
 import { createClient } from '@/lib/supabase/server'
-import { getCachedAllProfiles, getCachedUser, getCachedPendingPayments, getCachedFinanceSettings, getCachedFinanceProjects, getCachedRecurring, getCachedFinanceRequests } from '@/lib/data'
+import { getCachedAllProfiles, getCachedUser, getCachedPendingPayments, getCachedFinanceSettings, getCachedFinanceProjects, getCachedRecurring, getCachedFinanceRequests, getCachedFinanceAccounts } from '@/lib/data'
+import { AccountsCard } from '@/components/finance/AccountsCard'
+import { accountBalances, accountPickerOptions, holderName } from '@/lib/finance/accounts'
 import { FinanceRequests } from '@/components/finance/FinanceRequests'
 import { catchUpRecurring } from '@/lib/finance/recurring-server'
 import { categoryLabel, REIMBURSEMENT_KEY } from '@/lib/finance/settings'
@@ -31,7 +33,8 @@ export default async function FinancePage() {
   const ws = await requireWorkspaceId()
 
   // Add any repeating entries that have come due since Finance was last opened, before reading.
-  const [settings, projects, recurring, ctx] = await Promise.all([getCachedFinanceSettings(), getCachedFinanceProjects(), getCachedRecurring(), getWorkspaceContext()])
+  const [settings, projects, recurring, ctx, allAccounts] = await Promise.all([getCachedFinanceSettings(), getCachedFinanceProjects(), getCachedRecurring(), getWorkspaceContext(), getCachedFinanceAccounts()])
+  const accounts = settings.features.accounts ? allAccounts : []
   if (settings.features.recurring) await catchUpRecurring(recurring)
   const currency = settings.currency
   const canEditSettings = ctx?.current.role === 'owner' || ctx?.current.role === 'admin'
@@ -66,8 +69,12 @@ export default async function FinancePage() {
     balance: balanceMap[p.id] ?? 0,
   })).sort((a, b) => b.balance - a.balance)
 
-  const memberTotal = members.reduce((s, m) => s + m.balance, 0)
+  // Accounts are one more place a balance lives: they add to the band's money like a member does.
+  const acctBalances = accountBalances(txns ?? [])
+  const accountTotal = accounts.reduce((s, a) => s + (acctBalances[a.id] ?? 0), 0)
+  const memberTotal = members.reduce((s, m) => s + m.balance, 0) + accountTotal
   const maxBal = Math.max(...members.map(m => Math.abs(m.balance)), 1)
+  const memberNameById = Object.fromEntries(profiles.map(p => [p.id, p.id === user?.id ? 'You' : (p.display_name ?? 'Member')]))
 
   const netForShow = (showId: string) =>
     (txns ?? []).filter(t => t.show_id === showId).reduce((s, t) => s + t.amount, 0)
@@ -108,17 +115,17 @@ export default async function FinancePage() {
   const myPendingPayments = user ? pendingPayments.filter(p => p.from_member === user.id) : []
 
   return (
-    <FinanceExtrasProvider projects={projects} knownTags={knownTags}>
+    <FinanceExtrasProvider projects={projects} knownTags={knownTags} accounts={accounts}>
     <div className="space-y-5">
       <PageHeader
         title="Finance"
-        subtitle={<>{settings.fundName} <b className="text-gray-900">{fmtSigned(memberTotal, currency)}</b> · {members.length} member{members.length !== 1 ? 's' : ''}</>}
+        subtitle={<>{settings.fundName} <b className="text-gray-900">{fmtSigned(memberTotal, currency)}</b> · {members.length} member{members.length !== 1 ? 's' : ''}{accounts.some(a => !a.archived) && ` · ${accounts.filter(a => !a.archived).length} account${accounts.filter(a => !a.archived).length !== 1 ? 's' : ''}`}</>}
         action={
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Link href="/finance/history" className="inline-flex items-center rounded-md border border-brand-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-brand-50 lg:hidden">
               History
             </Link>
-            <ExportModal members={profiles.map(p => ({ id: p.id, name: p.display_name ?? 'Member' }))} />
+            <ExportModal members={[...profiles.map(p => ({ id: p.id, name: p.display_name ?? 'Member' })), ...accountPickerOptions(accounts)]} />
             {canEditSettings && (
               <Link href="/settings/money" aria-label="Money settings" title="Money settings" className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-brand-200 bg-white text-gray-600 hover:bg-brand-50">
                 <Settings2 className="h-4 w-4" />
@@ -148,6 +155,10 @@ export default async function FinancePage() {
       </nav>
 
       {waiting.length > 0 && <WaitingToBePaid shows={waiting} />}
+
+      {settings.features.accounts && (
+        <AccountsCard accounts={accounts} balances={acctBalances} nameById={memberNameById} currency={currency} canManage={canEditSettings} />
+      )}
 
       <div className="grid items-start gap-4 lg:grid-cols-[1.1fr_1fr]">
         {/* Balances */}
@@ -240,7 +251,7 @@ export default async function FinancePage() {
                 members={memberOptions}
                 shows={shows ?? []}
                 budgets={budgets ?? []}
-                payerName={nameOf(t.member_id)}
+                payerName={holderName(t, accounts, nameOf)}
                 badge={
                   t.show_id && showTitleById[t.show_id]
                     ? { label: showTitleById[t.show_id], kind: 'show' }

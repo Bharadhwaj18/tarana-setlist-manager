@@ -5,7 +5,8 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { todayISO } from '@/lib/shows'
-import { getCachedAllProfiles, getCachedFinanceSettings } from '@/lib/data'
+import { getCachedAllProfiles, getCachedFinanceAccounts, getCachedFinanceSettings } from '@/lib/data'
+import { accountIdOf } from '@/lib/finance/accounts'
 import { getWorkspaceContext, isCurrentTreasurer, isFinanceApprover, requireWorkspaceId } from '@/lib/workspace'
 import { sendNotification, sendNotificationToAll } from '@/actions/notifications'
 import type { Json } from '@/types/database'
@@ -22,7 +23,10 @@ async function requireTreasurer(): Promise<string | null> {
 }
 
 interface TransactionInput {
+  /** A member's pocket. Null with an account_id: the entry belongs to that account instead. */
   member_id: string | null
+  /** A band account (bank account, cash box). Never together with a member. */
+  account_id?: string | null
   amount: number
   description: string
   category?: string | null
@@ -31,6 +35,15 @@ interface TransactionInput {
   date?: string
   tags?: string[]
   project_id?: string | null
+}
+
+/**
+ * The account column for a write. Sent only when an account is involved (or when accounts are on and an entry is
+ * moving back to a member), so a workspace that never uses accounts never touches the column.
+ */
+function accountColumn(accountId: string | null | undefined, accountsOn: boolean): { account_id?: string | null } {
+  if (accountId) return { account_id: accountId }
+  return accountsOn ? { account_id: null } : {}
 }
 
 /**
@@ -47,6 +60,14 @@ async function validateTransactionWrite(
 ): Promise<string | null> {
   if (data.tags && (data.tags.length > 10 || data.tags.some(t => typeof t !== 'string' || !t.trim() || t.length > 40))) {
     return 'Use up to 10 tags, each under 40 characters.'
+  }
+
+  if (data.account_id) {
+    if (!(await getCachedFinanceSettings()).features.accounts) return 'Band accounts are switched off for this workspace.'
+    if (data.category === 'reimbursement') return 'A reimbursement is paid back to a person, not an account.'
+    const { data: account } = await supabase.from('finance_accounts').select('archived_at').eq('id', data.account_id).maybeSingle()
+    if (!account) return 'That account is no longer there.'
+    if (account.archived_at) return 'That account is archived. Pick another, or bring it back first.'
   }
 
   // A budget only ever tracks Misc spending: a debit with no show attached.
@@ -82,15 +103,17 @@ export async function addTransaction(data: TransactionInput): Promise<{ error?: 
   // "Paid by / Received by" is optional in the form — Band Fund was removed
   // as a choice there entirely (it never physically holds cash), so a blank
   // selection unambiguously means "whoever's submitting this."
-  data = { ...data, member_id: data.member_id ?? user.id }
+  data = { ...data, account_id: data.account_id ?? null, member_id: data.account_id ? null : data.member_id ?? user.id }
 
   const validationError = await validateTransactionWrite(supabase, data)
   if (validationError) return { error: validationError }
 
   if (await needsApproval()) return submitForApproval(supabase, user.id, data)
+  const { account_id: addAccountId, ...addRow } = data
 
   const { error } = await supabase.from('finance_transactions').insert({
-    ...data,
+    ...addRow,
+    ...accountColumn(addAccountId, false),
     workspace_id: await requireWorkspaceId(),
     date: data.date ?? todayISO(),
     recorded_by: user.id,
@@ -121,13 +144,16 @@ export async function updateTransaction(id: string, data: TransactionInput): Pro
   if (!user) return { error: 'Not authenticated' }
   if (await needsApproval()) return { error: APPROVAL_ONLY }
 
-  data = { ...data, member_id: data.member_id ?? user.id }
+  data = { ...data, account_id: data.account_id ?? null, member_id: data.account_id ? null : data.member_id ?? user.id }
 
   const validationError = await validateTransactionWrite(supabase, data)
   if (validationError) return { error: validationError }
 
+  const { account_id: updateAccountId, ...updateRow } = data
+  const accountsOn = (await getCachedFinanceSettings()).features.accounts
   const { error } = await supabase.from('finance_transactions').update({
-    ...data,
+    ...updateRow,
+    ...accountColumn(updateAccountId, accountsOn),
     date: data.date ?? todayISO(),
   }).eq('id', id)
   if (error) return { error: error.message }
@@ -215,6 +241,12 @@ export async function splitShows(shows: ShowSplitInput[], payments: SplitPayment
   if (permissionError) return { error: permissionError }
 
   const workspaceId = await requireWorkspaceId()
+
+  // Payouts are worked out from members' holdings. Money sitting in a band account isn't part of that yet.
+  const { count: inAccounts } = await supabase.from('finance_transactions').select('id', { count: 'exact', head: true })
+    .eq('workspace_id', workspaceId).in('show_id', shows.map(s => s.showId)).not('account_id', 'is', null)
+  if (inAccounts) return { error: 'Some of this show’s money is in a band account. Paying out from an account isn’t available yet, so it can’t be split here.' }
+
   const now = new Date().toISOString()
   const today = todayISO()
   // Only tie transactions to a specific show when there's exactly one in
@@ -313,6 +345,7 @@ export async function exportTransactions(filters: {
   dateTo?: string
   memberId?: string | 'all' | 'fund'
 }): Promise<{ data?: { date: string; member: string; description: string; amount: number }[]; error?: string }> {
+  const accounts = await getCachedFinanceAccounts()
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
@@ -325,7 +358,9 @@ export async function exportTransactions(filters: {
 
   if (filters.dateFrom) query = query.gte('date', filters.dateFrom)
   if (filters.dateTo) query = query.lte('date', filters.dateTo)
-  if (filters.memberId === 'fund') query = query.is('member_id', null)
+  const accountFilter = filters.memberId ? accountIdOf(filters.memberId) : null
+  if (accountFilter) query = query.eq('account_id', accountFilter)
+  else if (filters.memberId === 'fund') query = query.is('member_id', null).is('account_id', null)
   else if (filters.memberId && filters.memberId !== 'all') query = query.eq('member_id', filters.memberId)
 
   const { data: txns, error } = await query
@@ -336,7 +371,7 @@ export async function exportTransactions(filters: {
 
   const rows = (txns ?? []).map(t => ({
     date: t.date,
-    member: t.member_id ? (nameMap.get(t.member_id) ?? 'Unknown') : 'Unattributed',
+    member: t.account_id ? (accounts.find(a => a.id === t.account_id)?.name ?? 'Account') : t.member_id ? (nameMap.get(t.member_id) ?? 'Unknown') : 'Unattributed',
     description: t.description,
     amount: t.amount,
   }))
@@ -359,6 +394,7 @@ async function submitForApproval(supabase: Awaited<ReturnType<typeof createClien
     workspace_id: workspaceId,
     submitted_by: userId,
     member_id: data.member_id,
+    ...accountColumn(data.account_id, false),
     amount: data.amount,
     description: data.description,
     category: data.category ?? null,

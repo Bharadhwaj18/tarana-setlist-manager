@@ -30,6 +30,8 @@ export interface FinanceFeatures {
   tds: boolean
   /** Entries from anyone but admins and treasurers wait for one of them to approve. */
   approvals: boolean
+  /** Real accounts (a band bank account, a cash box) next to members. Off by default. */
+  accounts: boolean
 }
 
 export type ShareMode = 'equal' | 'percent' | 'ratio' | 'fixed'
@@ -92,7 +94,7 @@ export const DEFAULT_FINANCE_SETTINGS: FinanceSettings = {
   fixedAmounts: {},
   cuts: [],
   tags: [],
-  features: { projects: true, recurring: true, receivables: true, tds: true, approvals: false },
+  features: { projects: true, recurring: true, receivables: true, tds: true, approvals: false, accounts: false },
 }
 
 export function isLockedCategory(c: Pick<FinanceCategory, 'key'>) {
@@ -220,7 +222,7 @@ export function normaliseFinanceSettings(raw: unknown): FinanceSettings {
     fixedAmounts,
     cuts,
     tags,
-    features: { projects: flag('projects'), recurring: flag('recurring'), receivables: flag('receivables'), tds: flag('tds'), approvals: flag('approvals') },
+    features: { projects: flag('projects'), recurring: flag('recurring'), receivables: flag('receivables'), tds: flag('tds'), approvals: flag('approvals'), accounts: flag('accounts') },
   }
 }
 

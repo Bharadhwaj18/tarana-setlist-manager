@@ -24,7 +24,13 @@ export async function saveFinanceSettings(input: FinanceSettings): Promise<{ err
   const settings = normaliseFinanceSettings(input)
   const supabase = await createClient()
   const raw = workspace.settings && typeof workspace.settings === 'object' && !Array.isArray(workspace.settings) ? (workspace.settings as Record<string, unknown>).finance : undefined
-  const wasApproving = normaliseFinanceSettings(raw).features.approvals
+  const before = normaliseFinanceSettings(raw)
+  const wasApproving = before.features.approvals
+  // Accounts that hold entries can't be switched off, or the band's money would vanish from view.
+  if (before.features.accounts && !settings.features.accounts) {
+    const { count } = await supabase.from('finance_transactions').select('id', { count: 'exact', head: true }).eq('workspace_id', workspace.id).not('account_id', 'is', null)
+    if (count) return { error: 'Band accounts hold entries, so they can’t be switched off. You can archive an account to hide it from new entries.' }
+  }
   const { error } = await supabase.rpc('set_finance_settings', { p_ws: workspace.id, p_settings: settings as unknown as Json })
   if (error) return { error: error.message }
   if (wasApproving && !settings.features.approvals) {

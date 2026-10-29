@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, Clock, X } from 'lucide-react'
 import { approveFinanceRequest, rejectFinanceRequest, withdrawFinanceRequest } from '@/actions/finance'
-import { useMoney } from '@/components/finance/FinanceSettingsContext'
+import { useFinanceExtras, useMoney } from '@/components/finance/FinanceSettingsContext'
 import { categoryLabel } from '@/lib/finance/settings'
 import { useToast } from '@/components/ui/Toaster'
 import { cn } from '@/lib/utils'
@@ -27,6 +27,7 @@ function shortDate(iso: string) {
  */
 export function FinanceRequests({ requests, nameById, showTitleById, currentUserId }: Props) {
   const { money, settings, canApprove } = useMoney()
+  const { accounts } = useFinanceExtras()
   const router = useRouter()
   const toast = useToast()
   const [busy, setBusy] = useState<string | null>(null)
@@ -68,7 +69,7 @@ export function FinanceRequests({ requests, nameById, showTitleById, currentUser
                 <div className="min-w-0">
                   <p className="truncate text-[15px] font-bold text-gray-900">{r.description}</p>
                   <p className="mt-0.5 text-xs text-gray-500">
-                    {[mine ? 'You' : nameById[r.submitted_by] ?? 'Someone', categoryLabel(settings, r.category), r.show_id ? showTitleById[r.show_id] : null, shortDate(r.date)].filter(Boolean).join(' · ')}
+                    {[mine ? 'You' : nameById[r.submitted_by] ?? 'Someone', r.account_id ? `${isIn ? 'into' : 'from'} ${accounts.find(a => a.id === r.account_id)?.name ?? 'an account'}` : null, categoryLabel(settings, r.category), r.show_id ? showTitleById[r.show_id] : null, shortDate(r.date)].filter(Boolean).join(' · ')}
                   </p>
                 </div>
                 <span className={cn('shrink-0 text-base font-extrabold tabular-nums', isIn ? 'text-brand-600 dark:text-emerald-400' : 'text-red-700')}>{isIn ? '+' : '−'}{money(r.amount)}</span>

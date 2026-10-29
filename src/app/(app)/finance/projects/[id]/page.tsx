@@ -4,7 +4,8 @@ import { ChevronLeft } from 'lucide-react'
 import { sectionGuard } from '@/lib/section-guard'
 import { createClient } from '@/lib/supabase/server'
 import { requireWorkspaceId } from '@/lib/workspace'
-import { getCachedAllProfiles, getCachedFinanceProjects, getCachedFinanceSettings, getCachedUser } from '@/lib/data'
+import { getCachedAllProfiles, getCachedFinanceAccounts, getCachedFinanceProjects, getCachedFinanceSettings, getCachedUser } from '@/lib/data'
+import { holderName } from '@/lib/finance/accounts'
 import { categoryLabel, formatMoney } from '@/lib/finance/settings'
 import { groupTotals, summarise } from '@/lib/finance/totals'
 import { FinanceExtrasProvider } from '@/components/finance/FinanceSettingsContext'
@@ -24,14 +25,16 @@ export default async function ProjectPage({ params }: Props) {
   const supabase = await createClient()
   const ws = await requireWorkspaceId()
 
-  const [settings, projects, profiles, { data: { user } }, { data: txns }, { data: shows }] = await Promise.all([
+  const [settings, projects, profiles, { data: { user } }, { data: txns }, { data: shows }, allAccounts] = await Promise.all([
     getCachedFinanceSettings(),
     getCachedFinanceProjects(),
     getCachedAllProfiles(),
     getCachedUser(),
     supabase.from('finance_transactions').select('*').eq('workspace_id', ws).eq('project_id', id).order('date', { ascending: false }),
     supabase.from('shows').select('*').eq('workspace_id', ws),
+    getCachedFinanceAccounts(),
   ])
+  const accounts = settings.features.accounts ? allAccounts : []
   const project = projects.find(p => p.id === id)
   if (!project) notFound()
 
@@ -46,7 +49,7 @@ export default async function ProjectPage({ params }: Props) {
   const card = 'rounded-2xl border border-brand-200 bg-white p-5 shadow-sm'
 
   return (
-    <FinanceExtrasProvider projects={projects} knownTags={[...new Set(entries.flatMap(t => t.tags ?? []))]}>
+    <FinanceExtrasProvider projects={projects} knownTags={[...new Set(entries.flatMap(t => t.tags ?? []))]} accounts={accounts}>
       <div className="space-y-5">
         <div>
           <Link href="/finance/projects" className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-gray-500 hover:text-gray-700">
@@ -93,7 +96,7 @@ export default async function ProjectPage({ params }: Props) {
                   transaction={t}
                   members={members}
                   shows={shows ?? []}
-                  payerName={nameOf(t.member_id)}
+                  payerName={holderName(t, accounts, nameOf)}
                   badge={t.show_id && showTitleById[t.show_id] ? { label: showTitleById[t.show_id], kind: 'show' } : t.category ? { label: categoryLabel(settings, t.category), kind: 'category' } : undefined}
                 />
               ))}

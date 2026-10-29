@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { ArrowDownLeft, ArrowUpRight, Check, ChevronDown, Plus, Pencil, X } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, Banknote, Check, ChevronDown, Landmark, Plus, Pencil, User, X } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Chip'
@@ -9,6 +9,7 @@ import { addTransaction, updateTransaction, addShow } from '@/actions/finance'
 import { useToast } from '@/components/ui/Toaster'
 import { activeCategories, categoryLabel, REIMBURSEMENT_KEY, type FinanceSettings } from '@/lib/finance/settings'
 import { useFinanceExtras, useMoney } from '@/components/finance/FinanceSettingsContext'
+import { accountIdOf, accountValue, isAccountValue } from '@/lib/finance/accounts'
 import { cn } from '@/lib/utils'
 import { todayISO } from '@/lib/shows'
 import type { FinanceProject, FinanceTransaction } from '@/types/finance'
@@ -16,7 +17,7 @@ import type { Show } from '@/types/shows'
 import type { Budget } from '@/types/budget'
 import { Select } from '@/components/ui/Select'
 
-interface Member { id: string; name: string }
+interface Member { id: string; name: string; isYou?: boolean }
 interface Props {
   members: Member[]
   shows: Show[]
@@ -35,6 +36,8 @@ interface Props {
   projects?: FinanceProject[]
   /** Tags already used on entries, offered as suggestions alongside the ones in settings. */
   knownTags?: string[]
+  /** Start a new entry with this holder chosen (an "acct:<id>" value), e.g. from an account's own page. */
+  presetHolder?: string
 }
 
 const inputCls = 'w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400'
@@ -50,13 +53,13 @@ function firstCategory(settings: FinanceSettings, dir: 'credit' | 'debit') {
   return activeCategories(settings, dirKey(dir))[0]?.key ?? 'misc'
 }
 
-function fieldsFrom(settings: FinanceSettings, transaction: FinanceTransaction | undefined, lockedShow?: { id: string; title: string }) {
+function fieldsFrom(settings: FinanceSettings, transaction: FinanceTransaction | undefined, lockedShow?: { id: string; title: string }, presetHolder?: string) {
   if (!transaction) {
     return {
       category: firstCategory(settings, 'credit'),
       // Empty = not for a show.
       showId: lockedShow?.id ?? NO_SHOW,
-      memberId: AUTO,
+      memberId: presetHolder ?? AUTO,
       amount: '',
       dir: 'credit' as 'credit' | 'debit',
       description: '',
@@ -71,7 +74,7 @@ function fieldsFrom(settings: FinanceSettings, transaction: FinanceTransaction |
     // Keep whatever category is saved, even one that's since been hidden.
     category: transaction.category ?? firstCategory(settings, dir),
     showId: transaction.show_id ?? NO_SHOW,
-    memberId: transaction.member_id ?? AUTO,
+    memberId: transaction.account_id ? accountValue(transaction.account_id) : transaction.member_id ?? AUTO,
     amount: String(Math.abs(transaction.amount)),
     dir,
     description: transaction.description,
@@ -82,11 +85,13 @@ function fieldsFrom(settings: FinanceSettings, transaction: FinanceTransaction |
   }
 }
 
-export function AddTransactionModal({ members, shows, budgets = [], transaction, lockedShow, open: controlledOpen, onOpenChange, fab, projects: projectsProp, knownTags: knownTagsProp }: Props) {
+export function AddTransactionModal({ members, shows, budgets = [], transaction, lockedShow, open: controlledOpen, onOpenChange, fab, projects: projectsProp, knownTags: knownTagsProp, presetHolder }: Props) {
   const { settings, symbol, needsApproval } = useMoney()
   const extras = useFinanceExtras()
   const projects = projectsProp ?? extras.projects
   const knownTags = knownTagsProp ?? extras.knownTags
+  // Accounts this entry can go to: the active ones, plus the one it's already in (even if archived since).
+  const accountChoices = settings.features.accounts ? extras.accounts.filter(a => !a.archived || a.id === transaction?.account_id) : []
   const isEdit = !!transaction
   const isControlled = controlledOpen !== undefined && onOpenChange !== undefined
   const unsplitShows = shows.filter(s => !s.split_at)
@@ -100,7 +105,7 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
   const [internalOpen, setInternalOpen] = useState(false)
   const open = isControlled ? controlledOpen : internalOpen
   const setOpen = isControlled ? onOpenChange : setInternalOpen
-  const [fields, setFields] = useState(() => fieldsFrom(settings, transaction, lockedShow))
+  const [fields, setFields] = useState(() => fieldsFrom(settings, transaction, lockedShow, presetHolder))
   const [newShowTitle, setNewShowTitle] = useState('')
   const [tagDraft, setTagDraft] = useState('')
   const [moreOpen, setMoreOpen] = useState(false)
@@ -125,7 +130,7 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
   if (open !== prevOpen) {
     setPrevOpen(open)
     if (open) {
-      setFields(fieldsFrom(settings, transaction, lockedShow))
+      setFields(fieldsFrom(settings, transaction, lockedShow, presetHolder))
       setMoreOpen(isEdit && !!(transaction?.tags?.length || transaction?.project_id || transaction?.budget_id))
       setNewShowTitle('')
       setTagDraft('')
@@ -185,7 +190,8 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
 
       const effectiveDir = isReimbursement ? 'debit' : dir
       const payload = {
-        member_id: memberId === AUTO ? null : memberId,
+        member_id: memberId === AUTO || isAccountValue(memberId) ? null : memberId,
+        account_id: isReimbursement ? null : accountIdOf(memberId),
         amount: effectiveDir === 'credit' ? amt : -amt,
         description: description.trim() || (isReimbursement ? 'Reimbursement' : effectiveDir === 'credit' ? 'Credit' : 'Debit'),
         category,
@@ -356,9 +362,46 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
             </div>
           )}
 
+          {/* Where the money goes: an account, my own pocket, or someone else's */}
+          {!isReimbursement && accountChoices.length > 0 && (() => {
+            const chosen = accountChoices.find(a => memberId === accountValue(a.id))
+            const someoneElse = !isAccountValue(memberId) && memberId !== AUTO
+            const others = members.filter(m => !m.isYou)
+            return (
+              <div>
+                <p className={labelCls}>{dir === 'credit' ? 'Received into' : 'Paid from'}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {accountChoices.map(a => (
+                    <Chip key={a.id} active={memberId === accountValue(a.id)} onClick={() => set('memberId', accountValue(a.id))}>
+                      <span className="inline-flex items-center gap-1.5">{a.kind === 'cash' ? <Banknote className="h-3.5 w-3.5" /> : <Landmark className="h-3.5 w-3.5" />}{a.name}</span>
+                    </Chip>
+                  ))}
+                  <Chip active={memberId === AUTO} onClick={() => set('memberId', AUTO)}>
+                    <span className="inline-flex items-center gap-1.5"><User className="h-3.5 w-3.5" />My pocket</span>
+                  </Chip>
+                  {others.length > 0 && (
+                    <Chip active={someoneElse} onClick={() => set('memberId', others[0].id)}>Someone else</Chip>
+                  )}
+                </div>
+                {someoneElse && (
+                  <Select id="entry-member" aria-label={dir === 'credit' ? 'Who got the money?' : 'Who paid?'} value={memberId} onChange={e => set('memberId', e.target.value)} className={cn(inputCls, 'mt-2')}>
+                    {others.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </Select>
+                )}
+                <p className="mt-1.5 text-xs text-gray-500">
+                  {chosen
+                    ? (dir === 'credit' ? `Goes straight into ${chosen.name}.` : `Comes straight out of ${chosen.name}. Nobody needs reimbursing.`)
+                    : memberId === AUTO
+                      ? (dir === 'credit' ? 'You’re holding this money for the band.' : 'You paid this yourself, so the band owes you it back.')
+                      : ''}
+                </p>
+              </div>
+            )
+          })()}
+
           {/* 6. Who and when */}
           <div className="grid grid-cols-2 gap-3">
-            {!isReimbursement && (
+            {!isReimbursement && accountChoices.length === 0 && (
               <div>
                 <label htmlFor="entry-member" className={labelCls}>{dir === 'credit' ? 'Who got the money?' : 'Who paid?'}</label>
                 <Select id="entry-member" value={memberId} onChange={e => set('memberId', e.target.value)} className={inputCls}>
@@ -367,7 +410,7 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
                 </Select>
               </div>
             )}
-            <div className={cn(isReimbursement && 'col-span-2')}>
+            <div className={cn((isReimbursement || accountChoices.length > 0) && 'col-span-2')}>
               <label htmlFor="entry-date" className={labelCls}>When?</label>
               <input id="entry-date" type="date" value={date} onChange={e => set('date', e.target.value)} className={inputCls} />
             </div>

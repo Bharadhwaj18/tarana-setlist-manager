@@ -2,6 +2,7 @@
 
 import { useFinanceExtras, useMoney } from '@/components/finance/FinanceSettingsContext'
 import { categoryLabel } from '@/lib/finance/settings'
+import { accountIdOf, accountValue, holderName } from '@/lib/finance/accounts'
 import { Fragment, useMemo, useState, useTransition } from 'react'
 import { Search, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -156,7 +157,7 @@ export function FinanceHistoryList({ transactions, members, shows, budgets, show
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [tagFilter, setTagFilter] = useState('all')
   const [projectFilter, setProjectFilter] = useState('all')
-  const { projects } = useFinanceExtras()
+  const { projects, accounts } = useFinanceExtras()
 
   // Only offer filters for categories and tags that actually appear in this list.
   const categoryKeys = [...new Set(transactions.map(t => t.category).filter((c): c is string => !!c))]
@@ -165,12 +166,15 @@ export function FinanceHistoryList({ transactions, members, shows, budgets, show
   const usedProjects = projects.filter(p => transactions.some(t => t.project_id === p.id))
 
   const nameOf = (id: string | null) => id === null ? 'Unattributed' : (members.find(m => m.id === id)?.name ?? 'Unknown')
+  const holderOf = (t: FinanceTransaction) => holderName(t, accounts, nameOf)
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     return transactions.filter(t => {
-      if (memberFilter === 'fund' && t.member_id !== null) return false
-      if (memberFilter !== 'all' && memberFilter !== 'fund' && t.member_id !== memberFilter) return false
+      const filterAccount = accountIdOf(memberFilter)
+      if (memberFilter === 'fund' && (t.member_id !== null || t.account_id !== null)) return false
+      if (filterAccount && t.account_id !== filterAccount) return false
+      if (memberFilter !== 'all' && memberFilter !== 'fund' && !filterAccount && t.member_id !== memberFilter) return false
       if (typeFilter === 'misc' && t.show_id) return false
       if (typeFilter === 'show' && !t.show_id) return false
       if (dirFilter === 'credit' && t.amount < 0) return false
@@ -187,7 +191,7 @@ export function FinanceHistoryList({ transactions, members, shows, budgets, show
     })
   }, [transactions, memberFilter, typeFilter, dirFilter, categoryFilter, tagFilter, projectFilter, query, showTitleById, moneySettings])
 
-  const bandFundRows = filtered.filter(t => t.category !== 'reimbursement' && t.member_id)
+  const bandFundRows = filtered.filter(t => t.category !== 'reimbursement' && (t.member_id || t.account_id))
   const total = bandFundRows.reduce((s, t) => s + t.amount, 0)
   const totalCredit = bandFundRows.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0)
   const totalDebit = bandFundRows.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0)
@@ -221,6 +225,7 @@ export function FinanceHistoryList({ transactions, members, shows, budgets, show
           <option value="all">Everyone</option>
           <option value="fund">Unattributed</option>
           {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+          {accounts.map(a => <option key={a.id} value={accountValue(a.id)}>{a.name} (account)</option>)}
         </Select>
         <Select value={typeFilter} onChange={e => setTypeFilter(e.target.value as typeof typeFilter)} className={cn(fieldCls, 'shrink-0')} aria-label="Type">
           <option value="all">All types</option>
@@ -297,7 +302,7 @@ export function FinanceHistoryList({ transactions, members, shows, budgets, show
                       members={members}
                       shows={shows}
                       budgets={budgets}
-                      payerName={nameOf(t.member_id)}
+                      payerName={holderOf(t)}
                       badge={badge}
                       afterFundTotal={rb?.total}
                       afterMemberBalance={rb?.memberBalance ?? undefined}

@@ -492,7 +492,9 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
                 const involved = involvedByShow[s.id] ?? new Set()
                 const showData = perShow.find(p => p.show.id === s.id)
 
-                const splittable = net > 0
+                // Money in a band account can't fund payouts yet, so a show that has some can't be split.
+                const inAccount = txns.some(t => t.account_id)
+                const splittable = net > 0 && !inAccount
                 return (
                   <div key={s.id} className={cn('rounded-xl border transition-colors', selected ? 'border-brand-400 bg-brand-50' : 'border-brand-200')}>
                     <button type="button" onClick={() => toggleShow(s.id)} disabled={!splittable}
@@ -507,7 +509,9 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
                           {new Date(s.show_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'long' })}
                           {s.venue ? ` · ${s.venue}` : ''}
                         </p>}
-                        {!splittable && <p className="text-xs text-red-500">Awaiting credit — can&apos;t split yet</p>}
+                        {!splittable && (inAccount
+                          ? <p className="text-xs text-amber-700">Some of this money is in a band account. Paying out from an account isn&apos;t available yet.</p>
+                          : <p className="text-xs text-red-500">Awaiting credit — can&apos;t split yet</p>)}
                       </div>
                       <p className={cn('text-sm font-bold tabular-nums', net < 0 ? 'text-red-500' : 'text-gray-800')}>
                         {net < 0 ? '−' : ''}{fmt(net)}
