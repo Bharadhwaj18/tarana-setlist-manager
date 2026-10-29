@@ -7,7 +7,7 @@ import { buildMonthGrid, groupItemsByDate, externalLabel, type DayItems, type Ex
 import { parseISODate } from '@/lib/dates'
 import { cn } from '@/lib/utils'
 import { DayDetailPanel } from './DayDetailPanel'
-import { HATCH_ROW, KIND_LABEL, KIND_PILL, type CalendarKind } from './calendarStyles'
+import { KIND_LABEL, KIND_PILL, type CalendarKind } from './calendarStyles'
 import { SquareCheck } from 'lucide-react'
 import type { Show, Unavailability, CalendarEvent } from '@/types'
 import type { CalendarTask } from '@/types/tasks'
@@ -180,6 +180,7 @@ export function CalendarMonthView({
               const isToday = day.date === today
               const isSelected = day.date === selectedDate
               const pills = items ? pillsFor(items) : []
+              const away = !!items && items.unavailability.length > 0
               const hidden = pills.length - MAX_PILLS
               return (
                 <button
@@ -191,12 +192,14 @@ export function CalendarMonthView({
                   className={cn(
                     'active:scale-[0.97] flex h-[5.5rem] min-w-0 flex-col items-stretch gap-1 overflow-hidden border-b border-r border-brand-100 p-1.5 text-left transition-colors hover:bg-brand-50 [&:nth-child(7n)]:border-r-0',
                     !day.inCurrentMonth && 'bg-gray-50/70',
-                    isSelected && 'bg-brand-50 ring-2 ring-inset ring-brand-400'
+                    // Someone away: the whole day goes red, so it can't be missed.
+                    away && day.inCurrentMonth && 'bg-red-50 ring-2 ring-inset ring-red-300 hover:bg-red-100',
+                    isSelected && (away ? 'bg-red-50 ring-2 ring-inset ring-red-500' : 'bg-brand-50 ring-2 ring-inset ring-brand-400')
                   )}
                 >
                   <span className={cn(
                     'flex h-[22px] w-[22px] shrink-0 items-center justify-center self-start rounded-full text-xs font-bold',
-                    isToday ? 'bg-brand-400 text-white' : day.inCurrentMonth ? 'text-gray-700' : 'text-gray-300'
+                    isToday ? 'bg-brand-400 text-white' : away && day.inCurrentMonth ? 'text-red-700' : day.inCurrentMonth ? 'text-gray-700' : 'text-gray-300'
                   )}>
                     {parseISODate(day.date).getDate()}
                   </span>
@@ -248,7 +251,7 @@ export function CalendarMonthView({
                 show: 'bg-brand-100 text-brand-700',
                 event: 'bg-amber-100 text-amber-800',
                 task: 'bg-sky-100 text-sky-800',
-                off: 'bg-white text-gray-500',
+                off: 'bg-red-600 text-white',
                 else: 'bg-white text-gray-500',
               }
               return (
@@ -262,10 +265,11 @@ export function CalendarMonthView({
                 >
                   {/* Background: selected, someone away (striped) or busy in another workspace (dashed). */}
                   <span aria-hidden="true" className={cn('absolute inset-0 rounded-xl',
-                    isSelected ? 'bg-hero' : d?.away ? HATCH_ROW : d?.elsewhere ? 'border-[1.5px] border-dashed border-gray-400' : '')} />
+                    isSelected ? 'bg-hero' : d?.away ? 'bg-red-100' : d?.elsewhere ? 'border-[1.5px] border-dashed border-gray-400' : '',
+                    d?.away && 'ring-2 ring-inset ring-red-500')} />
                   <span className={cn('relative flex h-[26px] w-[26px] items-center justify-center rounded-lg text-[13px] font-extrabold',
                     d?.show ? (isSelected ? 'bg-hero-fg text-hero' : 'bg-brand-400 text-white')
-                      : isSelected ? 'text-hero-fg' : d?.away ? 'text-gray-500' : 'text-gray-800',
+                      : isSelected ? 'text-hero-fg' : d?.away ? 'text-red-700' : 'text-gray-800',
                     isToday && !d?.show && (isSelected ? 'ring-2 ring-hero-fg' : 'ring-2 ring-brand-400'))}>
                     {parseISODate(day.date).getDate()}
                   </span>
@@ -290,7 +294,7 @@ export function CalendarMonthView({
             <span className="inline-flex items-center gap-1.5"><span className="h-3.5 w-3.5 rounded bg-brand-400" />Show</span>
             <span className="inline-flex items-center gap-1.5"><span className="h-[3px] w-3 rounded-full bg-amber-500" />Event</span>
             <span className="inline-flex items-center gap-1.5"><SquareCheck className="h-3 w-3 text-sky-600" strokeWidth={3} />Task due</span>
-            <span className="inline-flex items-center gap-1.5"><span className={cn('h-3.5 w-3.5 rounded', HATCH_ROW)} />Away</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-3.5 w-3.5 rounded bg-red-100 ring-2 ring-inset ring-red-500" />Away</span>
             <span className="inline-flex items-center gap-1.5"><span className="h-3.5 w-3.5 rounded border-[1.5px] border-dashed border-gray-400" />Busy elsewhere</span>
           </div>
         </div>

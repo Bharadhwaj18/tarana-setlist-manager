@@ -18,6 +18,7 @@ import type { FinanceProject, FinanceTransaction } from '@/types/finance'
 import type { Show } from '@/types/shows'
 import type { Budget } from '@/types/budget'
 import { Select } from '@/components/ui/Select'
+import { ShowPicker } from '@/components/finance/ShowPicker'
 
 interface Member { id: string; name: string; isYou?: boolean }
 interface Props {
@@ -388,11 +389,9 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
           {!lockedShow && (
             <div>
               <label htmlFor="entry-show" className={labelCls}>Is it for a show? <span className="font-normal text-gray-500">(optional)</span></label>
-              <Select id="entry-show" value={showId} onChange={e => set('showId', e.target.value)} className={inputCls}>
-                <option value={NO_SHOW}>No, not for a show</option>
-                {availableShows.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
-                <option value={NEW_SHOW}>+ A new show…</option>
-              </Select>
+              <ShowPicker id="entry-show" shows={availableShows} value={showId} noShow={NO_SHOW} newShow={NEW_SHOW}
+                onChange={v => set('showId', v)}
+                onCreate={title => { setFields(prev => ({ ...prev, showId: NEW_SHOW })); setNewShowTitle(title) }} />
               {showId === NEW_SHOW && (
                 <input
                   type="text"

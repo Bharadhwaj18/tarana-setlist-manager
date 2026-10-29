@@ -74,7 +74,7 @@ export function QuickAddMenu({ allowed }: { allowed: QuickAddAllowed }) {
     allowed.shows && { key: 'show', label: 'Add show', icon: CalendarDays, href: '/shows/new' },
     allowed.setlists && { key: 'setlist', label: 'Add setlist', icon: ListMusic, href: '/setlists/new' },
     allowed.finance && { key: 'money', label: 'Add transaction', icon: Wallet, onPick: openMoney },
-    allowed.calendar && { key: 'event', label: 'Add calendar event', icon: CalendarPlus, onPick: () => { setMenuOpen(false); setEvent(true) } },
+    allowed.calendar && { key: 'event', label: 'Add calendar event', icon: CalendarPlus, onPick: () => { setMenuOpen(false); setEvent(true); void load() } },
     allowed.tasks && { key: 'task', label: 'Add task', icon: CheckSquare, onPick: () => openWithData(setTask) },
   ].filter(Boolean) as Item[]
 
@@ -137,7 +137,7 @@ export function QuickAddMenu({ allowed }: { allowed: QuickAddAllowed }) {
         </FinanceExtrasProvider>
       )}
       {data && allowed.tasks && <QuickTaskModal boards={data.boards} members={data.members} open={task} onOpenChange={setTask} />}
-      {allowed.calendar && <QuickEventModal open={event} onOpenChange={setEvent} />}
+      {allowed.calendar && <QuickEventModal open={event} onOpenChange={setEvent} members={data?.members ?? []} />}
     </>
   )
 }

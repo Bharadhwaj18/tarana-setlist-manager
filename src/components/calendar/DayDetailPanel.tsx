@@ -33,7 +33,7 @@ interface RowProps {
 function Row({ kind, href, children }: RowProps) {
   const base = cn(
     'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-gray-800',
-    kind === 'else' ? cn('border border-dashed border-gray-300', HATCH_ROW) : 'bg-brand-50',
+    kind === 'else' ? cn('border border-dashed border-gray-300', HATCH_ROW) : kind === 'off' ? 'bg-red-50 ring-1 ring-inset ring-red-200' : 'bg-brand-50',
     href && 'transition-colors hover:bg-brand-100'
   )
   const content = (

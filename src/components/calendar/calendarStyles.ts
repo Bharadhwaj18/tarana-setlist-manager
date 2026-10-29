@@ -16,7 +16,7 @@ export const KIND_LABEL: Record<CalendarKind, string> = {
 export const KIND_PILL: Record<CalendarKind, string> = {
   show: 'bg-brand-100 text-brand-700',
   task: 'bg-sky-100 text-sky-800',
-  off: 'bg-gray-100 text-gray-600',
+  off: 'bg-red-100 text-red-700',
   event: 'bg-amber-100 text-amber-800',
   else: `border border-dashed border-gray-300 text-gray-500 ${HATCH}`,
 }
@@ -25,7 +25,7 @@ export const KIND_PILL: Record<CalendarKind, string> = {
 export const KIND_BAR: Record<CalendarKind, string> = {
   show: 'bg-brand-400',
   task: 'bg-sky-600',
-  off: 'bg-gray-400',
+  off: 'bg-red-500',
   event: 'bg-amber-500',
   else: 'bg-gray-300',
 }
