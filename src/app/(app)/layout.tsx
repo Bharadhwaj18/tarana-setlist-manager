@@ -4,7 +4,7 @@ import { PENDING_INVITE_COOKIE, WORKSPACE_CHOSEN_COOKIE, WORKSPACE_COOKIE } from
 import { createClient } from '@/lib/supabase/server'
 import { getCachedUser, getCachedPendingPayments, getCachedNotifications, getCachedAllProfiles, getCachedFinanceSettings } from '@/lib/data'
 import { FinanceSettingsProvider } from '@/components/finance/FinanceSettingsContext'
-import { QuickAddMoney } from '@/components/finance/QuickAddMoney'
+import { QuickAddMenu } from '@/components/layout/QuickAddMenu'
 import { OfflineEntrySync } from '@/components/finance/OfflineEntrySync'
 import { RememberLastPage } from '@/components/layout/RememberLastPage'
 import { PayablesProvider } from '@/components/layout/PayablesContext'
@@ -96,7 +96,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         currentWorkspaceId={currentWorkspaceId} hiddenSections={hiddenSections} />
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-5xl px-4 pb-28 pt-16 sm:px-6 lg:px-8 lg:pb-8 lg:pt-8">
-          <FinanceSettingsProvider settings={financeSettings} canApprove={!!ctx && isFinanceApprover(ctx.current)} workspaceId={currentWorkspaceId}><PageFade>{children}</PageFade><PlayerSpacer />{ctx?.current.sections.finance === 'edit' && <><QuickAddMoney /><OfflineEntrySync /></>}</FinanceSettingsProvider>
+          <FinanceSettingsProvider settings={financeSettings} canApprove={!!ctx && isFinanceApprover(ctx.current)} workspaceId={currentWorkspaceId}><PageFade>{children}</PageFade><PlayerSpacer />{ctx && <QuickAddMenu allowed={{ shows: ctx.current.sections.shows === 'edit', setlists: ctx.current.sections.setlists === 'edit', finance: ctx.current.sections.finance === 'edit', calendar: ctx.current.sections.calendar === 'edit', tasks: ctx.current.sections.tasks === 'edit' }} />}{ctx?.current.sections.finance === 'edit' && <OfflineEntrySync />}</FinanceSettingsProvider>
         </div>
       </main>
       <TooltipLayer />

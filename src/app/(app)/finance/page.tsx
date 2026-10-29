@@ -148,7 +148,6 @@ export default async function FinancePage() {
           </div>
         }
       />
-      <AddTransactionModal fab members={memberOptions} shows={shows ?? []} budgets={budgets ?? []} />
 
       {/* Pending payments — a standing reminder until marked paid */}
       <PendingPaymentsBanner payments={myPendingPayments} profiles={profiles} />
