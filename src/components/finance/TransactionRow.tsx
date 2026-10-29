@@ -43,10 +43,13 @@ export function TransactionRow({ transaction: t, members, shows, budgets, payerN
   const [leaving, setLeaving] = useState(false)
   const toast = useToast()
   const isCredit = t.amount >= 0
+  // A move is two linked entries: it isn't edited, only undone (which removes both).
+  const isMove = !!t.transfer_id
+  const canEdit = canChangeEntries && !isMove
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!window.confirm('Delete this entry? This can’t be undone.')) return
+    if (!window.confirm(isMove ? 'Undo this move? Both sides of it are removed.' : 'Delete this entry? This can’t be undone.')) return
     setLeaving(true)
     window.setTimeout(() => startDeleteTransition(async () => {
       const result = await deleteTransaction(t.id)
@@ -56,16 +59,16 @@ export function TransactionRow({ transaction: t, members, shows, budgets, payerN
 
   return (
     <div
-      role={canChangeEntries ? 'button' : undefined}
-      tabIndex={canChangeEntries ? 0 : undefined}
-      onClick={() => canChangeEntries && setEditOpen(true)}
+      role={canEdit ? 'button' : undefined}
+      tabIndex={canEdit ? 0 : undefined}
+      onClick={() => canEdit && setEditOpen(true)}
       onKeyDown={e => {
-        if (canChangeEntries && (e.key === 'Enter' || e.key === ' ')) {
+        if (canEdit && (e.key === 'Enter' || e.key === ' ')) {
           e.preventDefault()
           setEditOpen(true)
         }
       }}
-      className={cn('animate-row-in flex items-center gap-3 px-4 py-3 text-left transition-colors', canChangeEntries && 'cursor-pointer hover:bg-brand-50', leaving && 'animate-row-out pointer-events-none')}
+      className={cn('animate-row-in flex items-center gap-3 px-4 py-3 text-left transition-colors', canEdit && 'cursor-pointer hover:bg-brand-50', leaving && 'animate-row-out pointer-events-none')}
     >
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-bold text-gray-900">{t.description}</p>
@@ -102,7 +105,7 @@ export function TransactionRow({ transaction: t, members, shows, budgets, payerN
           type="button"
           onClick={handleDelete}
           disabled={isDeleting}
-          aria-label="Delete entry"
+          aria-label={isMove ? 'Undo move' : 'Delete entry'}
           className="shrink-0 rounded-md p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
         >
           <Trash2 className="h-4 w-4" />

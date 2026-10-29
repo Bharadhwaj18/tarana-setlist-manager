@@ -1,4 +1,4 @@
-import { PAYOUT_KEYS } from './settings'
+import { PAYOUT_KEYS, TRANSFER_KEY } from './settings'
 
 interface Entry { amount: number; category: string | null }
 
@@ -18,14 +18,21 @@ export function isPayout(e: Pick<Entry, 'category'>) {
   return !!e.category && PAYOUT_KEYS.has(e.category)
 }
 
+/** A move between an account and somewhere else: money changing place, not coming in or going out. */
+export function isTransfer(e: Pick<Entry, 'category'>) {
+  return e.category === TRANSFER_KEY
+}
+
 export function summarise(entries: Entry[]): Totals {
-  let moneyIn = 0, moneyOut = 0, payouts = 0
+  let moneyIn = 0, moneyOut = 0, payouts = 0, count = 0
   for (const e of entries) {
+    if (isTransfer(e)) continue
+    count++
     if (isPayout(e)) payouts += -e.amount
     else if (e.amount >= 0) moneyIn += e.amount
     else moneyOut += -e.amount
   }
-  return { moneyIn: round2(moneyIn), moneyOut: round2(moneyOut), net: round2(moneyIn - moneyOut), payouts: round2(payouts), count: entries.length }
+  return { moneyIn: round2(moneyIn), moneyOut: round2(moneyOut), net: round2(moneyIn - moneyOut), payouts: round2(payouts), count }
 }
 
 export interface Group { key: string; label: string; totals: Totals }

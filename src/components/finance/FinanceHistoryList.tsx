@@ -49,11 +49,14 @@ function TransactionTableRow({ transaction: t, members, shows, budgets, payerNam
   const [leaving, setLeaving] = useState(false)
   const toast = useToast()
   const isCredit = t.amount >= 0
+  // A move is two linked entries: it isn't edited, only undone (which removes both).
+  const isMove = !!t.transfer_id
+  const canEdit = canChangeEntries && !isMove
   const dateStr = new Date(t.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!window.confirm('Delete this entry? This can’t be undone.')) return
+    if (!window.confirm(isMove ? 'Undo this move? Both sides of it are removed.' : 'Delete this entry? This can’t be undone.')) return
     // The row fades out first, then the delete runs and the list refreshes without it.
     setLeaving(true)
     window.setTimeout(() => startDeleteTransition(async () => {
@@ -66,11 +69,11 @@ function TransactionTableRow({ transaction: t, members, shows, budgets, payerNam
     <tr
       className={cn(
         'animate-row-in',
-        canChangeEntries && 'cursor-pointer transition-colors hover:bg-brand-50',
+        canEdit && 'cursor-pointer transition-colors hover:bg-brand-50',
         isDeleting && 'pointer-events-none opacity-40',
         leaving && 'animate-row-out pointer-events-none'
       )}
-      onClick={() => canChangeEntries && setEditOpen(true)}
+      onClick={() => canEdit && setEditOpen(true)}
     >
       {/* Date: own column on sm+; hidden on mobile, shown in description subline */}
       <td className="hidden whitespace-nowrap py-3 pl-4 pr-3 text-[13px] text-gray-500 sm:table-cell">
@@ -125,7 +128,7 @@ function TransactionTableRow({ transaction: t, members, shows, budgets, payerNam
           onClick={handleDelete}
           disabled={isDeleting || !canChangeEntries}
           hidden={!canChangeEntries}
-          aria-label="Delete entry"
+          aria-label={isMove ? 'Undo move' : 'Delete entry'}
           className="rounded-md p-1 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
         >
           <Trash2 className="h-3.5 w-3.5" />
@@ -191,7 +194,8 @@ export function FinanceHistoryList({ transactions, members, shows, budgets, show
     })
   }, [transactions, memberFilter, typeFilter, dirFilter, categoryFilter, tagFilter, projectFilter, query, showTitleById, moneySettings])
 
-  const bandFundRows = filtered.filter(t => t.category !== 'reimbursement' && (t.member_id || t.account_id))
+  // Moves shift money between places; they aren't money in or out.
+  const bandFundRows = filtered.filter(t => t.category !== 'reimbursement' && t.category !== 'transfer' && (t.member_id || t.account_id))
   const total = bandFundRows.reduce((s, t) => s + t.amount, 0)
   const totalCredit = bandFundRows.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0)
   const totalDebit = bandFundRows.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0)

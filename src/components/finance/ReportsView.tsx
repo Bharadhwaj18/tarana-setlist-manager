@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { Download, FileText } from 'lucide-react'
 import { useMoney } from '@/components/finance/FinanceSettingsContext'
 import { categoryLabel } from '@/lib/finance/settings'
-import { groupTotals, summarise, isPayout } from '@/lib/finance/totals'
+import { groupTotals, summarise, isPayout, isTransfer } from '@/lib/finance/totals'
 import { buildGroupedReportPdf } from '@/lib/pdf/financeReports'
 import { APP_SLUG } from '@/lib/brand'
 import { Button } from '@/components/ui/Button'
@@ -86,7 +86,7 @@ export function ReportsView({ entries, today, memberNames, projectNames, showTit
 
   const groups = useMemo(() => {
     // Split payouts aren't income or spending; they're summed separately below.
-    const real = inPeriod.filter(e => !isPayout(e))
+    const real = inPeriod.filter(e => !isPayout(e) && !isTransfer(e))
     switch (group.value) {
       case 'category': return groupTotals(real, e => (e.category ? [e.category] : []), k => categoryLabel(settings, k), 'Uncategorised')
       case 'tag': return groupTotals(real, e => e.tags, k => `#${k}`, 'No tag')

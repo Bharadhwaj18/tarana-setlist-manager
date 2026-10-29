@@ -157,7 +157,7 @@ export default async function FinancePage() {
       {waiting.length > 0 && <WaitingToBePaid shows={waiting} />}
 
       {settings.features.accounts && (
-        <AccountsCard accounts={accounts} balances={acctBalances} nameById={memberNameById} currency={currency} canManage={canEditSettings} />
+        <AccountsCard accounts={accounts} balances={acctBalances} nameById={memberNameById} currency={currency} canManage={canEditSettings} members={memberOptions} />
       )}
 
       <div className="grid items-start gap-4 lg:grid-cols-[1.1fr_1fr]">

@@ -63,6 +63,8 @@ export interface FinanceSettings {
 export const REIMBURSEMENT_KEY = 'reimbursement'
 export const SPLIT_KEY = 'split'
 export const BALANCE_TOP_UP_KEY = 'balance_reimbursement'
+/** Money moved between an account and another account or a pocket. Neither income nor spending. */
+export const TRANSFER_KEY = 'transfer'
 /** Money moved to members when shows are split. Not income or spending, so reports list it separately. */
 export const PAYOUT_KEYS = new Set([SPLIT_KEY, BALANCE_TOP_UP_KEY])
 const LOCKED_KEYS = new Set([REIMBURSEMENT_KEY, 'misc'])
@@ -236,6 +238,7 @@ export function categoryLabel(s: FinanceSettings, key: string | null | undefined
   if (!key) return 'Uncategorised'
   if (key === SPLIT_KEY) return 'Split payout'
   if (key === BALANCE_TOP_UP_KEY) return 'Balance top-up'
+  if (key === TRANSFER_KEY) return 'Moved money'
   const match = s.categories.find(c => c.key === key && (!direction || c.direction === direction)) ?? s.categories.find(c => c.key === key)
   if (match) return match.label
   return key.replace(/^c_/, '').replace(/[_-]+/g, ' ').replace(/^\w/, ch => ch.toUpperCase())

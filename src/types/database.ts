@@ -907,6 +907,7 @@ export type Database = {
           id: string
           member_id: string | null
           account_id: string | null
+          transfer_id: string | null
           amount: number
           description: string
           category: string | null
@@ -924,6 +925,7 @@ export type Database = {
           id?: string
           member_id?: string | null
           account_id?: string | null
+          transfer_id?: string | null
           amount: number
           description: string
           category?: string | null
@@ -941,6 +943,7 @@ export type Database = {
           id?: string
           member_id?: string | null
           account_id?: string | null
+          transfer_id?: string | null
           amount?: number
           description?: string
           category?: string | null
@@ -1501,6 +1504,7 @@ export type Database = {
       }
       set_finance_settings: { Args: { p_ws: string; p_settings: Json }; Returns: undefined }
       rename_finance_tag: { Args: { p_ws: string; p_old: string; p_new?: string | null }; Returns: undefined }
+      move_money: { Args: { p_ws: string; p_from_account?: string; p_from_member?: string; p_to_account?: string; p_to_member?: string; p_amount: number; p_from_desc: string; p_to_desc: string; p_date?: string }; Returns: string }
       approve_finance_request: { Args: { p_id: string }; Returns: string }
       approve_all_finance_requests: { Args: { p_ws: string }; Returns: number }
       mark_pending_payment_paid: { Args: { p_id: string; p_date?: string }; Returns: string }

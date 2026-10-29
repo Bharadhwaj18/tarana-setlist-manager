@@ -9,6 +9,7 @@ import { accountValue } from '@/lib/finance/accounts'
 import { categoryLabel } from '@/lib/finance/settings'
 import { FinanceExtrasProvider } from '@/components/finance/FinanceSettingsContext'
 import { AddTransactionModal } from '@/components/finance/AddTransactionModal'
+import { MoveMoneyButton } from '@/components/finance/MoveMoneyButton'
 import { TransactionRow } from '@/components/finance/TransactionRow'
 import { fmtSigned } from '@/components/finance/money'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -68,8 +69,9 @@ export default async function AccountPage({ params }: Props) {
           <p className={cn('mt-2 font-display text-4xl font-bold tabular-nums', balance < 0 && 'text-red-200')}>{fmtSigned(balance, currency)}</p>
           {account.upiId && <p className="mt-1 text-xs font-semibold opacity-80">UPI {account.upiId}</p>}
           {!account.archived && (
-            <div className="mt-4">
+            <div className="mt-4 flex flex-wrap items-center gap-2">
               <AddTransactionModal presetHolder={accountValue(account.id)} members={members} shows={shows ?? []} budgets={budgets ?? []} />
+              <MoveMoneyButton accounts={accounts} members={members} balances={{ [account.id]: balance }} from={accountValue(account.id)} />
             </div>
           )}
         </section>

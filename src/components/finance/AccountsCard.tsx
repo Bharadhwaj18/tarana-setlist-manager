@@ -4,6 +4,7 @@ import { SectionLabel } from '@/components/ui/SectionLabel'
 import { DEBIT_TEXT, fmtSigned } from '@/components/finance/money'
 import { cn } from '@/lib/utils'
 import type { FinanceAccount } from '@/lib/finance/accounts'
+import { MoveMoneyButton } from '@/components/finance/MoveMoneyButton'
 
 interface Props {
   accounts: FinanceAccount[]
@@ -13,10 +14,11 @@ interface Props {
   currency: string
   /** Owners and admins: can reach account settings. */
   canManage: boolean
+  members: { id: string; name: string; isYou?: boolean }[]
 }
 
 /** "Where the money is": the band's real accounts, each opening its own page. */
-export function AccountsCard({ accounts, balances, nameById, currency, canManage }: Props) {
+export function AccountsCard({ accounts, balances, nameById, currency, canManage, members }: Props) {
   // Archived accounts leave the list unless they still hold something, so the total always adds up.
   const shown = accounts.filter(a => !a.archived || (balances[a.id] ?? 0) !== 0)
 
@@ -24,11 +26,14 @@ export function AccountsCard({ accounts, balances, nameById, currency, canManage
     <section aria-label="Where the money is" className="rounded-2xl border border-brand-200 bg-white p-5 shadow-sm">
       <div className="mb-3 flex items-center justify-between gap-3">
         <SectionLabel>Where the money is</SectionLabel>
-        {canManage && shown.length > 0 && (
-          <Link href="/settings/money" className="inline-flex items-center gap-1 text-sm font-extrabold text-brand-600 hover:underline">
-            <Settings2 className="h-3.5 w-3.5" />Manage
-          </Link>
-        )}
+        <div className="flex items-center gap-2">
+          {shown.length > 0 && <MoveMoneyButton accounts={accounts} members={members} balances={balances} variant="ghost" />}
+          {canManage && shown.length > 0 && (
+            <Link href="/settings/money" className="inline-flex items-center gap-1 text-sm font-extrabold text-brand-600 hover:underline">
+              <Settings2 className="h-3.5 w-3.5" />Manage
+            </Link>
+          )}
+        </div>
       </div>
 
       {shown.length === 0 ? (

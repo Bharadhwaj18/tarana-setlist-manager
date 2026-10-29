@@ -149,6 +149,9 @@ export async function updateTransaction(id: string, data: TransactionInput): Pro
   const validationError = await validateTransactionWrite(supabase, data)
   if (validationError) return { error: validationError }
 
+  const { data: existing } = await supabase.from('finance_transactions').select('transfer_id').eq('id', id).maybeSingle()
+  if (existing?.transfer_id) return { error: 'A move can’t be edited. Undo it and move the money again.' }
+
   const { account_id: updateAccountId, ...updateRow } = data
   const accountsOn = (await getCachedFinanceSettings()).features.accounts
   const { error } = await supabase.from('finance_transactions').update({
@@ -166,7 +169,10 @@ export async function updateTransaction(id: string, data: TransactionInput): Pro
 export async function deleteTransaction(id: string): Promise<{ error?: string }> {
   if (await needsApproval()) return { error: APPROVAL_ONLY }
   const supabase = await createClient()
-  const { error } = await supabase.from('finance_transactions').delete().eq('id', id)
+  // Undoing one side of a move undoes both, so the two never get out of step. (No transfer column yet: plain delete.)
+  const { data: row } = await supabase.from('finance_transactions').select('transfer_id').eq('id', id).maybeSingle()
+  const del = supabase.from('finance_transactions').delete()
+  const { error } = row?.transfer_id ? await del.eq('transfer_id', row.transfer_id) : await del.eq('id', id)
   if (error) return { error: error.message }
   revalidatePath('/finance')
   revalidatePath('/finance/split')
