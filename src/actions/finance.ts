@@ -6,7 +6,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { todayISO } from '@/lib/shows'
 import { getCachedAllProfiles, getCachedFinanceAccounts, getCachedFinanceSettings } from '@/lib/data'
-import { accountIdOf } from '@/lib/finance/accounts'
+import { accountIdOf, isAccountValue } from '@/lib/finance/accounts'
 import { getWorkspaceContext, isCurrentTreasurer, isFinanceApprover, requireWorkspaceId } from '@/lib/workspace'
 import { sendNotification, sendNotificationToAll } from '@/actions/notifications'
 import type { Json } from '@/types/database'
@@ -95,6 +95,13 @@ async function needsApproval(): Promise<boolean> {
 
 const APPROVAL_ONLY = 'While treasurer approval is on, only an admin or treasurer can change or delete entries.'
 
+/** Owners, admins and treasurers: the people who run the band's accounts. */
+async function isApprover(): Promise<boolean> {
+  const ctx = await getWorkspaceContext()
+  return !!ctx && isFinanceApprover(ctx.current)
+}
+const ACCOUNT_ONLY = 'Only an admin or treasurer can change what’s in an account.'
+
 export async function addTransaction(data: TransactionInput): Promise<{ error?: string; pending?: boolean }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -108,7 +115,9 @@ export async function addTransaction(data: TransactionInput): Promise<{ error?: 
   const validationError = await validateTransactionWrite(supabase, data)
   if (validationError) return { error: validationError }
 
-  if (await needsApproval()) return submitForApproval(supabase, user.id, data)
+  // Entries in an account are the treasurer's to make. Anyone else can ask: it always waits for approval,
+  // whether or not treasurer approval is switched on.
+  if ((await needsApproval()) || (data.account_id && !(await isApprover()))) return submitForApproval(supabase, user.id, data)
   const { account_id: addAccountId, ...addRow } = data
 
   const { error } = await supabase.from('finance_transactions').insert({
@@ -143,14 +152,16 @@ export async function updateTransaction(id: string, data: TransactionInput): Pro
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
   if (await needsApproval()) return { error: APPROVAL_ONLY }
+  if (data.account_id && !(await isApprover())) return { error: 'Only an admin or treasurer can put an entry in an account. Add it as a new entry and it waits for approval.' }
 
   data = { ...data, account_id: data.account_id ?? null, member_id: data.account_id ? null : data.member_id ?? user.id }
 
   const validationError = await validateTransactionWrite(supabase, data)
   if (validationError) return { error: validationError }
 
-  const { data: existing } = await supabase.from('finance_transactions').select('transfer_id').eq('id', id).maybeSingle()
+  const { data: existing } = await supabase.from('finance_transactions').select('transfer_id, account_id').eq('id', id).maybeSingle()
   if (existing?.transfer_id) return { error: 'A move can’t be edited. Undo it and move the money again.' }
+  if (existing?.account_id && !(await isApprover())) return { error: ACCOUNT_ONLY }
 
   const { account_id: updateAccountId, ...updateRow } = data
   const accountsOn = (await getCachedFinanceSettings()).features.accounts
@@ -170,7 +181,8 @@ export async function deleteTransaction(id: string): Promise<{ error?: string }>
   if (await needsApproval()) return { error: APPROVAL_ONLY }
   const supabase = await createClient()
   // Undoing one side of a move undoes both, so the two never get out of step. (No transfer column yet: plain delete.)
-  const { data: row } = await supabase.from('finance_transactions').select('transfer_id').eq('id', id).maybeSingle()
+  const { data: row } = await supabase.from('finance_transactions').select('transfer_id, account_id').eq('id', id).maybeSingle()
+  if ((row?.account_id || row?.transfer_id) && !(await isApprover())) return { error: ACCOUNT_ONLY }
   const del = supabase.from('finance_transactions').delete()
   const { error } = row?.transfer_id ? await del.eq('transfer_id', row.transfer_id) : await del.eq('id', id)
   if (error) return { error: error.message }
@@ -211,7 +223,7 @@ export interface ShowSplitInput {
 }
 
 export interface SplitPayment {
-  /** who's paying — gets debited */
+  /** who's paying — gets debited. A member id, or "acct:<id>" when a band account pays. */
   from: string
   /** who this covers — never credited; the moment it's paid it's personal money, out of scope for this app */
   to: string
@@ -248,10 +260,12 @@ export async function splitShows(shows: ShowSplitInput[], payments: SplitPayment
 
   const workspaceId = await requireWorkspaceId()
 
-  // Payouts are worked out from members' holdings. Money sitting in a band account isn't part of that yet.
-  const { count: inAccounts } = await supabase.from('finance_transactions').select('id', { count: 'exact', head: true })
-    .eq('workspace_id', workspaceId).in('show_id', shows.map(s => s.showId)).not('account_id', 'is', null)
-  if (inAccounts) return { error: 'Some of this show’s money is in a band account. Paying out from an account isn’t available yet, so it can’t be split here.' }
+  // A payout from a band account waits to be marked paid, like any other. The account must be this workspace's and open.
+  const accounts = await getCachedFinanceAccounts()
+  for (const p of payments) {
+    const id = accountIdOf(p.from)
+    if (isAccountValue(p.from) && !accounts.some(a => a.id === id && !a.archived)) return { error: 'One of the accounts paying out is archived or missing.' }
+  }
 
   const now = new Date().toISOString()
   const today = todayISO()
@@ -281,7 +295,8 @@ export async function splitShows(shows: ShowSplitInput[], payments: SplitPayment
   let pendingIds: string[] = []
   if (crossPayments.length > 0) {
     const pending = crossPayments.map(p => ({
-      from_member: p.from,
+      from_member: isAccountValue(p.from) ? null : p.from,
+      from_account: accountIdOf(p.from),
       to_member: p.to,
       amount: p.amount,
       description: p.description,
@@ -294,7 +309,7 @@ export async function splitShows(shows: ShowSplitInput[], payments: SplitPayment
     pendingIds = (insertedPending ?? []).map(r => r.id)
 
     for (const p of crossPayments) {
-      if (p.from === user.id) continue // don't ping yourself about your own debt
+      if (p.from === user.id || isAccountValue(p.from)) continue // don't ping yourself about your own debt; an account has no one to ping
       await sendNotification({
         recipientId: p.from,
         title: `You owe ${await moneyText(p.amount)}`,
@@ -314,9 +329,11 @@ export async function splitShows(shows: ShowSplitInput[], payments: SplitPayment
 
   // Freeze this run — the full report plus who pays whom — so Split History
   // is a record of the split itself, not a re-derivation from live data.
-  const ids = [...new Set(payments.flatMap(p => [p.from, p.to]))]
+  const ids = [...new Set(payments.flatMap(p => [p.from, p.to]))].filter(id => !isAccountValue(id))
   const { data: people } = await supabase.from('profiles').select('id, display_name').in('id', ids)
-  const nameOf = (id: string) => people?.find(p => p.id === id)?.display_name ?? 'Member'
+  const nameOf = (id: string) => isAccountValue(id)
+    ? (accounts.find(a => a.id === accountIdOf(id))?.name ?? 'Account')
+    : (people?.find(p => p.id === id)?.display_name ?? 'Member')
   let crossIndex = 0
   const runPayments: SplitRunPayment[] = real.map(p =>
     p.from === p.to

@@ -4,7 +4,8 @@ import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { requireWorkspaceId } from '@/lib/workspace'
-import { getCachedAllProfiles, getCachedUser } from '@/lib/data'
+import { getCachedAllProfiles, getCachedFinanceAccounts, getCachedFinanceSettings, getCachedUser } from '@/lib/data'
+import { accountBalances, activeAccounts } from '@/lib/finance/accounts'
 import { todayISO, isUpcoming } from '@/lib/shows'
 import { SplitWizard } from '@/components/finance/SplitWizard'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -16,12 +17,17 @@ export default async function SplitPage() {
   const supabase = await createClient()
   const ws = await requireWorkspaceId()
 
-  const [{ data: { user } }, profiles, { data: unsplitShows }, { data: allTxns }] = await Promise.all([
+  const [{ data: { user } }, profiles, { data: unsplitShows }, { data: allTxns }, allAccounts, settings] = await Promise.all([
     getCachedUser(),
     getCachedAllProfiles(),
     supabase.from('shows').select('*').eq('workspace_id', ws).is('split_at', null).order('show_date', { ascending: false }),
     supabase.from('finance_transactions').select('*').eq('workspace_id', ws),
+    getCachedFinanceAccounts(),
+    getCachedFinanceSettings(),
   ])
+  const accountList = settings.features.accounts ? allAccounts : []
+  const acctBalances = accountBalances(allTxns ?? [])
+  const payingAccounts = activeAccounts(accountList).map(a => ({ id: a.id, name: a.name, balance: acctBalances[a.id] ?? 0 }))
 
   // A show that hasn't happened yet has nothing to split — same rule as the
   // Finance page's "unsplit shows" reminder (src/lib/shows.ts).
@@ -84,6 +90,7 @@ export default async function SplitPage() {
         txnsByShow={txnsByShow}
         memberBalances={balances}
         memberFundBalances={fundBalances}
+        accounts={payingAccounts}
       />
     </div>
   )

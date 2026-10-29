@@ -30,11 +30,11 @@ const labelCls = 'mb-1.5 block text-xs font-bold text-gray-700'
 
 /** "Move money": shift money between an account and another account or a member's pocket. Not income or spending. */
 export function MoveMoneyButton({ accounts, members, balances, from, variant = 'secondary', className }: Props) {
-  const { canChangeEntries } = useMoney()
+  const { canApprove } = useMoney()
   const [open, setOpen] = useState(false)
   const active = activeAccounts(accounts)
-  // With approval on, only admins and treasurers change what counts, and moving money does.
-  if (!canChangeEntries || active.length === 0) return null
+  // Accounts are run by admins and treasurers, so moving money is theirs to do.
+  if (!canApprove || active.length === 0) return null
 
   return (
     <>
@@ -64,7 +64,7 @@ function MoveForm({ accounts, members, balances, from: fromProp, onDone }: { acc
 
   const holders = [
     ...accounts.map(a => ({ value: accountValue(a.id), label: balances[a.id] !== undefined ? `${a.name} · ${money(balances[a.id])}` : a.name })),
-    ...members.map(m => ({ value: m.id, label: m.isYou ? 'My pocket' : `${m.name}’s pocket` })),
+    ...members.map(m => ({ value: m.id, label: m.isYou ? 'Me' : m.name })),
   ]
   const value = parseFloat(amount)
   const problem = validateMove(from, to, value)

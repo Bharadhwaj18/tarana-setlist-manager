@@ -17,6 +17,7 @@ import type { FinanceTransaction } from '@/types/finance'
 import type { Show } from '@/types/shows'
 import type { SplitRunReport } from '@/types/split-run'
 import { Select } from '@/components/ui/Select'
+import { accountIdOf, accountValue } from '@/lib/finance/accounts'
 
 interface Member { id: string; name: string }
 interface Props {
@@ -28,6 +29,8 @@ interface Props {
   memberBalances: Record<string, number>
   /** Each member's current tagged Band Fund balance (category 'fund' only) — used to decide who can safely absorb another payer's share without a real payment existing for it. */
   memberFundBalances: Record<string, number>
+  /** Open band accounts and what each holds, as possible payers. Empty when band accounts are off. */
+  accounts: { id: string; name: string; balance: number }[]
 }
 
 function round2(n: number) { return Math.round(n * 100) / 100 }
@@ -56,7 +59,7 @@ function descriptionFor(payment: Payment, nameOf: (id: string) => string, showTi
     : `Paid ${nameOf(payment.to)}'s share — ${showTitles}`
 }
 
-export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalances, memberFundBalances }: Props) {
+export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalances, memberFundBalances, accounts }: Props) {
   const { money: fmt, settings: moneySettings } = useMoney()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => {
     if (shows.length !== 1) return new Set()
@@ -191,7 +194,11 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
   // Manual mode (default): show each person's amount owed and everyone's
   // Band Fund, and let a person assign who pays whom themselves. Auto mode
   // (WIP): the algorithm's own routed payments above.
-  const [mode, setMode] = useState<'manual' | 'auto'>('manual')
+  const [pickedMode, setMode] = useState<'manual' | 'auto'>('manual')
+  // Money sitting in a band account is paid out by hand, so Auto mode (which routes between members) steps aside.
+  const hasAccountMoney = selectedShows.some(s => (txnsByShow[s.id] ?? []).some(t => t.account_id))
+  const mode = hasAccountMoney ? 'manual' : pickedMode
+  const accountBalanceOf = (value: string) => accounts.find(a => a.id === accountIdOf(value))?.balance ?? 0
 
   // Manual assignment scratchpad — recipientId -> one or more {payerId,
   // amount} rows, so a recipient's payment can be split across more than
@@ -284,7 +291,7 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
       .flatMap(id => assignmentsFor(id))
       .filter(a => a.payerId === memberId)
       .reduce((s, a) => s + (a.amount || 0), 0)
-    return round2((memberBalances[memberId] ?? 0) - totalAssigned)
+    return round2((accountIdOf(memberId) ? accountBalanceOf(memberId) : (memberBalances[memberId] ?? 0)) - totalAssigned)
   }
 
   // Manual mode's assignments, translated directly into payments — every
@@ -324,11 +331,12 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
   // amount actually assigned to a payer first.
   const canConfirm = showsReady && (mode === 'auto' || manualFullyAssigned)
 
-  const nameOf = (id: string) => members.find(m => m.id === id)?.name ?? 'Unknown'
+  const accountName = (id: string) => accounts.find(a => a.id === accountIdOf(id))?.name ?? 'Account'
+  const nameOf = (id: string) => accountIdOf(id) ? accountName(id) : members.find(m => m.id === id)?.name ?? 'Unknown'
   // "You" only ever makes sense to whoever's looking at the screen right
   // now — a saved transaction description gets read by every band member,
   // forever, so it always uses the real display name instead.
-  const realNameOf = (id: string) => realNames.find(m => m.id === id)?.name ?? 'Unknown'
+  const realNameOf = (id: string) => accountIdOf(id) ? accountName(id) : realNames.find(m => m.id === id)?.name ?? 'Unknown'
 
   const [isDownloading, setIsDownloading] = useState(false)
 
@@ -492,9 +500,8 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
                 const involved = involvedByShow[s.id] ?? new Set()
                 const showData = perShow.find(p => p.show.id === s.id)
 
-                // Money in a band account can't fund payouts yet, so a show that has some can't be split.
                 const inAccount = txns.some(t => t.account_id)
-                const splittable = net > 0 && !inAccount
+                const splittable = net > 0
                 return (
                   <div key={s.id} className={cn('rounded-xl border transition-colors', selected ? 'border-brand-400 bg-brand-50' : 'border-brand-200')}>
                     <button type="button" onClick={() => toggleShow(s.id)} disabled={!splittable}
@@ -509,9 +516,8 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
                           {new Date(s.show_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'long' })}
                           {s.venue ? ` · ${s.venue}` : ''}
                         </p>}
-                        {!splittable && (inAccount
-                          ? <p className="text-xs text-amber-700">Some of this money is in a band account. Paying out from an account isn&apos;t available yet.</p>
-                          : <p className="text-xs text-red-500">Awaiting credit — can&apos;t split yet</p>)}
+                        {!splittable && <p className="text-xs text-red-500">Awaiting credit — can&apos;t split yet</p>}
+                        {splittable && inAccount && <p className="text-xs text-gray-500">Some of this money is in a band account, which can pay out.</p>}
                       </div>
                       <p className={cn('text-sm font-bold tabular-nums', net < 0 ? 'text-red-500' : 'text-gray-800')}>
                         {net < 0 ? '−' : ''}{fmt(net)}
@@ -626,7 +632,7 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
           </section>
 
           {/* 3 · Who gets what — Manual / Auto mode switch */}
-          {perShow.length > 0 && (
+          {perShow.length > 0 && !hasAccountMoney && (
             <SegmentedTabs
               tabs={[{ value: 'manual', label: 'Manual' }, { value: 'auto', label: 'Auto mode (WIP)' }]}
               value={mode}
@@ -677,6 +683,9 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
                               className="min-w-0 flex-1 rounded-lg border border-brand-200 bg-white px-2 py-2 text-xs text-gray-900 focus:border-brand-400 focus:outline-none"
                             >
                               <option value="">Paid by…</option>
+                              {accounts.map(a => (
+                                <option key={a.id} value={accountValue(a.id)}>{a.name} · {fmt(a.balance)}</option>
+                              ))}
                               {members.map(m => (
                                 <option key={m.id} value={m.id}>{m.id === id ? `${m.name} (self, from ${moneySettings.fundName})` : m.name}</option>
                               ))}
@@ -713,6 +722,18 @@ export function SplitWizard({ shows, members, realNames, txnsByShow, memberBalan
 
               <SectionLabel className="mb-2 mt-6">{moneySettings.fundName} balances</SectionLabel>
               <div className="divide-y divide-brand-100 rounded-xl border border-brand-100">
+                {accounts.map(a => {
+                  const remaining = remainingFundFor(accountValue(a.id))
+                  return (
+                    <div key={a.id} className="flex items-center justify-between px-4 py-2.5">
+                      <span className="text-sm font-medium text-gray-800">{a.name}</span>
+                      <div className="text-right">
+                        <span className={cn('text-sm font-bold tabular-nums', remaining < 0 ? 'text-red-500' : 'text-brand-600')}>{remaining < 0 ? '−' : ''}{fmt(remaining)}</span>
+                        {Math.abs(remaining - a.balance) > 0.01 && <p className="text-[10px] text-gray-400">was {fmt(a.balance)}</p>}
+                      </div>
+                    </div>
+                  )
+                })}
                 {members.map(m => {
                   const starting = memberBalances[m.id] ?? 0
                   const remaining = remainingFundFor(m.id)

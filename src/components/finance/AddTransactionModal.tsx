@@ -86,13 +86,15 @@ function fieldsFrom(settings: FinanceSettings, transaction: FinanceTransaction |
 }
 
 export function AddTransactionModal({ members, shows, budgets = [], transaction, lockedShow, open: controlledOpen, onOpenChange, fab, projects: projectsProp, knownTags: knownTagsProp, presetHolder }: Props) {
-  const { settings, symbol, needsApproval } = useMoney()
+  const { settings, symbol, needsApproval, canApprove } = useMoney()
   const extras = useFinanceExtras()
   const projects = projectsProp ?? extras.projects
   const knownTags = knownTagsProp ?? extras.knownTags
   // Accounts this entry can go to: the active ones, plus the one it's already in (even if archived since).
-  const accountChoices = settings.features.accounts ? extras.accounts.filter(a => !a.archived || a.id === transaction?.account_id) : []
+  // Only admins and treasurers change what's in an account, so when editing, everyone else keeps to themselves. A new
+  // entry from anyone else can still ask for an account: it waits for approval.
   const isEdit = !!transaction
+  const accountChoices = settings.features.accounts && (canApprove || !isEdit) ? extras.accounts.filter(a => !a.archived || a.id === transaction?.account_id) : []
   const isControlled = controlledOpen !== undefined && onOpenChange !== undefined
   const unsplitShows = shows.filter(s => !s.split_at)
   // Editing a transaction tagged to an already-split show still needs that
@@ -258,7 +260,7 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
           </div>
         ) : (
         <form onSubmit={handleSubmit} className="space-y-5">
-          {needsApproval && !isEdit && (
+          {(needsApproval || (isAccountValue(memberId) && !canApprove)) && !isEdit && (
             <p className="rounded-xl bg-amber-50 px-3.5 py-2.5 text-sm font-semibold text-amber-900">An admin or treasurer will approve this before it counts.</p>
           )}
           {/* 1. In or out — the one choice everything else follows from. */}
@@ -362,7 +364,7 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
             </div>
           )}
 
-          {/* Where the money goes: an account, my own pocket, or someone else's */}
+          {/* Where the money goes: an account, me, or someone else */}
           {!isReimbursement && accountChoices.length > 0 && (() => {
             const chosen = accountChoices.find(a => memberId === accountValue(a.id))
             const someoneElse = !isAccountValue(memberId) && memberId !== AUTO
@@ -377,7 +379,7 @@ export function AddTransactionModal({ members, shows, budgets = [], transaction,
                     </Chip>
                   ))}
                   <Chip active={memberId === AUTO} onClick={() => set('memberId', AUTO)}>
-                    <span className="inline-flex items-center gap-1.5"><User className="h-3.5 w-3.5" />My pocket</span>
+                    <span className="inline-flex items-center gap-1.5"><User className="h-3.5 w-3.5" />Me</span>
                   </Chip>
                   {others.length > 0 && (
                     <Chip active={someoneElse} onClick={() => set('memberId', others[0].id)}>Someone else</Chip>

@@ -37,7 +37,7 @@ interface Props {
  * accidental safety net.
  */
 export function TransactionRow({ transaction: t, members, shows, budgets, payerName, badge, afterFundTotal, afterMemberBalance }: Props) {
-  const { money: fmt, signed: fmtSigned, canChangeEntries } = useMoney()
+  const { money: fmt, signed: fmtSigned, canChangeEntries, canApprove } = useMoney()
   const [editOpen, setEditOpen] = useState(false)
   const [isDeleting, startDeleteTransition] = useTransition()
   const [leaving, setLeaving] = useState(false)
@@ -45,7 +45,10 @@ export function TransactionRow({ transaction: t, members, shows, budgets, payerN
   const isCredit = t.amount >= 0
   // A move is two linked entries: it isn't edited, only undone (which removes both).
   const isMove = !!t.transfer_id
-  const canEdit = canChangeEntries && !isMove
+  // What's in an account (and any move) is for admins and treasurers to change.
+  const inAccount = !!t.account_id || isMove
+  const canEdit = canChangeEntries && !isMove && (!inAccount || canApprove)
+  const canDelete = canChangeEntries && (!inAccount || canApprove)
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -100,7 +103,7 @@ export function TransactionRow({ transaction: t, members, shows, budgets, payerN
       <span className={cn('shrink-0 text-sm font-extrabold tabular-nums', isCredit ? CREDIT_TEXT : DEBIT_TEXT)}>
         {isCredit ? '+' : '−'}{fmt(t.amount)}
       </span>
-      {canChangeEntries && (
+      {canDelete && (
         <button
           type="button"
           onClick={handleDelete}

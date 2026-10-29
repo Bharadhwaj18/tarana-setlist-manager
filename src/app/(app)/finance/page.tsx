@@ -3,7 +3,7 @@ import { sectionGuard } from '@/lib/section-guard'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedAllProfiles, getCachedUser, getCachedPendingPayments, getCachedFinanceSettings, getCachedFinanceProjects, getCachedRecurring, getCachedFinanceRequests, getCachedFinanceAccounts } from '@/lib/data'
 import { AccountsCard } from '@/components/finance/AccountsCard'
-import { accountBalances, accountPickerOptions, holderName } from '@/lib/finance/accounts'
+import { accountBalances, accountPickerOptions, accountValue, holderName } from '@/lib/finance/accounts'
 import { FinanceRequests } from '@/components/finance/FinanceRequests'
 import { catchUpRecurring } from '@/lib/finance/recurring-server'
 import { categoryLabel, REIMBURSEMENT_KEY } from '@/lib/finance/settings'
@@ -17,13 +17,14 @@ import { TransactionRow } from '@/components/finance/TransactionRow'
 import { ExportModal } from '@/components/finance/ExportModal'
 import { ReimburseButton } from '@/components/finance/ReimburseButton'
 import { PendingPaymentsBanner } from '@/components/finance/PendingPaymentsBanner'
+import { AccountPayouts, OwedToYou } from '@/components/finance/AccountPayouts'
 import { BudgetsSection } from '@/components/finance/BudgetsSection'
 import { fmt, fmtSigned, BAR_FILL, DEBIT_TEXT } from '@/components/finance/money'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { SectionLabel } from '@/components/ui/SectionLabel'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { computeBudgetProgress, unallocatedFund } from '@/lib/finance/budgets'
-import { isCurrentTreasurer, requireWorkspaceId } from '@/lib/workspace'
+import { isCurrentTreasurer, isFinanceApprover, requireWorkspaceId } from '@/lib/workspace'
 import { cn } from '@/lib/utils'
 
 export default async function FinancePage() {
@@ -113,6 +114,12 @@ export default async function FinancePage() {
 
   const memberOptions = profiles.map(p => ({ id: p.id, name: p.id === user?.id ? 'You' : (p.display_name ?? 'Member'), isYou: p.id === user?.id })).sort((a, b) => Number(b.isYou) - Number(a.isYou))
   const myPendingPayments = user ? pendingPayments.filter(p => p.from_member === user.id) : []
+  // Payouts waiting on a band account are the treasurer's to hand out; whoever's owed one also sees it, to say they got it.
+  const canRunAccounts = !!ctx && isFinanceApprover(ctx.current)
+  const accountPayouts = pendingPayments.filter(p => p.from_account)
+  const owedToMe = user ? pendingPayments.filter(p => p.to_member === user.id && !(canRunAccounts && p.from_account)) : []
+  const accountInfo = accounts.map(a => ({ id: a.id, name: a.name }))
+  const payerChoices = [...(canRunAccounts ? accounts.filter(a => !a.archived).map(a => ({ id: accountValue(a.id), name: a.name })) : []), ...memberOptions]
 
   return (
     <FinanceExtrasProvider projects={projects} knownTags={knownTags} accounts={accounts}>
@@ -141,6 +148,8 @@ export default async function FinancePage() {
 
       {/* Pending payments — a standing reminder until marked paid */}
       <PendingPaymentsBanner payments={myPendingPayments} profiles={profiles} />
+      {canRunAccounts && <AccountPayouts payments={accountPayouts} accounts={accountInfo} profiles={profiles} />}
+      <OwedToYou payments={owedToMe} accounts={accountInfo} profiles={profiles} />
 
       <FinanceRequests requests={requests} currentUserId={user?.id ?? ''}
         nameById={Object.fromEntries(profiles.map(p => [p.id, p.display_name ?? 'Member']))}
@@ -186,10 +195,10 @@ export default async function FinancePage() {
                     <div className="mt-1">
                       <p className="text-[11px] font-bold text-red-700">
                         {incoming.length > 0
-                          ? `${fmt(covered, currency)} assigned: ${incoming.map(p => nameOf(p.from_member)).join(', ')}`
+                          ? `${fmt(covered, currency)} assigned: ${incoming.map(p => p.from_account ? (accounts.find(a => a.id === p.from_account)?.name ?? 'Account') : nameOf(p.from_member)).join(', ')}`
                           : 'Reimbursement pending'}
                       </p>
-                      {-m.balance - covered > 0.005 && <ReimburseButton memberId={m.id} payers={memberOptions} />}
+                      {-m.balance - covered > 0.005 && <ReimburseButton memberId={m.id} payers={payerChoices} />}
                     </div>
                   )
                 })()}

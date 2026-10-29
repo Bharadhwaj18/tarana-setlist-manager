@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { todayISO } from '@/lib/shows'
-import { getWorkspaceContext } from '@/lib/workspace'
+import { getWorkspaceContext, isFinanceApprover } from '@/lib/workspace'
 import { getCachedAllProfiles, getCachedFinanceAccounts, getCachedFinanceSettings } from '@/lib/data'
 import { holderColumns, moveDescriptions, validateMove } from '@/lib/finance/transfers'
 
@@ -23,6 +23,7 @@ export async function moveMoney(input: { from: string; to: string; amount: numbe
   if (invalid) return { error: invalid }
   const ctx = await getWorkspaceContext()
   if (!ctx) return { error: 'Not authenticated' }
+  if (!isFinanceApprover(ctx.current)) return { error: 'Only an admin or treasurer can move money.' }
   if (!(await getCachedFinanceSettings()).features.accounts) return { error: 'Band accounts are switched off for this workspace.' }
 
   const from = holderColumns(input.from)!

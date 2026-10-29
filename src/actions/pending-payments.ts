@@ -6,7 +6,9 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { todayISO } from '@/lib/shows'
 import { sendNotification } from '@/actions/notifications'
-import { requireWorkspaceId } from '@/lib/workspace'
+import { getWorkspaceContext, isFinanceApprover, requireWorkspaceId } from '@/lib/workspace'
+import { getCachedFinanceAccounts } from '@/lib/data'
+import { accountIdOf, isAccountValue } from '@/lib/finance/accounts'
 
 const BALANCE_REIMBURSEMENT = 'balance_reimbursement'
 
@@ -27,6 +29,13 @@ export async function requestBalanceReimbursement(memberId: string, payerId: str
   if (!user) return { error: 'Not authenticated' }
   if (memberId === payerId) return { error: 'The payer must be someone else.' }
   const workspaceId = await requireWorkspaceId()
+  // An account can pay too, but only admins and treasurers hand out its money.
+  const fromAccount = accountIdOf(payerId)
+  if (isAccountValue(payerId)) {
+    const ctx = await getWorkspaceContext()
+    if (!ctx || !isFinanceApprover(ctx.current)) return { error: 'Only an admin or treasurer can pay from an account.' }
+    if (!(await getCachedFinanceAccounts()).some(a => a.id === fromAccount && !a.archived)) return { error: 'That account is archived or missing.' }
+  }
 
   const { data: txns, error: txErr } = await supabase
     .from('finance_transactions')
@@ -49,7 +58,7 @@ export async function requestBalanceReimbursement(memberId: string, payerId: str
   const amount = Math.round((-balance - alreadyPending) * 100) / 100
   if (amount <= 0) return { error: 'Nothing left to reimburse for this member.' }
 
-  const existing = (open ?? []).find(p => p.from_member === payerId)
+  const existing = (open ?? []).find(p => fromAccount ? p.from_account === fromAccount : p.from_member === payerId)
   if (existing) {
     const { error } = await supabase
       .from('pending_payments')
@@ -59,7 +68,8 @@ export async function requestBalanceReimbursement(memberId: string, payerId: str
   } else {
     const { data: recipient } = await supabase.from('profiles').select('display_name').eq('id', memberId).maybeSingle()
     const { error } = await supabase.from('pending_payments').insert({
-      from_member: payerId,
+      from_member: fromAccount ? null : payerId,
+      from_account: fromAccount,
       to_member: memberId,
       amount,
       description: `Balance reimbursement to ${recipient?.display_name ?? 'member'}`,
@@ -70,7 +80,7 @@ export async function requestBalanceReimbursement(memberId: string, payerId: str
     if (error) return { error: error.message }
   }
 
-  if (payerId !== user.id) {
+  if (!fromAccount && payerId !== user.id) {
     await sendNotification({
       recipientId: payerId,
       title: `You owe ${await moneyText(amount)}`,
@@ -85,13 +95,11 @@ export async function requestBalanceReimbursement(memberId: string, payerId: str
 }
 
 /**
- * The payer marks a pending split payment as paid, once they've actually
- * handed the money over — this is what turns it into a real Band Fund
- * debit. Trust-based, same as the rest of this app: the payer's own word
- * is enough (a treasurer can also do it, e.g. correcting on someone's
- * behalf), no recipient confirmation required.
+ * Marks a pending payment as paid, once the money has actually changed hands — this is what turns it into a
+ * real debit (on the payer, or on the account paying). Trust-based, same as the rest of this app: the payer,
+ * the person being paid, or a treasurer can say so. `reference` is an optional UPI or bank reference.
  */
-export async function markPendingPaymentPaid(id: string): Promise<{ error?: string }> {
+export async function markPendingPaymentPaid(id: string, reference?: string): Promise<{ error?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
@@ -108,18 +116,35 @@ export async function markPendingPaymentPaid(id: string): Promise<{ error?: stri
   // One database call does the debit, the recipient's credit for a balance
   // reimbursement, and the paid stamp together — and checks payer-or-treasurer
   // itself, so it works even with treasurer approval switched on.
-  const { error: payErr } = await supabase.rpc('mark_pending_payment_paid', { p_id: id, p_date: todayISO() })
+  const { error: payErr } = await supabase.rpc('mark_pending_payment_paid', { p_id: id, p_date: todayISO(), p_ref: reference?.trim() || undefined })
   if (payErr) return { error: payErr.message }
 
+  const { data: actor } = await supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle()
+  const actorName = actor?.display_name ?? 'Someone'
+  const accountName = pending.from_account ? ((await getCachedFinanceAccounts()).find(a => a.id === pending.from_account)?.name ?? 'The account') : null
   if (pending.to_member !== user.id) {
-    const { data: actor } = await supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle()
     await sendNotification({
       recipientId: pending.to_member,
-      title: `${actor?.display_name ?? 'Someone'} paid you ${await moneyText(pending.amount)}`,
+      title: `${accountName ?? actorName} paid you ${await moneyText(pending.amount)}`,
       body: pending.description,
       link: '/finance/history',
       type: 'payment_received',
     })
+  } else if (pending.from_account) {
+    // The person being paid said they got it: tell the treasurers, who'd otherwise be waiting to mark it.
+    const { data: staff } = await supabase.from('workspace_members').select('user_id, role, permissions').eq('workspace_id', pending.workspace_id ?? '')
+    const { data: payee } = await supabase.from('profiles').select('display_name').eq('id', pending.to_member).maybeSingle()
+    for (const m of staff ?? []) {
+      const isStaff = m.role === 'owner' || m.role === 'admin' || (m.permissions as Record<string, unknown> | null)?.treasurer === true
+      if (!isStaff || m.user_id === user.id) continue
+      await sendNotification({
+        recipientId: m.user_id,
+        title: `${payee?.display_name ?? 'A member'} got ${await moneyText(pending.amount)} from ${accountName}`,
+        body: pending.description,
+        link: '/finance/history',
+        type: 'payment_received',
+      })
+    }
   }
 
   revalidatePath('/finance')

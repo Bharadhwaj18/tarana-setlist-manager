@@ -962,7 +962,10 @@ export type Database = {
         Row: {
           workspace_id: string | null
           id: string
-          from_member: string
+          from_member: string | null
+          from_account: string | null
+          paid_by: string | null
+          paid_ref: string | null
           to_member: string
           amount: number
           description: string
@@ -975,7 +978,10 @@ export type Database = {
         Insert: {
           workspace_id?: string | null
           id?: string
-          from_member: string
+          from_member?: string | null
+          from_account?: string | null
+          paid_by?: string | null
+          paid_ref?: string | null
           to_member: string
           amount: number
           description: string
@@ -988,7 +994,10 @@ export type Database = {
         Update: {
           workspace_id?: string | null
           id?: string
-          from_member?: string
+          from_member?: string | null
+          from_account?: string | null
+          paid_by?: string | null
+          paid_ref?: string | null
           to_member?: string
           amount?: number
           description?: string
@@ -1507,7 +1516,7 @@ export type Database = {
       move_money: { Args: { p_ws: string; p_from_account?: string; p_from_member?: string; p_to_account?: string; p_to_member?: string; p_amount: number; p_from_desc: string; p_to_desc: string; p_date?: string }; Returns: string }
       approve_finance_request: { Args: { p_id: string }; Returns: string }
       approve_all_finance_requests: { Args: { p_ws: string }; Returns: number }
-      mark_pending_payment_paid: { Args: { p_id: string; p_date?: string }; Returns: string }
+      mark_pending_payment_paid: { Args: { p_id: string; p_date?: string; p_ref?: string }; Returns: string }
       save_push_subscription: { Args: { p_endpoint: string; p_p256dh: string; p_auth: string }; Returns: undefined }
       transfer_workspace_ownership: { Args: { p_ws: string; p_new_owner: string }; Returns: undefined }
       workspace_attention: {

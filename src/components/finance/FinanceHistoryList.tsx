@@ -43,7 +43,7 @@ interface RowProps {
 }
 
 function TransactionTableRow({ transaction: t, members, shows, budgets, payerName, badge, afterFundTotal, afterMemberBalance }: RowProps) {
-  const { money: fmt, signed: fmtSigned, canChangeEntries } = useMoney()
+  const { money: fmt, signed: fmtSigned, canChangeEntries, canApprove } = useMoney()
   const [editOpen, setEditOpen] = useState(false)
   const [isDeleting, startDeleteTransition] = useTransition()
   const [leaving, setLeaving] = useState(false)
@@ -51,7 +51,10 @@ function TransactionTableRow({ transaction: t, members, shows, budgets, payerNam
   const isCredit = t.amount >= 0
   // A move is two linked entries: it isn't edited, only undone (which removes both).
   const isMove = !!t.transfer_id
-  const canEdit = canChangeEntries && !isMove
+  // What's in an account (and any move) is for admins and treasurers to change.
+  const inAccount = !!t.account_id || isMove
+  const canEdit = canChangeEntries && !isMove && (!inAccount || canApprove)
+  const canDelete = canChangeEntries && (!inAccount || canApprove)
   const dateStr = new Date(t.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })
 
   const handleDelete = (e: React.MouseEvent) => {
@@ -126,8 +129,8 @@ function TransactionTableRow({ transaction: t, members, shows, budgets, payerNam
         <button
           type="button"
           onClick={handleDelete}
-          disabled={isDeleting || !canChangeEntries}
-          hidden={!canChangeEntries}
+          disabled={isDeleting || !canDelete}
+          hidden={!canDelete}
           aria-label={isMove ? 'Undo move' : 'Delete entry'}
           className="rounded-md p-1 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
         >
