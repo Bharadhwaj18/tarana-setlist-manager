@@ -1,36 +1,22 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Tarana Setlist Manager
 
-## Getting Started
+The app my band runs on. Rehearsals, setlists, chord charts, gigs and money - one PWA the whole band uses on stage and off.
 
-First, run the development server:
+**Live:** https://tarana-setlist-manager.vercel.app
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## What it does
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- **Setlists** - drag-and-drop set building with sections, shareable and printable (PDF export)
+- **Chord charts** - charts with live transposition (chordsheetjs)
+- **Shows** - enquiry-to-booking pipeline with status tracking and documents
+- **Finance** - gig income, expenses, splits between members, budgets, reports
+- **Calendar** - rehearsals, gigs, availability, push notifications (web-push)
+- **Offline-first PWA** - service worker, offline sync, installable on band members' phones
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Stack
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Next.js 16 (App Router), React 19, TypeScript, Supabase (Postgres with row-level security on every table), Tailwind CSS 4, Radix UI, zod, Vitest. Product analytics via PostHog. Nightly automated database backups via GitHub Actions.
 
-## Learn More
+## Why it looks like this
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+A band is a small business with terrible tooling. Everything here exists because a spreadsheet or a WhatsApp group failed us first. The finance split wizard alone has saved more arguments than any other feature I've built.
