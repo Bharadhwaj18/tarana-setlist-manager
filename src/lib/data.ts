@@ -287,6 +287,42 @@ export const getCachedAllCalendars = cache(async () => {
   }
 })
 
+export interface PersonalTask { id: string; title: string; dueDate: string | null; priority: string; workspaceId: string; workspaceName: string; boardName: string }
+export interface PersonalShow { id: string; title: string; date: string | null; venue: string | null; workspaceId: string; workspaceName: string }
+
+const workspaceTitle = (m: { workspace: { type: string; name: string } }) => (m.workspace.type === 'personal' ? 'Personal' : m.workspace.name)
+
+/** Open tasks assigned to you in every workspace where Tasks isn't hidden from you. */
+export const getCachedPersonalTasks = cache(async (): Promise<PersonalTask[]> => {
+  const ctx = await getWorkspaceContext()
+  if (!ctx) return []
+  const open = ctx.memberships.filter(m => m.sections.tasks !== 'none')
+  if (open.length === 0) return []
+  const ids = open.map(m => m.workspace.id)
+  const supabase = await createClient()
+  const [tasks, boards] = await Promise.all([
+    supabase.from('tasks').select('id, title, due_date, priority, workspace_id, board_id').in('workspace_id', ids).contains('assignee_ids', [ctx.userId]).neq('progress', 'completed'),
+    supabase.from('task_boards').select('id, name').in('workspace_id', ids).is('archived_at', null),
+  ])
+  const boardName = new Map((boards.data ?? []).map(b => [b.id, b.name]))
+  const wsName = new Map(open.map(m => [m.workspace.id, workspaceTitle(m)]))
+  return (tasks.data ?? [])
+    .filter(t => boardName.has(t.board_id))
+    .map(t => ({ id: t.id, title: t.title, dueDate: t.due_date, priority: t.priority, workspaceId: t.workspace_id, workspaceName: wsName.get(t.workspace_id) ?? '', boardName: boardName.get(t.board_id) ?? '' }))
+})
+
+/** Shows from every workspace where Shows isn't hidden from you. */
+export const getCachedPersonalShows = cache(async (): Promise<PersonalShow[]> => {
+  const ctx = await getWorkspaceContext()
+  if (!ctx) return []
+  const open = ctx.memberships.filter(m => m.sections.shows !== 'none')
+  if (open.length === 0) return []
+  const supabase = await createClient()
+  const { data } = await supabase.from('shows').select('id, title, show_date, venue, workspace_id').in('workspace_id', open.map(m => m.workspace.id))
+  const wsName = new Map(open.map(m => [m.workspace.id, workspaceTitle(m)]))
+  return (data ?? []).flatMap(s => s.workspace_id ? [{ id: s.id, title: s.title, date: s.show_date, venue: s.venue, workspaceId: s.workspace_id, workspaceName: wsName.get(s.workspace_id) ?? '' }] : [])
+})
+
 export interface PersonalHolding { workspaceId: string; name: string; currency: string; balance: number }
 export interface PersonalPayment {
   id: string

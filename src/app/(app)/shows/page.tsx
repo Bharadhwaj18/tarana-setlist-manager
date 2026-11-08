@@ -1,18 +1,32 @@
 import Link from 'next/link'
 import { sectionGuard } from '@/lib/section-guard'
 import { Plus, CalendarDays } from 'lucide-react'
-import { getCachedShows, getCachedShowTransactions, getCachedSetlistsByShow, getCachedEventManagementCompanies, getCachedFinanceSettings } from '@/lib/data'
+import { getCachedPersonalShows, getCachedShows, getCachedShowTransactions, getCachedSetlistsByShow, getCachedEventManagementCompanies, getCachedFinanceSettings } from '@/lib/data'
 import { formatMoney } from '@/lib/finance/settings'
 import { todayISO, isUpcoming, canonicalCity } from '@/lib/shows'
 import { Button } from '@/components/ui/Button'
 import { ShowSearchList } from '@/components/shows/ShowSearchList'
 import { PageHeader } from '@/components/ui/PageHeader'
+import { getWorkspaceContext } from '@/lib/workspace'
+import { ScopeToggle } from '@/components/layout/ScopeToggle'
+import { PersonalShows } from '@/components/shows/PersonalShows'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { SectionLabel } from '@/components/ui/SectionLabel'
 
-export default async function ShowsPage() {
+export default async function ShowsPage({ searchParams }: { searchParams: Promise<{ scope?: string }> }) {
   const denied = await sectionGuard('shows')
   if (denied) return denied
+  const { scope } = await searchParams
+  // Your Personal space opens on shows from every workspace, unless you pick "This one".
+  const wsCtx = await getWorkspaceContext()
+  if (wsCtx?.current.workspace.type === 'personal' && wsCtx.memberships.length > 1 && scope !== 'this') {
+    return (
+      <div className="max-w-3xl">
+        <PageHeader title="Shows" subtitle="From all your workspaces" action={<ScopeToggle all thisHref="/shows?scope=this" allHref="/shows" />} />
+        <PersonalShows shows={await getCachedPersonalShows()} currentId={wsCtx.current.workspace.id} today={todayISO()} />
+      </div>
+    )
+  }
   const [shows, txns, setlists, eventManagementCompanies] = await Promise.all([
     getCachedShows(),
     getCachedShowTransactions(),
