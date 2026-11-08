@@ -1,5 +1,5 @@
 import { cache } from 'react'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedUser } from '@/lib/auth-cache'
 import { WORKSPACE_COOKIE, pickCurrentWorkspace, normalisePermissions } from '@/lib/workspace-shared'
@@ -40,7 +40,9 @@ export const getWorkspaceContext = cache(async (): Promise<WorkspaceContext | nu
   if (!memberships.length) return null
 
   const cookieStore = await cookies()
-  const current = pickCurrentWorkspace(memberships, cookieStore.get(WORKSPACE_COOKIE)?.value)
+  // The phone app names its workspace in a header; it's checked against your memberships like the cookie is.
+  const wanted = (await headers()).get('x-workspace-id') ?? cookieStore.get(WORKSPACE_COOKIE)?.value
+  const current = pickCurrentWorkspace(memberships, wanted)
   return { userId: user.id, current, memberships }
 })
 

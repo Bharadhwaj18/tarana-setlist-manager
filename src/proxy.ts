@@ -10,6 +10,7 @@ export const config = {
     // api/cron/* is excluded — it authenticates via CRON_SECRET (Vercel's
     // cron invoker has no logged-in session), and would otherwise get
     // redirected to /login by this proxy before its own auth check runs.
-    '/((?!_next/static|_next/image|favicon.ico|manifest.json|icons/.*|api/cron/.*|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // api/mobile/* is excluded too: the phone app signs each request with a token, not a cookie session.
+    '/((?!_next/static|_next/image|favicon.ico|manifest.json|icons/.*|api/cron/.*|api/mobile/.*|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
