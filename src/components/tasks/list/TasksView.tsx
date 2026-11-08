@@ -38,6 +38,8 @@ interface Props {
   openTaskId?: string
   /** Opened from "All my tasks": show just yours this time. */
   onlyMine?: boolean
+  /** Personal space only: the "This one | All workspaces" switch. */
+  scopeToggle?: React.ReactNode
 }
 
 const VIEW_KEY = 'tasks-view-v2'
@@ -150,7 +152,7 @@ export function TasksView(props: Props) {
   const viewTabs = (
     <div role="tablist" aria-label="View" className="flex rounded-xl bg-brand-100 p-1">
       {([['list', 'List', List], ['kanban', 'Kanban', SquareKanban]] as const).map(([key, label, Icon]) => (
-        <Link key={key} role="tab" aria-selected={props.view === key} href={key === 'list' ? '/tasks' : `/tasks?view=kanban${props.kanbanGroupId ? `&group=${props.kanbanGroupId}` : ''}`}
+        <Link key={key} role="tab" aria-selected={props.view === key} href={key === 'list' ? '/tasks?view=list' :`/tasks?view=kanban${props.kanbanGroupId ? `&group=${props.kanbanGroupId}` : ''}`}
           className={cn('flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-extrabold transition-colors', props.view === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900')}>
           <Icon className="h-4 w-4" />{label}
         </Link>
@@ -159,6 +161,8 @@ export function TasksView(props: Props) {
   )
 
   const header = (
+    <>
+    {props.scopeToggle && <div className="mb-3 flex justify-end">{props.scopeToggle}</div>}
     <div className="mb-4 flex items-end justify-between gap-3">
       <div className="min-w-0">
         <h1 className="font-display text-3xl font-bold text-gray-900">Tasks</h1>
@@ -166,6 +170,7 @@ export function TasksView(props: Props) {
       </div>
       {viewTabs}
     </div>
+    </>
   )
 
   if (boards.length === 0) {
