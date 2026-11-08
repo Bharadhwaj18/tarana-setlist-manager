@@ -36,10 +36,9 @@ export default async function MoneySettingsPage() {
     <>
       <SettingsHeader eyebrow={s.isPersonal ? 'Personal space' : s.workspace.name} title="Money" />
       <div className="max-w-3xl space-y-5">
+        {/* The switch and the accounts sit at the top and save on their own; the rest of the page has Save changes. */}
+        <AccountsManager accounts={accounts} members={people} balances={balances} entryCounts={entryCounts} currency={financeSettings.currency} enabled={financeSettings.features.accounts} />
         <MoneySettings initial={financeSettings} members={people} canEdit usedTags={tagsInUse} />
-        {financeSettings.features.accounts && (
-          <AccountsManager accounts={accounts} members={people} balances={balances} entryCounts={entryCounts} currency={financeSettings.currency} />
-        )}
       </div>
     </>
   )

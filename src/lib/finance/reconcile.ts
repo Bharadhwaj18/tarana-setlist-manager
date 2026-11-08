@@ -55,3 +55,14 @@ export function latestChecks(checks: BalanceCheck[]): Record<string, BalanceChec
   }
   return out
 }
+
+/** A short line about when the account was last matched against the bank. */
+export function checkStatusText(state: CheckState, last: BalanceCheck | undefined, today: string): string {
+  if (!last) return 'Not checked against the bank yet'
+  const ago = daysSince(last.checkedOn, today)
+  const when = ago === 0 ? 'today' : ago === 1 ? 'yesterday' : `${ago} days ago`
+  if (state === 'stale') return `Last checked ${when}`
+  if (state === 'matched') return `Matched the bank ${when}`
+  if (state === 'fixed') return `Corrected to match the bank ${when}`
+  return `Was off from the bank ${when}`
+}

@@ -31,8 +31,8 @@ const help = 'mt-1 text-sm text-gray-500'
 const label = 'mb-1.5 block text-sm font-bold text-gray-800'
 const select = 'w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400 disabled:bg-gray-50'
 
+// Band accounts has its own switch at the top of the page, which saves straight away.
 const FEATURES: { key: keyof FinanceFeatures; title: string; text: string }[] = [
-  { key: 'accounts', title: 'Band accounts', text: 'Track a real bank account or a cash box, so you can see where the band’s money is. Off keeps Finance exactly as it is today.' },
   { key: 'approvals', title: 'Treasurer approves new entries', text: 'Money added by members waits until an admin or treasurer approves it, and doesn’t count until then. Turning this off approves anything still waiting.' },
   { key: 'projects', title: 'Projects and tours', text: 'Group money under a tour, an album or any project, with its own budget and totals.' },
   { key: 'recurring', title: 'Repeating entries', text: 'Rent, retainers, subscriptions: set them once and they are added every week, month or year.' },
@@ -40,7 +40,7 @@ const FEATURES: { key: keyof FinanceFeatures; title: string; text: string }[] = 
   { key: 'tds', title: 'Tax deducted at source (TDS)', text: 'Extra fields on shows for tax the client keeps back. Turn off if it doesn’t apply to you.' },
 ]
 
-function Toggle({ on, onChange, disabled, label: name }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean; label: string }) {
+export function Toggle({ on, onChange, disabled, label: name }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean; label: string }) {
   return (
     <button
       type="button"
@@ -59,7 +59,9 @@ function Toggle({ on, onChange, disabled, label: name }: { on: boolean; onChange
 export function MoneySettings({ initial, members, canEdit, usedTags = [] }: Props) {
   const router = useRouter()
   const toast = useToast()
-  const [s, setS] = useState<FinanceSettings>(initial)
+  const [draft, setS] = useState<FinanceSettings>(initial)
+  // The band accounts switch saves on its own, so always take its value from what's saved.
+  const s = useMemo(() => ({ ...draft, features: { ...draft.features, accounts: initial.features.accounts } }), [draft, initial.features.accounts])
   const [pending, startTransition] = useTransition()
   const [newCategory, setNewCategory] = useState<Record<MoneyDirection, string>>({ in: '', out: '' })
   const [newTag, setNewTag] = useState('')

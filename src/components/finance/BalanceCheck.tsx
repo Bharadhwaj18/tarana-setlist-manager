@@ -8,22 +8,11 @@ import { Modal } from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/Toaster'
 import { useMoney } from '@/components/finance/FinanceSettingsContext'
 import { checkAccountBalance } from '@/actions/finance-checks'
-import { balanceDifference, daysSince, type BalanceCheck, type CheckState } from '@/lib/finance/reconcile'
+import { balanceDifference, checkStatusText, type BalanceCheck, type CheckState } from '@/lib/finance/reconcile'
 import { cn } from '@/lib/utils'
 
 const labelCls = 'mb-1.5 block text-xs font-bold text-gray-700'
 const inputCls = 'w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400'
-
-/** A short line about when the account was last matched against the bank. */
-export function checkStatusText(state: CheckState, last: BalanceCheck | undefined, today: string): string {
-  if (!last) return 'Not checked against the bank yet'
-  const ago = daysSince(last.checkedOn, today)
-  const when = ago === 0 ? 'today' : ago === 1 ? 'yesterday' : `${ago} days ago`
-  if (state === 'stale') return `Last checked ${when}`
-  if (state === 'matched') return `Matched the bank ${when}`
-  if (state === 'fixed') return `Corrected to match the bank ${when}`
-  return `Was off from the bank ${when}`
-}
 
 const STATE_STYLE: Record<CheckState, string> = {
   matched: 'bg-emerald-50 text-emerald-800',

@@ -9,6 +9,8 @@ import { UserAvatar } from '@/components/ui/UserAvatar'
 import { useToast } from '@/components/ui/Toaster'
 import { cn } from '@/lib/utils'
 import { createAccount, deleteAccount, setAccountArchived, updateAccount } from '@/actions/finance-accounts'
+import { setBandAccountsEnabled } from '@/actions/finance-settings'
+import { Toggle } from '@/components/finance/MoneySettings'
 import { MAX_ACCOUNTS, type AccountKind, type FinanceAccount } from '@/lib/finance/accounts'
 import { formatMoney as formatMoneyIn } from '@/lib/finance/settings'
 
@@ -21,17 +23,31 @@ interface Props {
   balances: Record<string, number>
   entryCounts: Record<string, number>
   currency: string
+  /** Whether band accounts are switched on. The switch saves straight away. */
+  enabled: boolean
 }
 
 const card = 'rounded-2xl border border-brand-200 bg-white p-5 shadow-sm'
 
 /** Make, edit, archive and delete accounts. Owners and admins only; the page only shows it to them. */
-export function AccountsManager({ accounts, members, balances, entryCounts, currency }: Props) {
+export function AccountsManager({ accounts, members, balances, entryCounts, currency, enabled }: Props) {
   const formatMoney = (n: number) => formatMoneyIn(n, currency)
   const router = useRouter()
   const toast = useToast()
   const [sheet, setSheet] = useState<{ account: FinanceAccount | null } | null>(null)
   const [pending, startTransition] = useTransition()
+  // Flips at once; goes back if the save fails.
+  const [on, setOn] = useState(enabled)
+  const [switching, startSwitch] = useTransition()
+  const toggle = (next: boolean) => {
+    setOn(next)
+    startSwitch(async () => {
+      const res = await setBandAccountsEnabled(next)
+      if (res.error) { setOn(!next); toast(res.error, 'error'); return }
+      toast(next ? 'Band accounts turned on' : 'Band accounts turned off', 'success')
+      router.refresh()
+    })
+  }
   const active = accounts.filter(a => !a.archived)
   const archived = accounts.filter(a => a.archived)
   const atLimit = active.length >= MAX_ACCOUNTS
@@ -80,15 +96,22 @@ export function AccountsManager({ accounts, members, balances, entryCounts, curr
 
   return (
     <section className={card}>
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-base font-extrabold text-gray-900">Accounts</h2>
-          <p className="mt-0.5 text-sm text-gray-500">Where the band’s money actually is. {active.length} of {MAX_ACCOUNTS} used.</p>
+          <h2 className="text-base font-extrabold text-gray-900">Band accounts</h2>
+          <p className="mt-0.5 text-sm text-gray-500">
+            {on
+              ? `Where the band’s money actually is. ${active.length} of ${MAX_ACCOUNTS} used.`
+              : 'Track a real bank account or a cash box, so you can see where the band’s money is. Off keeps Finance exactly as it is today.'}
+          </p>
         </div>
-        <Button type="button" size="sm" onClick={() => setSheet({ account: null })} disabled={atLimit || pending}>
-          <Plus className="h-4 w-4" />New account
-        </Button>
+        <Toggle label="Band accounts" on={on} disabled={switching} onChange={toggle} />
       </div>
+      {on && (
+      <>
+      <Button type="button" size="sm" className="mt-3" onClick={() => setSheet({ account: null })} disabled={atLimit || pending}>
+        <Plus className="h-4 w-4" />New account
+      </Button>
       {atLimit && <p className="mt-2 text-xs font-semibold text-amber-800">That’s the most you can have. Archive one to make room.</p>}
 
       {active.length === 0 ? (
@@ -104,6 +127,8 @@ export function AccountsManager({ accounts, members, balances, entryCounts, curr
           <p className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-gray-500">Archived</p>
           <ul className="mt-1 divide-y divide-brand-100 opacity-80">{archived.map(row)}</ul>
         </div>
+      )}
+      </>
       )}
 
       <AccountSheet open={!!sheet} account={sheet?.account ?? null} members={members} onOpenChange={o => { if (!o) setSheet(null) }} />

@@ -40,6 +40,16 @@ export async function saveFinanceSettings(input: FinanceSettings): Promise<{ err
   return {}
 }
 
+/** Turns band accounts on or off straight away, leaving every other money setting as saved. */
+export async function setBandAccountsEnabled(on: boolean): Promise<{ error?: string }> {
+  const ctx = await getWorkspaceContext()
+  if (!ctx) return { error: 'Not authenticated' }
+  const { workspace } = ctx.current
+  const raw = workspace.settings && typeof workspace.settings === 'object' && !Array.isArray(workspace.settings) ? (workspace.settings as Record<string, unknown>).finance : undefined
+  const saved = normaliseFinanceSettings(raw)
+  return saveFinanceSettings({ ...saved, features: { ...saved.features, accounts: on } })
+}
+
 /** Renames a tag on every entry, or removes it when `next` is empty. */
 export async function renameFinanceTag(previous: string, next: string | null): Promise<{ error?: string }> {
   const supabase = await createClient()

@@ -2,15 +2,15 @@ import Link from 'next/link'
 import { sectionGuard } from '@/lib/section-guard'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedAllProfiles, getCachedUser, getCachedPendingPayments, getCachedFinanceSettings, getCachedFinanceProjects, getCachedRecurring, getCachedFinanceRequests, getCachedFinanceAccounts } from '@/lib/data'
-import { AccountsCard } from '@/components/finance/AccountsCard'
-import { latestChecks, toCheck } from '@/lib/finance/reconcile'
-import { accountBalances, accountPickerOptions, accountValue, holderName } from '@/lib/finance/accounts'
+import { MoveMoneyButton } from '@/components/finance/MoveMoneyButton'
+import { checkState, checkStatusText, latestChecks, toCheck } from '@/lib/finance/reconcile'
+import { accountBalances, accountPickerOptions, accountValue, holderName, type FinanceAccount } from '@/lib/finance/accounts'
 import { FinanceRequests } from '@/components/finance/FinanceRequests'
 import { catchUpRecurring } from '@/lib/finance/recurring-server'
 import { categoryLabel, REIMBURSEMENT_KEY } from '@/lib/finance/settings'
 import { FinanceExtrasProvider } from '@/components/finance/FinanceSettingsContext'
 import { WaitingToBePaid } from '@/components/finance/WaitingToBePaid'
-import { FolderKanban, PieChart, Repeat, Settings2 } from 'lucide-react'
+import { Banknote, ChevronRight, FolderKanban, Landmark, PieChart, Plus, Repeat, Settings2 } from 'lucide-react'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { todayISO, isUpcoming } from '@/lib/shows'
 import { AddTransactionModal } from '@/components/finance/AddTransactionModal'
@@ -78,7 +78,14 @@ export default async function FinancePage() {
   const acctBalances = accountBalances(txns ?? [])
   const accountTotal = accounts.reduce((s, a) => s + (acctBalances[a.id] ?? 0), 0)
   const memberTotal = members.reduce((s, m) => s + m.balance, 0) + accountTotal
-  const maxBal = Math.max(...members.map(m => Math.abs(m.balance)), 1)
+  // An account is one more holder of money: it sits in the same list as the members, ranked by what it holds.
+  // (An archived account drops out unless it still holds something, so the list always adds up.)
+  const checks = latestChecks((checkRows ?? []).map(toCheck))
+  const holders = [
+    ...members.map(m => ({ ...m, account: null as FinanceAccount | null })),
+    ...accounts.filter(a => !a.archived || (acctBalances[a.id] ?? 0) !== 0).map(a => ({ id: a.id, name: a.name, balance: acctBalances[a.id] ?? 0, account: a as FinanceAccount | null })),
+  ].sort((a, b) => b.balance - a.balance)
+  const maxBal = Math.max(...holders.map(h => Math.abs(h.balance)), 1)
   const memberNameById = Object.fromEntries(profiles.map(p => [p.id, p.id === user?.id ? 'You' : (p.display_name ?? 'Member')]))
 
   const netForShow = (showId: string) =>
@@ -168,19 +175,52 @@ export default async function FinancePage() {
 
       {waiting.length > 0 && <WaitingToBePaid shows={waiting} />}
 
-      {settings.features.accounts && (
-        <AccountsCard accounts={accounts} balances={acctBalances} nameById={memberNameById} currency={currency} canManage={canEditSettings} members={memberOptions} checks={latestChecks((checkRows ?? []).map(toCheck))} today={todayISO()} />
+      {settings.features.accounts && holders.every(h => !h.account) && (
+        <div className="rounded-2xl border-2 border-dashed border-brand-200 p-4 text-center">
+          <p className="text-sm text-gray-600">Add the band’s bank account or cash box. It shows up in the balances below, just like a member.</p>
+          {canEditSettings && (
+            <Link href="/settings/money" className="mt-3 inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-brand-600 px-4 text-sm font-extrabold text-white hover:bg-brand-700">
+              <Plus className="h-4 w-4" />Make an account
+            </Link>
+          )}
+        </div>
       )}
 
       <div className="grid items-start gap-4 lg:grid-cols-[1.1fr_1fr]">
         {/* Balances */}
         <section className="rounded-2xl border border-brand-200 bg-white p-5 shadow-sm">
-          <SectionLabel className="mb-4">Member balances</SectionLabel>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <SectionLabel>Balances</SectionLabel>
+            {settings.features.accounts && (
+              <div className="flex items-center gap-2">
+                {accounts.some(a => !a.archived) && <MoveMoneyButton accounts={accounts} members={memberOptions} balances={acctBalances} variant="ghost" />}
+                {canEditSettings && (
+                  <Link href="/settings/money" className="inline-flex items-center gap-1 text-sm font-extrabold text-brand-600 hover:underline">
+                    <Settings2 className="h-3.5 w-3.5" />Accounts
+                  </Link>
+                )}
+              </div>
+            )}
+          </div>
           <div className="space-y-4">
-            {members.map((m, i) => (
+            {holders.map((m, i) => (
               <div key={m.id}>
                 <div className="mb-1 flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-semibold text-gray-800">{m.name}</span>
+                  {m.account ? (
+                    <Link href={`/finance/accounts/${m.account.id}`} className="flex min-w-0 flex-1 items-center gap-2 hover:underline">
+                      {m.account.kind === 'cash' ? <Banknote className="h-4 w-4 shrink-0 text-brand-700" /> : <Landmark className="h-4 w-4 shrink-0 text-brand-700" />}
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-gray-800">{m.name}{m.account.archived && <span className="ml-2 text-xs font-bold text-gray-400">Archived</span>}</span>
+                        <span className="block truncate text-[11px] font-semibold text-gray-500">
+                          {m.account.heldBy ? `Account · held by ${memberNameById[m.account.heldBy] ?? 'a member'}` : 'Account · held by the band'}
+                          {!m.account.archived && ` · ${checkStatusText(checkState(checks[m.account.id], todayISO()), checks[m.account.id], todayISO())}`}
+                        </span>
+                      </span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
+                    </Link>
+                  ) : (
+                    <span className="truncate text-sm font-semibold text-gray-800">{m.name}</span>
+                  )}
                   <span className={cn('shrink-0 text-sm font-extrabold tabular-nums', m.balance < 0 ? DEBIT_TEXT : 'text-gray-900')}>
                     {fmtSigned(m.balance, currency)}
                   </span>
@@ -191,7 +231,7 @@ export default async function FinancePage() {
                     style={{ width: `${Math.round((Math.abs(m.balance) / maxBal) * 100)}%`, opacity: m.balance >= 0 ? Math.max(0.5, 1 - i * 0.15) : 1 }}
                   />
                 </div>
-                {m.balance < 0 && (() => {
+                {!m.account && m.balance < 0 && (() => {
                   const incoming = pendingPayments.filter(p => p.to_member === m.id && p.category === 'balance_reimbursement')
                   const covered = incoming.reduce((s, p) => s + p.amount, 0)
                   return (
