@@ -5,6 +5,7 @@ import type { TaskData } from '@/types/tasks'
 import { seesFrom, type GroupNote, type WorkspaceGroup } from '@/lib/groups'
 import { toAccount, type FinanceAccount } from '@/lib/finance/accounts'
 import { normaliseFinanceSettings } from '@/lib/finance/settings'
+import { balancesByWorkspace } from '@/lib/finance/overview'
 
 export { getCachedUser } from '@/lib/auth-cache'
 
@@ -283,6 +284,55 @@ export const getCachedAllCalendars = cache(async () => {
     events: events.data ?? [],
     profiles: profiles.data ?? [],
     workspaces: open.map(m => ({ id: m.workspace.id, name: m.workspace.type === 'personal' ? 'Personal' : m.workspace.name })),
+  }
+})
+
+export interface PersonalHolding { workspaceId: string; name: string; currency: string; balance: number }
+export interface PersonalPayment {
+  id: string
+  workspaceName: string
+  currency: string
+  amount: number
+  description: string
+  /** Who it goes to (when you owe it) or who it comes from (when you're owed it). */
+  otherName: string
+}
+export interface PersonalFinance { holdings: PersonalHolding[]; owe: PersonalPayment[]; owed: PersonalPayment[] }
+
+/**
+ * Your own money across every workspace you're in (Personal's finance overview): what you hold in each, and what you
+ * owe or are owed. Only your own rows; other members' balances stay inside their workspace. Skips workspaces where
+ * Finance is hidden from you.
+ */
+export const getCachedPersonalFinance = cache(async (): Promise<PersonalFinance | null> => {
+  const ctx = await getWorkspaceContext()
+  if (!ctx) return null
+  const open = ctx.memberships.filter(m => m.workspace.type !== 'personal' && m.sections.finance !== 'none')
+  if (open.length === 0) return { holdings: [], owe: [], owed: [] }
+  const ids = open.map(m => m.workspace.id)
+  const me = ctx.userId
+  const supabase = await createClient()
+  const [txns, payments, profiles] = await Promise.all([
+    supabase.from('finance_transactions').select('workspace_id, amount, category').in('workspace_id', ids).eq('member_id', me),
+    supabase.from('pending_payments').select('*').in('workspace_id', ids).is('paid_at', null).or(`from_member.eq.${me},to_member.eq.${me}`),
+    supabase.from('profiles').select('id, display_name'),
+  ])
+  const accountIds = [...new Set((payments.data ?? []).map(p => p.from_account).filter((a): a is string => !!a))]
+  const accounts = accountIds.length ? (await supabase.from('finance_accounts').select('id, name').in('id', accountIds)).data ?? [] : []
+
+  const meta = Object.fromEntries(open.map(m => {
+    const raw = m.workspace.settings && typeof m.workspace.settings === 'object' && !Array.isArray(m.workspace.settings) ? (m.workspace.settings as Record<string, unknown>).finance : undefined
+    return [m.workspace.id, { name: m.workspace.name, currency: normaliseFinanceSettings(raw).currency }]
+  }))
+  const balances = balancesByWorkspace(txns.data ?? [])
+  const nameOf = (id: string | null) => (profiles.data ?? []).find(p => p.id === id)?.display_name ?? 'A member'
+  const toItem = (p: NonNullable<typeof payments.data>[number], other: string): PersonalPayment => ({
+    id: p.id, workspaceName: meta[p.workspace_id ?? '']?.name ?? '', currency: meta[p.workspace_id ?? '']?.currency ?? 'INR', amount: p.amount, description: p.category === 'balance_reimbursement' ? 'Balance reimbursement' : p.description, otherName: other,
+  })
+  return {
+    holdings: open.map(m => ({ workspaceId: m.workspace.id, name: m.workspace.name, currency: meta[m.workspace.id].currency, balance: balances[m.workspace.id] ?? 0 })),
+    owe: (payments.data ?? []).filter(p => p.from_member === me).map(p => toItem(p, nameOf(p.to_member))),
+    owed: (payments.data ?? []).filter(p => p.to_member === me).map(p => toItem(p, p.from_account ? (accounts.find(a => a.id === p.from_account)?.name ?? 'An account') : nameOf(p.from_member))),
   }
 })
 

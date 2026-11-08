@@ -1,10 +1,11 @@
 import Link from 'next/link'
 import { sectionGuard } from '@/lib/section-guard'
 import { createClient } from '@/lib/supabase/server'
-import { getCachedAllProfiles, getCachedUser, getCachedPendingPayments, getCachedFinanceSettings, getCachedFinanceProjects, getCachedRecurring, getCachedFinanceRequests, getCachedFinanceAccounts } from '@/lib/data'
+import { getCachedPersonalFinance, getCachedAllProfiles, getCachedUser, getCachedPendingPayments, getCachedFinanceSettings, getCachedFinanceProjects, getCachedRecurring, getCachedFinanceRequests, getCachedFinanceAccounts } from '@/lib/data'
 import { MoveMoneyButton } from '@/components/finance/MoveMoneyButton'
 import { checkState, checkStatusText, latestChecks, toCheck } from '@/lib/finance/reconcile'
 import { accountBalances, accountPickerOptions, accountValue, holderName, type FinanceAccount } from '@/lib/finance/accounts'
+import { PersonalMoneyOverview } from '@/components/finance/PersonalMoneyOverview'
 import { FinanceRequests } from '@/components/finance/FinanceRequests'
 import { catchUpRecurring } from '@/lib/finance/recurring-server'
 import { categoryLabel, REIMBURSEMENT_KEY } from '@/lib/finance/settings'
@@ -39,6 +40,8 @@ export default async function FinancePage() {
   const accounts = settings.features.accounts ? allAccounts : []
   if (settings.features.recurring) await catchUpRecurring(recurring)
   const currency = settings.currency
+  // Personal also looks across the workspaces you're in.
+  const personalOverview = ctx?.current.workspace.type === 'personal' ? await getCachedPersonalFinance() : null
   const canEditSettings = ctx?.current.role === 'owner' || ctx?.current.role === 'admin'
 
   const [{ data: { user } }, profiles, { data: txns }, { data: shows }, pendingPayments, { data: budgets }, requests, { data: checkRows }] = await Promise.all([
@@ -137,7 +140,7 @@ export default async function FinancePage() {
     <div className="space-y-5">
       <PageHeader
         title="Finance"
-        subtitle={<>{settings.fundName} <b className="text-gray-900">{fmtSigned(memberTotal, currency)}</b> · {members.length} member{members.length !== 1 ? 's' : ''}{accounts.some(a => !a.archived) && ` · ${accounts.filter(a => !a.archived).length} account${accounts.filter(a => !a.archived).length !== 1 ? 's' : ''}`}</>}
+        subtitle={<>{settings.fundName} <b className="text-gray-900">{fmtSigned(memberTotal, currency)}</b>{!personalOverview && ` · ${members.length} member${members.length !== 1 ? 's' : ''}`}{accounts.some(a => !a.archived) && ` · ${accounts.filter(a => !a.archived).length} account${accounts.filter(a => !a.archived).length !== 1 ? 's' : ''}`}</>}
         action={
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Link href="/finance/history" className="inline-flex items-center rounded-md border border-brand-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-brand-50 lg:hidden">
@@ -155,6 +158,8 @@ export default async function FinancePage() {
           </div>
         }
       />
+
+      {personalOverview && ctx && <PersonalMoneyOverview data={personalOverview} currentId={ctx.current.workspace.id} />}
 
       {/* Pending payments — a standing reminder until marked paid */}
       <PendingPaymentsBanner payments={myPendingPayments} profiles={profiles} />
