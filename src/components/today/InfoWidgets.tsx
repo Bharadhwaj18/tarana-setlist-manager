@@ -1,5 +1,6 @@
 import { Megaphone, Newspaper, Quote, Sparkles } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { APP_NAME } from '@/lib/brand'
 
 /** A small label that says which section a widget belongs to (or that it's app-wide info). */
 export function SectionTag({ label }: { label: string }) {
@@ -50,7 +51,7 @@ export function infoCards(today: string): InfoCard[] {
     { id: 'tip', node: frame('Tip', 'Tip of the day', Sparkles, <p className="text-sm text-gray-700">{TIPS[dayIndex % TIPS.length]}</p>) },
     {
       id: 'updates',
-      node: frame('ArtistOps', "What's new", Megaphone, (
+      node: frame(APP_NAME, "What's new", Megaphone, (
         <ul className="space-y-1.5 text-sm text-gray-700">
           {UPDATES.map(u => <li key={u} className="flex gap-2"><span aria-hidden="true" className="mt-2 h-1 w-1 shrink-0 rounded-full bg-brand-500" />{u}</li>)}
         </ul>
@@ -71,7 +72,7 @@ export function infoCards(today: string): InfoCard[] {
     },
     {
       id: 'start',
-      node: frame('ArtistOps', 'Get started', Sparkles, <p className="text-sm text-gray-700">Add your next show, then build its setlist. Everything for the gig stays in one place.</p>),
+      node: frame(APP_NAME, 'Get started', Sparkles, <p className="text-sm text-gray-700">Add your next show, then build its setlist. Everything for the gig stays in one place.</p>),
     },
     {
       id: 'tip2',

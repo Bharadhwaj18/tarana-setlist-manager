@@ -1,14 +1,12 @@
 /**
- * The product's name lives here and nowhere else. "ArtistOps" is a placeholder: change these
- * values (and public/manifest.json, public/offline.html, public/sw.js, src/app/icon.svg and
- * public/icon.svg, which are static files and can't import this) when the real name is chosen.
+ * The product's name lives here and nowhere else. Rigly. Renaming means changing these values and the
+ * static files that can't import this: public/manifest.json, public/offline.html, public/sw.js,
+ * src/app/icon.svg, public/icon.svg and the PNG icons.
  */
 
-/** The name split for the wordmark (second part is set bolder and in the accent colour). Keep it a two-part split. */
-export const APP_NAME_PARTS = ['Artist', 'Ops'] as const
-
-export const APP_NAME = APP_NAME_PARTS.join('')
+/** How the name is written in text. The logo itself is the lowercase "rigly" wordmark in components/ui/Wordmark.tsx. */
+export const APP_NAME = 'Rigly'
 export const APP_TAGLINE = 'Everything an artist runs on'
 /** Lower-case, no spaces: for file names. */
-export const APP_SLUG = 'artistops'
+export const APP_SLUG = 'rigly'
 export const APP_EMAIL_PLACEHOLDER = 'you@example.com'
