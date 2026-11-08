@@ -10,10 +10,15 @@ import * as notes from '@/actions/notes'
 import * as finance from '@/actions/finance'
 import * as pendingPayments from '@/actions/pending-payments'
 import * as eventManagement from '@/actions/event-management'
+import * as financeSettings from '@/actions/finance-settings'
+import * as financeAccounts from '@/actions/finance-accounts'
+import * as financeTransfers from '@/actions/finance-transfers'
+import * as financeChecks from '@/actions/finance-checks'
+import * as budgets from '@/actions/budgets'
 
 // The phone app runs the same server actions as the website, so validation, notifications, push and approval
 // rules stay in one place. Only these modules are reachable, and only with a signed-in user's token.
-const MODULES: Record<string, Record<string, unknown>> = { shows, setlists, songs, calendarEvents, unavailability, tasks, notes, finance, pendingPayments, eventManagement }
+const MODULES: Record<string, Record<string, unknown>> = { shows, setlists, songs, calendarEvents, unavailability, tasks, notes, finance, pendingPayments, eventManagement, financeSettings, financeAccounts, financeTransfers, financeChecks, budgets }
 
 export const dynamic = 'force-dynamic'
 
