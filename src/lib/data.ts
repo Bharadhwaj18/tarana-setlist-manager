@@ -263,11 +263,15 @@ export const getCachedExternalCalendar = cache(async () => {
 export const getCachedAllCalendars = cache(async () => {
   const ctx = await getWorkspaceContext()
   if (!ctx) return null
-  const ids = ctx.memberships.map(m => m.workspace.id)
+  // Only workspaces where the calendar isn't hidden from you; shows and tasks also need their own section.
+  const open = ctx.memberships.filter(m => m.sections.calendar !== 'none')
+  const ids = open.map(m => m.workspace.id)
+  const showIds = open.filter(m => m.sections.shows !== 'none').map(m => m.workspace.id)
+  const taskIds = open.filter(m => m.sections.tasks !== 'none').map(m => m.workspace.id)
   const supabase = await createClient()
   const [shows, tasks, unavailability, events, profiles] = await Promise.all([
-    supabase.from('shows').select('*').in('workspace_id', ids),
-    supabase.from('tasks').select('*').in('workspace_id', ids).not('due_date', 'is', null),
+    supabase.from('shows').select('*').in('workspace_id', showIds),
+    supabase.from('tasks').select('*').in('workspace_id', taskIds).not('due_date', 'is', null),
     supabase.from('unavailability').select('*').in('workspace_id', ids),
     supabase.from('calendar_events').select('*').in('workspace_id', ids),
     supabase.from('profiles').select('id, display_name'),
@@ -278,7 +282,7 @@ export const getCachedAllCalendars = cache(async () => {
     unavailability: unavailability.data ?? [],
     events: events.data ?? [],
     profiles: profiles.data ?? [],
-    workspaces: ctx.memberships.map(m => ({ id: m.workspace.id, name: m.workspace.type === 'personal' ? 'Personal' : m.workspace.name })),
+    workspaces: open.map(m => ({ id: m.workspace.id, name: m.workspace.type === 'personal' ? 'Personal' : m.workspace.name })),
   }
 })
 

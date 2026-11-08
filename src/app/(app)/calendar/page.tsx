@@ -14,7 +14,9 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const { scope } = await searchParams
   const ctx = await getWorkspaceContext()
   const multiple = (ctx?.memberships.length ?? 0) > 1
-  const all = multiple && scope === 'all'
+  // Your Personal space is the home for everything: it opens on all your workspaces unless you pick "This one".
+  const inPersonal = ctx?.current.workspace.type === 'personal'
+  const all = multiple && (scope === 'all' || (inPersonal && scope !== 'this'))
 
   const { data: { user } } = await getCachedUser()
   const nameFor = (profiles: { id: string; display_name: string | null }[]) => {
@@ -25,11 +27,11 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
 
   const scopeToggle = multiple ? (
     <div className="flex shrink-0 rounded-xl bg-brand-100 p-1">
-      <Link href="/calendar" className={cn(tab, !all ? 'bg-brand-400 text-white' : 'text-gray-700 hover:text-gray-900')}>
+      <Link href={inPersonal ? '/calendar?scope=this' : '/calendar'} className={cn(tab, !all ? 'bg-brand-400 text-white' : 'text-gray-700 hover:text-gray-900')}>
         <span className="md:hidden">This one</span>
         <span className="hidden md:inline">This workspace</span>
       </Link>
-      <Link href="/calendar?scope=all" className={cn(tab, all ? 'bg-brand-400 text-white' : 'text-gray-700 hover:text-gray-900')}>
+      <Link href={inPersonal ? '/calendar' : '/calendar?scope=all'} className={cn(tab, all ? 'bg-brand-400 text-white' : 'text-gray-700 hover:text-gray-900')}>
         <span className="md:hidden">All</span>
         <span className="hidden md:inline">All workspaces</span>
       </Link>
@@ -46,7 +48,8 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         <CalendarMonthView
           shows={data.shows}
           tasks={data.tasks}
-          unavailability={data.unavailability}
+          // Personal is for shows, tasks and events; who's away is a workspace matter.
+          unavailability={inPersonal ? [] : data.unavailability}
           events={data.events}
           members={[]}
           nameById={nameById}
