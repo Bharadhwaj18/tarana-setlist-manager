@@ -323,6 +323,34 @@ export const getCachedPersonalShows = cache(async (): Promise<PersonalShow[]> =>
   return (data ?? []).flatMap(s => s.workspace_id ? [{ id: s.id, title: s.title, date: s.show_date, venue: s.venue, workspaceId: s.workspace_id, workspaceName: wsName.get(s.workspace_id) ?? '' }] : [])
 })
 
+export interface PersonalNote { id: string; title: string; dueDate: string | null; workspaceId: string; workspaceName: string }
+
+/** Setlists from every workspace where Setlists isn't hidden from you (same shape as a show, so the list is shared). */
+export const getCachedPersonalSetlists = cache(async (): Promise<PersonalShow[]> => {
+  const ctx = await getWorkspaceContext()
+  if (!ctx) return []
+  const open = ctx.memberships.filter(m => m.sections.setlists !== 'none')
+  if (open.length === 0) return []
+  const supabase = await createClient()
+  const { data } = await supabase.from('setlists').select('id, title, show_date, venue, workspace_id').in('workspace_id', open.map(m => m.workspace.id))
+  const wsName = new Map(open.map(m => [m.workspace.id, workspaceTitle(m)]))
+  return (data ?? []).flatMap(s => s.workspace_id ? [{ id: s.id, title: s.title, date: s.show_date, venue: s.venue, workspaceId: s.workspace_id, workspaceName: wsName.get(s.workspace_id) ?? '' }] : [])
+})
+
+/** Notes assigned to you, not done, not archived or in the trash, in every workspace where Notes isn't hidden from you. */
+export const getCachedPersonalNotes = cache(async (): Promise<PersonalNote[]> => {
+  const ctx = await getWorkspaceContext()
+  if (!ctx) return []
+  const open = ctx.memberships.filter(m => m.sections.notes !== 'none')
+  if (open.length === 0) return []
+  const supabase = await createClient()
+  const { data } = await supabase.from('notes').select('id, title, due_date, workspace_id')
+    .in('workspace_id', open.map(m => m.workspace.id)).eq('assigned_to', ctx.userId)
+    .is('completed_at', null).is('archived_at', null).is('deleted_at', null)
+  const wsName = new Map(open.map(m => [m.workspace.id, workspaceTitle(m)]))
+  return (data ?? []).flatMap(n => n.workspace_id ? [{ id: n.id, title: n.title, dueDate: n.due_date, workspaceId: n.workspace_id, workspaceName: wsName.get(n.workspace_id) ?? '' }] : [])
+})
+
 export interface PersonalHolding { workspaceId: string; name: string; currency: string; balance: number }
 export interface PersonalPayment {
   id: string

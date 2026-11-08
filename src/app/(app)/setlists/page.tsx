@@ -1,7 +1,10 @@
 import Link from 'next/link'
 import { sectionGuard } from '@/lib/section-guard'
 import { Plus, ListMusic } from 'lucide-react'
-import { getCachedSetlists, getCachedSetlistPreviewRows } from '@/lib/data'
+import { getCachedSetlists, getCachedSetlistPreviewRows, getCachedPersonalSetlists } from '@/lib/data'
+import { getWorkspaceContext } from '@/lib/workspace'
+import { ScopeToggle } from '@/components/layout/ScopeToggle'
+import { PersonalShows } from '@/components/shows/PersonalShows'
 import { todayISO } from '@/lib/shows'
 import { SetlistsBrowser, type PreviewSong } from '@/components/setlists/SetlistsBrowser'
 import { Button } from '@/components/ui/Button'
@@ -10,9 +13,20 @@ import { PageHeader } from '@/components/ui/PageHeader'
 
 const PREVIEW_SONGS = 5
 
-export default async function SetlistsPage() {
+export default async function SetlistsPage({ searchParams }: { searchParams: Promise<{ scope?: string }> }) {
   const denied = await sectionGuard('setlists')
   if (denied) return denied
+  const { scope } = await searchParams
+  // Your Personal space opens on setlists from every workspace, unless you pick "This one".
+  const wsCtx = await getWorkspaceContext()
+  if (wsCtx?.current.workspace.type === 'personal' && wsCtx.memberships.length > 1 && scope !== 'this') {
+    return (
+      <div className="max-w-3xl">
+        <PageHeader title="Setlists" subtitle="From all your workspaces" action={<ScopeToggle all thisHref="/setlists?scope=this" allHref="/setlists" />} />
+        <PersonalShows shows={await getCachedPersonalSetlists()} currentId={wsCtx.current.workspace.id} today={todayISO()} basePath="/setlists" noun="setlists" pastLabel="Earlier" />
+      </div>
+    )
+  }
   const [setlists, songRows] = await Promise.all([getCachedSetlists(), getCachedSetlistPreviewRows()])
 
   const countMap: Record<string, number> = {}

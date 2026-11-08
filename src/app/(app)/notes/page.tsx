@@ -1,5 +1,10 @@
-import { getCachedNotes, getCachedChecklistItems, getCachedAllProfiles, getCachedShows, getCachedSongs, getCachedUser } from '@/lib/data'
+import { getCachedPersonalNotes, getCachedNotes, getCachedChecklistItems, getCachedAllProfiles, getCachedShows, getCachedSongs, getCachedUser } from '@/lib/data'
 import { sectionGuard } from '@/lib/section-guard'
+import { getWorkspaceContext } from '@/lib/workspace'
+import { todayISO } from '@/lib/shows'
+import { addDays, format } from 'date-fns'
+import { ScopeToggle } from '@/components/layout/ScopeToggle'
+import { PersonalNotes } from '@/components/notes/PersonalNotes'
 import { createClient } from '@/lib/supabase/server'
 import { purgeOldTrash } from '@/lib/notes-trash'
 import { NotesList } from '@/components/notes/NotesList'
@@ -7,13 +12,25 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import type { ChecklistItem } from '@/types'
 
 interface Props {
-  searchParams: Promise<{ open?: string; new?: string; show?: string; song?: string }>
+  searchParams: Promise<{ open?: string; new?: string; show?: string; song?: string; scope?: string }>
 }
 
 export default async function NotesPage({ searchParams }: Props) {
   const denied = await sectionGuard('notes')
   if (denied) return denied
-  const { open, new: isNew, show, song } = await searchParams
+  const { open, new: isNew, show, song, scope } = await searchParams
+
+  // Your Personal space opens on notes assigned to you in every workspace, unless you pick "This one" or are opening a specific note.
+  const wsCtx = await getWorkspaceContext()
+  if (wsCtx?.current.workspace.type === 'personal' && wsCtx.memberships.length > 1 && scope !== 'this' && !open && !isNew && !show && !song) {
+    const today = todayISO()
+    return (
+      <div className="max-w-3xl">
+        <PageHeader title="Notes" subtitle="Assigned to you, across all your workspaces" action={<ScopeToggle all thisHref="/notes?scope=this" allHref="/notes" />} />
+        <PersonalNotes notes={await getCachedPersonalNotes()} currentId={wsCtx.current.workspace.id} today={today} weekAhead={format(addDays(new Date(today + 'T00:00:00'), 7), 'yyyy-MM-dd')} />
+      </div>
+    )
+  }
 
   // Trash older than 30 days is removed whenever someone opens Notes.
   const supabase = await createClient()
