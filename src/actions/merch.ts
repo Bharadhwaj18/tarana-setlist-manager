@@ -2,8 +2,11 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requireWorkspaceId } from '@/lib/workspace'
-import { ADJUST_REASONS, parseVariantLabels, signedQty, unitCostOf, type AdjustReason } from '@/lib/merch'
+import { getWorkspaceContext, isMerchApprover, requireWorkspaceId } from '@/lib/workspace'
+import { getCachedFinanceSettings } from '@/lib/data'
+import { formatMoney } from '@/lib/finance/settings'
+import { sendNotification } from '@/actions/notifications'
+import { ADJUST_REASONS, parseVariantLabels, saleTakings, signedQty, unitCostOf, variantPrice, type AdjustReason, type SaleMode } from '@/lib/merch'
 
 type Result = { error?: string; id?: string }
 
@@ -250,4 +253,175 @@ export async function deleteMerchMove(id: string): Promise<Result> {
   if (error) return { error: friendly(error.message) }
   done()
   return {}
+}
+
+// ---- Sales -------------------------------------------------------------------------------------------------------
+//
+// A sale takes its stock out straight away and waits as "pending". Nothing reaches Finance until a merch approver
+// (owner, admin or Merch role) approves the show's sales, which writes one income entry (see approve_merch_sales).
+
+export interface SaleInput {
+  showId?: string | null
+  date: string
+  mode: SaleMode
+  lines: { variantId: string; qty: number }[]
+  cash?: number | null
+  upi?: number | null
+  card?: number | null
+  /** Who ran the stall or is holding the money. Defaults to whoever records it. */
+  heldBy?: string | null
+  notes?: string | null
+}
+
+async function moneyText(n: number) {
+  return formatMoney(n, (await getCachedFinanceSettings()).currency)
+}
+
+/** Everyone in the workspace who can approve merch takings, except the person doing this. */
+async function merchApproverIds(supabase: Awaited<ReturnType<typeof createClient>>, workspaceId: string, except: string) {
+  const { data } = await supabase.from('workspace_members').select('user_id, role, permissions').eq('workspace_id', workspaceId)
+  return (data ?? [])
+    .filter(m => m.user_id !== except && (m.role === 'owner' || m.role === 'admin' || (m.permissions as Record<string, unknown> | null)?.merch_manager === true))
+    .map(m => m.user_id)
+}
+
+export async function recordMerchSale(input: SaleInput): Promise<Result> {
+  const { supabase, user } = await signedIn()
+  if (!user) return { error: 'Not signed in' }
+  if (!isDate(input.date)) return { error: 'Pick a date.' }
+  if (!['count', 'stall', 'manual'].includes(input.mode)) return { error: 'Unknown kind of sale.' }
+
+  // One line per variant, positive whole units.
+  const qtyByVariant = new Map<string, number>()
+  for (const l of input.lines ?? []) {
+    const q = Math.trunc(Number(l.qty))
+    if (l.variantId && q > 0) qtyByVariant.set(l.variantId, (qtyByVariant.get(l.variantId) ?? 0) + q)
+  }
+  const amounts = [money(input.cash), money(input.upi), money(input.card)].map(a => a ?? 0)
+  if (amounts.some(Number.isNaN)) return { error: 'Enter valid amounts.' }
+  const [cash_amount, upi_amount, card_amount] = amounts
+  if (!qtyByVariant.size && cash_amount + upi_amount + card_amount === 0) return { error: 'Add what was sold, or the money taken.' }
+
+  const workspace_id = await requireWorkspaceId()
+  const ids = [...qtyByVariant.keys()]
+  const { data: variants } = ids.length
+    ? await supabase.from('merch_variants').select('id, price, item:merch_items(price)').in('id', ids).eq('workspace_id', workspace_id)
+    : { data: [] }
+  if ((variants ?? []).length !== ids.length) return { error: 'Some of those items are no longer there. Reload and try again.' }
+
+  if (input.showId) {
+    const { data: show } = await supabase.from('shows').select('id').eq('id', input.showId).eq('workspace_id', workspace_id).maybeSingle()
+    if (!show) return { error: 'That show is no longer there.' }
+  }
+
+  let held_by = input.heldBy || user.id
+  if (held_by !== user.id) {
+    const { data: member } = await supabase.from('workspace_members').select('user_id').eq('workspace_id', workspace_id).eq('user_id', held_by).maybeSingle()
+    if (!member) held_by = user.id
+  }
+
+  const { data: sale, error } = await supabase.from('merch_sales').insert({
+    workspace_id, show_id: input.showId || null, date: input.date, mode: input.mode,
+    cash_amount, upi_amount, card_amount, held_by, notes: clean(input.notes, 2000),
+  }).select('id').single()
+  if (error) return { error: friendly(error.message) }
+
+  if (ids.length) {
+    const { error: mError } = await supabase.from('merch_stock_moves').insert((variants ?? []).map(v => {
+      const item = Array.isArray(v.item) ? v.item[0] : v.item
+      return {
+        workspace_id, variant_id: v.id, qty: -(qtyByVariant.get(v.id) ?? 0), reason: 'sale',
+        unit_price: variantPrice({ price: item?.price ?? 0 }, v), show_id: input.showId || null, sale_id: sale.id, date: input.date,
+      }
+    }))
+    if (mError) {
+      await supabase.from('merch_sales').delete().eq('id', sale.id)
+      return { error: friendly(mError.message) }
+    }
+  }
+
+  // Tell the approvers there's money to look at.
+  const total = cash_amount + upi_amount + card_amount
+  if (total > 0) {
+    const [{ data: actor }, approvers] = await Promise.all([
+      supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle(),
+      merchApproverIds(supabase, workspace_id, user.id),
+    ])
+    const units = [...qtyByVariant.values()].reduce((a, b) => a + b, 0)
+    const title = `${actor?.display_name ?? 'Someone'} recorded ${await moneyText(total)} of merch sales`
+    for (const recipientId of approvers) {
+      await sendNotification({ recipientId, title, body: `${units} unit${units === 1 ? '' : 's'}, waiting for your approval`, link: '/merch', type: 'merch_sale_pending' })
+    }
+  }
+
+  done()
+  if (input.showId) revalidatePath(`/shows/${input.showId}`)
+  return { id: sale.id }
+}
+
+/** Deletes a pending sale (it was a mistake), putting its stock back. */
+export async function deleteMerchSale(id: string): Promise<Result> {
+  const { supabase, user } = await signedIn()
+  if (!user) return { error: 'Not signed in' }
+  const { data: sale } = await supabase.from('merch_sales').select('status, show_id').eq('id', id).maybeSingle()
+  if (!sale) return { error: 'That sale is already gone.' }
+  if (sale.status !== 'pending') return { error: 'This sale is approved and in Finance, so it can’t be deleted here.' }
+  const { error } = await supabase.from('merch_sales').delete().eq('id', id)
+  if (error) return { error: friendly(error.message) }
+  done()
+  if (sale.show_id) revalidatePath(`/shows/${sale.show_id}`)
+  return {}
+}
+
+/** An approver turns a pending sale down: it's removed, its stock goes back, and whoever recorded it is told why. */
+export async function rejectMerchSale(id: string, reason: string): Promise<Result> {
+  const { supabase, user } = await signedIn()
+  if (!user) return { error: 'Not signed in' }
+  const ctx = await getWorkspaceContext()
+  if (!ctx || !isMerchApprover(ctx.current)) return { error: 'Only an admin or someone with the Merch role can turn sales down.' }
+  const { data: sale } = await supabase.from('merch_sales').select('status, show_id, created_by, cash_amount, upi_amount, card_amount').eq('id', id).maybeSingle()
+  if (!sale) return { error: 'That sale is already gone.' }
+  if (sale.status !== 'pending') return { error: 'This sale is already approved.' }
+  const { error } = await supabase.from('merch_sales').delete().eq('id', id)
+  if (error) return { error: friendly(error.message) }
+  if (sale.created_by !== user.id) {
+    await sendNotification({
+      recipientId: sale.created_by,
+      title: `Merch sale not approved: ${await moneyText(saleTakings(sale))}`,
+      body: reason.trim() || 'It was removed and the stock put back.',
+      link: '/merch',
+      type: 'merch_sale_decided',
+    })
+  }
+  done()
+  if (sale.show_id) revalidatePath(`/shows/${sale.show_id}`)
+  return {}
+}
+
+/**
+ * Approves pending sales from one show (or all from no show) and writes one Finance income entry for their total.
+ * The money is held by `memberId` or `accountId`; with neither, by whoever held it on the first sale.
+ */
+export async function approveMerchSales(saleIds: string[], to: { memberId?: string | null; accountId?: string | null } = {}): Promise<Result> {
+  const { supabase, user } = await signedIn()
+  if (!user) return { error: 'Not signed in' }
+  if (!saleIds?.length) return { error: 'Pick at least one sale.' }
+  const ctx = await getWorkspaceContext()
+  if (!ctx || !isMerchApprover(ctx.current)) return { error: 'Only an admin or someone with the Merch role can approve merch takings.' }
+  if (to.accountId && !(await getCachedFinanceSettings()).features.accounts) return { error: 'Band accounts are switched off for this workspace.' }
+
+  const { data: sales } = await supabase.from('merch_sales').select('created_by, show_id, cash_amount, upi_amount, card_amount').in('id', saleIds)
+  const { data: txId, error } = await supabase.rpc('approve_merch_sales', { p_ids: saleIds, p_member: to.memberId || null, p_account: to.accountId || null })
+  if (error) return { error: friendly(error.message) }
+
+  const total = (sales ?? []).reduce((sum, s) => sum + saleTakings(s), 0)
+  for (const recipientId of new Set((sales ?? []).map(s => s.created_by).filter(id => id !== user.id))) {
+    await sendNotification({ recipientId, title: `Merch takings approved: ${await moneyText(total)}`, body: 'Added to Finance.', link: '/finance', type: 'merch_sale_decided' })
+  }
+
+  done()
+  revalidatePath('/finance', 'layout')
+  const showId = sales?.[0]?.show_id
+  if (showId) revalidatePath(`/shows/${showId}`)
+  return { id: txId ?? undefined }
 }

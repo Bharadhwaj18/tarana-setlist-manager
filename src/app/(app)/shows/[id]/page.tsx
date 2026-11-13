@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import { sectionGuard } from '@/lib/section-guard'
 import { LinkedNotes } from '@/components/notes/LinkedNotes'
 import Link from 'next/link'
-import { ChevronLeft, Pencil, MapPin, ListMusic, Wallet, Plus, Building2, User, Phone, Mail, Film, Check } from 'lucide-react'
+import { ChevronLeft, Pencil, MapPin, ListMusic, Wallet, Plus, Building2, User, Phone, Mail, Film, Check, Shirt } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedShow, getCachedAllProfiles, getCachedUser, getCachedEventManagementCompany, getCachedFinanceSettings } from '@/lib/data'
 import { formatMoney } from '@/lib/finance/settings'
@@ -17,6 +17,8 @@ import { computeTds } from '@/lib/finance/tds'
 import { todayISO } from '@/lib/shows'
 import { countdownLabel } from '@/lib/dates'
 import { cn } from '@/lib/utils'
+import { getWorkspaceContext } from '@/lib/workspace'
+import { saleTakings } from '@/lib/merch'
 
 
 const BOOKED = ['Confirmed', 'Advance Received', 'Completed']
@@ -45,13 +47,16 @@ export default async function ShowDetailPage({ params }: Props) {
   const { id } = await params
   const supabase = await createClient()
 
-  const [show, { data: { user } }, profiles, { data: txns }, { data: setlist }, { data: documents }] = await Promise.all([
+  const [show, { data: { user } }, profiles, { data: txns }, { data: setlist }, { data: documents }, ctx, { data: merchSales }, { data: merchMoves }] = await Promise.all([
     getCachedShow(id),
     getCachedUser(),
     getCachedAllProfiles(),
     supabase.from('finance_transactions').select('*').eq('show_id', id).order('created_at', { ascending: false }),
     supabase.from('setlists').select('id, title').eq('show_id', id).maybeSingle(),
     supabase.from('show_documents').select('*').eq('show_id', id).order('created_at', { ascending: false }),
+    getWorkspaceContext(),
+    supabase.from('merch_sales').select('status, cash_amount, upi_amount, card_amount').eq('show_id', id),
+    supabase.from('merch_stock_moves').select('qty, reason').eq('show_id', id).in('reason', ['sale', 'giveaway']),
   ])
 
   if (!show) notFound()
@@ -75,6 +80,13 @@ export default async function ShowDetailPage({ params }: Props) {
   // to duplicate that figure just to see the TDS math.
   const creditsTotal = (txns ?? []).filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0)
   const { tdsAmount: tdsToClaim, grossFee: tdsGrossFee } = computeTds(creditsTotal, show.tds_percentage ?? 0)
+
+  // Merch at this show: what sold, what was given away, and how much of the money is approved into Finance.
+  const merchLevel = ctx?.current.sections.merch ?? 'none'
+  const merchSold = (merchMoves ?? []).filter(m => m.reason === 'sale').reduce((n, m) => n - m.qty, 0)
+  const merchGiven = (merchMoves ?? []).filter(m => m.reason === 'giveaway').reduce((n, m) => n - m.qty, 0)
+  const merchTakings = (merchSales ?? []).reduce((n, s) => n + saleTakings(s), 0)
+  const merchWaiting = (merchSales ?? []).filter(s => s.status === 'pending').reduce((n, s) => n + saleTakings(s), 0)
 
   const today = todayISO()
   const venueLine = [show.venue, show.show_date ? countdownLabel(show.show_date, today) : null].filter(Boolean).join(' · ')
@@ -193,6 +205,34 @@ export default async function ShowDetailPage({ params }: Props) {
 
             <AddTransactionModal members={members} shows={[show]} lockedShow={{ id: show.id, title: show.title }} />
           </section>
+
+          {/* Merch */}
+          {merchLevel !== 'none' && (
+            <section className={cn(card, !(merchSales ?? []).length && 'border-dashed')}>
+              <div className="mb-3 flex items-center justify-between">
+                <SectionLabel className="flex items-center gap-2"><Shirt className="h-4 w-4" /> Merch</SectionLabel>
+                {merchTakings > 0 && <span className="font-display text-lg font-bold text-gray-900">{fmt(merchTakings)}</span>}
+              </div>
+              {(merchSales ?? []).length > 0 || merchGiven > 0 ? (
+                <div className="mb-3 space-y-1.5">
+                  <Row label="Sold">{merchSold} unit{merchSold === 1 ? '' : 's'}</Row>
+                  {merchGiven > 0 && <Row label="Given away">{merchGiven}</Row>}
+                  {merchWaiting > 0 && <Row label="Waiting for approval"><span className="text-amber-600">{fmt(merchWaiting)}</span></Row>}
+                  {merchTakings - merchWaiting > 0 && <Row label="In Finance">{fmt(merchTakings - merchWaiting)}</Row>}
+                </div>
+              ) : (
+                <p className="mb-3 text-sm text-gray-400">No merch sold at this show yet.</p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                {merchLevel === 'edit' && (
+                  <Button size="sm" asChild><Link href={`/merch/sell?show=${id}`}><Plus className="h-4 w-4" /> Sell merch</Link></Button>
+                )}
+                {(merchSales ?? []).length > 0 && (
+                  <Button size="sm" variant="secondary" asChild><Link href="/merch">Open Merch</Link></Button>
+                )}
+              </div>
+            </section>
+          )}
 
           {/* Notes */}
           {show.notes && (

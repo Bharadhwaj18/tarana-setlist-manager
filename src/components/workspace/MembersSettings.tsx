@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { KeyRound, Link2, Trash2, UserPlus, Users } from 'lucide-react'
-import { setMemberRole, setMemberTreasurer, removeMember } from '@/actions/workspace'
+import { setMemberRole, setMemberTreasurer, setMemberMerchManager, removeMember } from '@/actions/workspace'
 import { StatusPill } from '@/components/ui/StatusPill'
 import { UserAvatar } from '@/components/ui/UserAvatar'
 import { cn } from '@/lib/utils'
@@ -71,6 +71,7 @@ export function MembersSettings({ workspaceName, members, isAdmin, isOwner, acti
                 <div className="mt-0.5 flex flex-wrap gap-1.5">
                   <StatusPill tone={m.role === 'member' ? 'gray' : 'green'}>{ROLE_LABEL[m.role] ?? m.role}</StatusPill>
                   {m.treasurer && <StatusPill tone="amber">Treasurer</StatusPill>}
+                  {m.merchManager && <StatusPill tone="amber">Merch</StatusPill>}
                   {isAdmin && m.role === 'member' && SECTIONS.some(sec => m.sections[sec.key] === 'none') && (
                     <StatusPill tone="gray">Limited</StatusPill>
                   )}
@@ -89,6 +90,10 @@ export function MembersSettings({ workspaceName, members, isAdmin, isOwner, acti
                   <label className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-gray-600">
                     <input type="checkbox" checked={m.treasurer} disabled={pending} onChange={e => run(() => setMemberTreasurer(m.userId, e.target.checked))} className="h-4 w-4 accent-brand-400" />
                     Treasurer
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-gray-600" title="Can approve merch takings into Finance">
+                    <input type="checkbox" checked={m.merchManager} disabled={pending} onChange={e => run(() => setMemberMerchManager(m.userId, e.target.checked))} className="h-4 w-4 accent-brand-400" />
+                    Merch
                   </label>
                   {isOwner && (
                     <Select

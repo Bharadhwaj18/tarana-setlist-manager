@@ -163,6 +163,15 @@ export async function acceptInvite(token: string): Promise<{ error?: string }> {
 }
 
 export async function setMemberTreasurer(userId: string, isTreasurer: boolean): Promise<{ error?: string }> {
+  return setMemberPermission(userId, 'treasurer', isTreasurer)
+}
+
+/** The Merch role: can approve merch takings into Finance. */
+export async function setMemberMerchManager(userId: string, on: boolean): Promise<{ error?: string }> {
+  return setMemberPermission(userId, 'merch_manager', on)
+}
+
+async function setMemberPermission(userId: string, key: 'treasurer' | 'merch_manager', on: boolean): Promise<{ error?: string }> {
   const auth = await requireAdminContext()
   if ('error' in auth) return { error: auth.error }
   const supabase = await createClient()
@@ -174,7 +183,7 @@ export async function setMemberTreasurer(userId: string, isTreasurer: boolean): 
     .maybeSingle()
   if (!member) return { error: 'Member not found.' }
   const raw = member.permissions && typeof member.permissions === 'object' && !Array.isArray(member.permissions) ? member.permissions : {}
-  const permissions = { ...raw, treasurer: isTreasurer }
+  const permissions = { ...raw, [key]: on }
   const { error } = await supabase
     .from('workspace_members')
     .update({ permissions })

@@ -450,17 +450,18 @@ export const getCachedFinanceRequests = cache(() =>
 )
 
 // Everything the Merch page needs: items, variants, the full stock log (with the show each move belongs to) and
-// restock batches. Stock is summed from the log on the page, so this is the whole picture in four reads.
+// restock batches, and sales. Stock is summed from the log on the page, so this is the whole picture in four reads.
 export const getCachedMerch = cache(async () => {
   const ctx = await getWorkspaceContext()
-  if (!ctx) return { items: [], variants: [], moves: [], batches: [] }
+  if (!ctx) return { items: [], variants: [], moves: [], batches: [], sales: [] }
   const supabase = await createClient()
   const ws = ctx.current.workspace.id
-  const [items, variants, moves, batches] = await Promise.all([
+  const [items, variants, moves, batches, sales] = await Promise.all([
     supabase.from('merch_items').select('*').eq('workspace_id', ws).order('position').order('created_at'),
     supabase.from('merch_variants').select('*').eq('workspace_id', ws).order('position').order('created_at'),
     supabase.from('merch_stock_moves').select('*, show:shows(id, title, show_date)').eq('workspace_id', ws).order('date', { ascending: false }).order('created_at', { ascending: false }),
     supabase.from('merch_batches').select('*').eq('workspace_id', ws).order('date', { ascending: false }),
+    supabase.from('merch_sales').select('*, show:shows(id, title, show_date)').eq('workspace_id', ws).order('date', { ascending: false }).order('created_at', { ascending: false }),
   ])
-  return { items: items.data ?? [], variants: variants.data ?? [], moves: moves.data ?? [], batches: batches.data ?? [] }
+  return { items: items.data ?? [], variants: variants.data ?? [], moves: moves.data ?? [], batches: batches.data ?? [], sales: sales.data ?? [] }
 })

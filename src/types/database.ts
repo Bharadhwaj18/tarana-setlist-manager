@@ -1660,6 +1660,9 @@ export type Database = {
           notes: string | null
           created_by: string
           created_at: string
+          status: string
+          approved_by: string | null
+          approved_at: string | null
         }
         Insert: {
           id?: string
@@ -1676,6 +1679,9 @@ export type Database = {
           notes?: string | null
           created_by?: string
           created_at?: string
+          status?: string
+          approved_by?: string | null
+          approved_at?: string | null
         }
         Update: {
           id?: string
@@ -1692,6 +1698,9 @@ export type Database = {
           notes?: string | null
           created_by?: string
           created_at?: string
+          status?: string
+          approved_by?: string | null
+          approved_at?: string | null
         }
         Relationships: [
           {
@@ -1781,6 +1790,14 @@ export type Database = {
     }
     Views: { [_ in never]: never }
     Functions: {
+      approve_merch_sales: {
+        Args: { p_ids: string[]; p_member?: string | null; p_account?: string | null }
+        Returns: string | null
+      }
+      merch_approver: {
+        Args: { ws: string }
+        Returns: boolean
+      }
       calendar_external: {
         Args: { p_ws: string }
         Returns: {

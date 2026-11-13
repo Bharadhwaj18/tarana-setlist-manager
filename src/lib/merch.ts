@@ -141,3 +141,42 @@ export function parseVariantLabels(input: string): string[] {
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100
+
+// ---- Sales ---------------------------------------------------------------------------------------------------------
+
+export type MerchSale = Database['public']['Tables']['merch_sales']['Row']
+export type SaleMode = 'count' | 'stall' | 'manual'
+export type PaymentMethod = 'cash' | 'upi' | 'card'
+
+/** Money taken on a sale, all payment methods together. */
+export const saleTakings = (s: Pick<MerchSale, 'cash_amount' | 'upi_amount' | 'card_amount'>): number =>
+  round2(Number(s.cash_amount) + Number(s.upi_amount) + Number(s.card_amount))
+
+/** What the units should have brought in at their prices. */
+export const expectedTotal = (lines: { qty: number; price: number }[]): number =>
+  round2(lines.reduce((sum, l) => sum + Math.max(0, Math.trunc(l.qty)) * l.price, 0))
+
+/**
+ * End-of-night count: units sold is what went out minus what came back.
+ * Returns an error message when the numbers can't be right (more back than went out).
+ */
+export function soldFromCount(tookOut: number, broughtBack: number): { sold: number } | { error: string } {
+  const out = Math.trunc(tookOut || 0)
+  const back = Math.trunc(broughtBack || 0)
+  if (out < 0 || back < 0) return { error: 'Counts can’t be negative.' }
+  if (back > out) return { error: 'More came back than went out.' }
+  return { sold: out - back }
+}
+
+/** Sales grouped by show (null = not at a show), newest show first, for approving one show at a time. */
+export function groupSalesByShow<T extends Pick<MerchSale, 'show_id' | 'date'>>(sales: T[]): { showId: string | null; sales: T[] }[] {
+  const groups = new Map<string, T[]>()
+  for (const s of sales) {
+    const key = s.show_id ?? ''
+    groups.set(key, [...(groups.get(key) ?? []), s])
+  }
+  const latest = (list: T[]) => list.reduce((d, s) => (s.date > d ? s.date : d), '')
+  return [...groups.entries()]
+    .map(([key, list]) => ({ showId: key || null, sales: list }))
+    .sort((a, b) => latest(b.sales).localeCompare(latest(a.sales)))
+}

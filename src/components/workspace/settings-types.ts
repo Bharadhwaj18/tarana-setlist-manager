@@ -6,6 +6,8 @@ export interface MemberRow {
   name: string
   role: string
   treasurer: boolean
+  /** Can approve merch takings into Finance. */
+  merchManager: boolean
   isYou: boolean
   /** Their profile photo, when they have one. */
   avatarUrl?: string | null

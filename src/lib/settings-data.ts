@@ -55,6 +55,7 @@ export const getSettingsMembers = cache(async (): Promise<MemberRow[]> => {
     name: profiles.find(p => p.id === m.user_id)?.display_name?.trim() || 'Unnamed member',
     role: m.role,
     treasurer: normalisePermissions(m.permissions).treasurer === true,
+    merchManager: normalisePermissions(m.permissions).merch_manager === true,
     sections: sectionLevelsFrom(s.isAdmin ? m.permissions : null, m.role),
     isYou: m.user_id === s.userId,
     avatarUrl: avatars[m.user_id] ?? null,

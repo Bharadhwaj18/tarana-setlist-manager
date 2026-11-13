@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Archive, ArchiveRestore, PackagePlus, Pencil, Plus, Shirt, SlidersHorizontal, Trash2 } from 'lucide-react'
+import Link from 'next/link'
+import { Archive, ArchiveRestore, PackagePlus, Pencil, Plus, ShoppingBag, Shirt, SlidersHorizontal, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -15,6 +16,7 @@ import { formatDateDMY } from '@/lib/dates'
 import { REASON_LABELS, isLowStock, isMoveReason, statsByVariant, statsFor, sumStats, variantPrice, type MerchBatch, type MerchItem, type MerchMove, type MerchVariant } from '@/lib/merch'
 import { deleteMerchBatch, deleteMerchItem, deleteMerchMove, setMerchItemArchived, setMerchVariantArchived } from '@/actions/merch'
 import { AdjustModal, ItemModal, RestockModal, VariantModal, type ShowOption } from './MerchForms'
+import { PendingApprovals, SalesByShow, type AccountOption, type Person, type SaleWithShow } from './MerchSales'
 
 type MoveWithShow = MerchMove & { show: { id: string; title: string; show_date: string | null } | null }
 
@@ -24,12 +26,17 @@ interface Props {
   moves: MoveWithShow[]
   batches: MerchBatch[]
   shows: ShowOption[]
+  sales: SaleWithShow[]
+  members: Person[]
+  accounts: AccountOption[]
   canEdit: boolean
+  canApprove: boolean
+  userId: string
 }
 
-type Tab = 'stock' | 'history'
+type Tab = 'stock' | 'sales' | 'history'
 
-export function MerchView({ items, variants, moves, batches, shows, canEdit }: Props) {
+export function MerchView({ items, variants, moves, batches, shows, sales, members, accounts, canEdit, canApprove, userId }: Props) {
   const { money } = useMoney()
   const [tab, setTab] = useState<Tab>('stock')
   const [showArchived, setShowArchived] = useState(false)
@@ -58,9 +65,10 @@ export function MerchView({ items, variants, moves, batches, shows, canEdit }: P
         title="Merch"
         subtitle="What’s in the box, what it cost, and what went out."
         action={canEdit && items.length > 0 ? (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button size="sm" asChild><Link href="/merch/sell"><ShoppingBag className="h-4 w-4" />Sell</Link></Button>
             <Button variant="secondary" size="sm" onClick={() => setRestock({ open: true, itemId: null })}><PackagePlus className="h-4 w-4" />Restock</Button>
-            <Button size="sm" onClick={() => setItemModal({ open: true, item: null })}><Plus className="h-4 w-4" />New item</Button>
+            <Button variant="secondary" size="sm" onClick={() => setItemModal({ open: true, item: null })}><Plus className="h-4 w-4" />New item</Button>
           </div>
         ) : undefined}
       />
@@ -74,6 +82,7 @@ export function MerchView({ items, variants, moves, batches, shows, canEdit }: P
         />
       ) : (
         <>
+          <PendingApprovals sales={sales} moves={moves} members={members} accounts={accounts} canApprove={canApprove} userId={userId} />
           <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Tile label="In stock" value={`${totals.stock}`} sub={totals.low > 0 ? `${totals.low} running low` : 'units'} warn={totals.low > 0} />
             <Tile label="Stock value" value={money(totals.stockValue)} sub="at cost" />
@@ -81,7 +90,7 @@ export function MerchView({ items, variants, moves, batches, shows, canEdit }: P
             <Tile label="Takings" value={money(totals.revenue)} sub="all time" />
           </div>
 
-          <SegmentedTabs className="mb-4" value={tab} onChange={setTab} tabs={[{ value: 'stock', label: 'Stock' }, { value: 'history', label: 'History', count: moves.length }]} />
+          <SegmentedTabs className="mb-4" value={tab} onChange={setTab} tabs={[{ value: 'stock', label: 'Stock' }, { value: 'sales', label: 'Sales' }, { value: 'history', label: 'History' }]} />
 
           {tab === 'stock' ? (
             <div className="space-y-4">
@@ -107,6 +116,8 @@ export function MerchView({ items, variants, moves, batches, shows, canEdit }: P
               ))}
               {shownItems.length === 0 && <p className="py-6 text-center text-sm text-gray-500">Nothing here.</p>}
             </div>
+          ) : tab === 'sales' ? (
+            <SalesByShow sales={sales} moves={moves} />
           ) : (
             <History moves={moves} items={items} variants={variants} batches={batches} canEdit={canEdit} />
           )}

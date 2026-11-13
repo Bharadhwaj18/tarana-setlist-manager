@@ -62,6 +62,11 @@ export function isFinanceApprover(membership: WorkspaceMembership): boolean {
   return membership.role === 'owner' || membership.role === 'admin' || hasPermission(membership, 'treasurer')
 }
 
+/** Can approve merch takings into Finance: owners, admins and members given the Merch role. */
+export function isMerchApprover(membership: WorkspaceMembership): boolean {
+  return membership.role === 'owner' || membership.role === 'admin' || hasPermission(membership, 'merch_manager')
+}
+
 /** Treasurer in the currently selected workspace. */
 export async function isCurrentTreasurer(): Promise<boolean> {
   const ctx = await getWorkspaceContext()
