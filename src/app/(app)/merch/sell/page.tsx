@@ -20,7 +20,7 @@ export default async function MerchSellPage({ searchParams }: { searchParams: Pr
       variants={merch.variants.filter(v => !v.archived_at)}
       moves={merch.moves}
       sales={merch.sales}
-      shows={shows.map(s => ({ id: s.id, title: s.title, show_date: s.show_date }))}
+      shows={shows.map(s => ({ id: s.id, title: s.title, show_date: s.show_date, venue: s.venue }))}
       members={profiles.map(p => ({ id: p.id, name: p.id === user?.id ? 'You' : (p.display_name?.trim() || 'Member') }))}
       userId={user?.id ?? ''}
       initialShowId={shows.some(s => s.id === show) ? show! : ''}

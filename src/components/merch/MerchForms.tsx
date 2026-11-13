@@ -6,16 +6,15 @@ import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
-import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { useToast } from '@/components/ui/Toaster'
 import { useMoney } from '@/components/finance/FinanceSettingsContext'
 import { createMerchItem, updateMerchItem, addMerchVariant, updateMerchVariant, logMerchRestock, adjustMerchStock } from '@/actions/merch'
 import { ADJUST_REASONS, REASON_LABELS, countFixFor, unitCostOf, type AdjustReason, type MerchItem, type MerchVariant } from '@/lib/merch'
-import { formatDateDMY } from '@/lib/dates'
 import { todayISO } from '@/lib/shows'
+import { ShowSelect } from './ShowSelect'
 
-export interface ShowOption { id: string; title: string; show_date: string | null }
+export interface ShowOption { id: string; title: string; show_date: string | null; venue?: string | null }
 
 function Field({ label, htmlFor, hint, children }: { label: string; htmlFor: string; hint?: string; children: ReactNode }) {
   return (
@@ -297,10 +296,7 @@ function AdjustForm({ variant, stock, shows, onDone }: { variant: MerchVariant; 
       </div>
       {!isCount && shows.length > 0 && (
         <Field label="At a show" htmlFor="adjust-show">
-          <Select id="adjust-show" value={showId} onChange={e => setShowId(e.target.value)}>
-            <option value="">Not at a show</option>
-            {shows.map(s => <option key={s.id} value={s.id}>{s.title}{s.show_date ? ` · ${formatDateDMY(s.show_date)}` : ''}</option>)}
-          </Select>
+          <ShowSelect id="adjust-show" shows={shows} value={showId} onChange={setShowId} noneLabel="Not at a show" />
         </Field>
       )}
       <Field label="Note" htmlFor="adjust-note">

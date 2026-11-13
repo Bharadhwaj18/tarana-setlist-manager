@@ -43,7 +43,7 @@ export async function PackKitPage({ kitId, showId }: { kitId: string | null; sho
 
   // Shows that don't have a kit yet (plus this kit's own show).
   const usedShows = new Set(merch.kits.filter(k => k.id !== kitId).map(k => k.show_id))
-  const showOptions = shows.filter(s => !usedShows.has(s.id)).map(s => ({ id: s.id, title: s.title, show_date: s.show_date }))
+  const showOptions = shows.filter(s => !usedShows.has(s.id)).map(s => ({ id: s.id, title: s.title, show_date: s.show_date, venue: s.venue }))
 
   return (
     <KitForm

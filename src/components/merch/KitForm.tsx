@@ -11,8 +11,8 @@ import { Select } from '@/components/ui/Select'
 import { SectionLabel } from '@/components/ui/SectionLabel'
 import { useToast } from '@/components/ui/Toaster'
 import { useMoney } from '@/components/finance/FinanceSettingsContext'
-import { formatDateDMY } from '@/lib/dates'
 import { saveMerchKit } from '@/actions/merch-kits'
+import { ShowSelect, type ShowChoice } from './ShowSelect'
 
 export interface PackRow {
   variantId: string
@@ -30,7 +30,7 @@ export interface PackRow {
 
 interface Props {
   kitId: string | null
-  shows: { id: string; title: string; show_date: string | null }[]
+  shows: ShowChoice[]
   members: { id: string; name: string }[]
   rows: PackRow[]
   initial: { showId: string; leadId: string; helperIds: string[]; notes: string }
@@ -77,10 +77,7 @@ export function KitForm({ kitId, shows, members, rows, initial }: Props) {
       <div className="mb-5 grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5 sm:col-span-2">
           <Label htmlFor="kit-show">Show</Label>
-          <Select id="kit-show" value={showId} onChange={e => setShowId(e.target.value)}>
-            <option value="">Pick a show</option>
-            {shows.map(s => <option key={s.id} value={s.id}>{s.title}{s.show_date ? ` · ${formatDateDMY(s.show_date)}` : ''}</option>)}
-          </Select>
+          <ShowSelect id="kit-show" shows={shows} value={showId} onChange={setShowId} />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="kit-lead">Running the stall</Label>

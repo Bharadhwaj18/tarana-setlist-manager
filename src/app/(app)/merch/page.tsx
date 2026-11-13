@@ -26,7 +26,7 @@ export default async function MerchPage() {
       sales={merch.sales}
       kits={merch.kits}
       kitLines={merch.kitLines}
-      shows={shows.map(s => ({ id: s.id, title: s.title, show_date: s.show_date }))}
+      shows={shows.map(s => ({ id: s.id, title: s.title, show_date: s.show_date, venue: s.venue }))}
       members={profiles.map(p => ({ id: p.id, name: p.id === user?.id ? 'You' : (p.display_name?.trim() || 'Member') }))}
       accounts={settings.features.accounts ? accounts.filter(a => !a.archived).map(a => ({ id: a.id, name: a.name })) : []}
       canEdit={ctx.current.sections.merch === 'edit'}

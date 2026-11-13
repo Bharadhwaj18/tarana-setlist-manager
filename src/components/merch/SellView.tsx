@@ -19,6 +19,7 @@ import { todayISO } from '@/lib/shows'
 import { expectedTotal, saleTakings, soldFromCount, statsByVariant, statsFor, variantPrice, type MerchItem, type MerchMove, type MerchSale, type MerchVariant, type PaymentMethod } from '@/lib/merch'
 import { deleteMerchSale, recordMerchSale } from '@/actions/merch'
 import type { ShowOption } from './MerchForms'
+import { ShowSelect } from './ShowSelect'
 
 type SaleWithShow = MerchSale & { show: { id: string; title: string; show_date: string | null } | null }
 
@@ -82,10 +83,7 @@ export function SellView({ items, variants, moves, sales, shows, members, userId
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_10rem_10rem]">
         <div className="space-y-1.5">
           <Label htmlFor="sell-show">Show</Label>
-          <Select id="sell-show" value={showId} onChange={e => pickShow(e.target.value)}>
-            <option value="">Not at a show</option>
-            {shows.map(s => <option key={s.id} value={s.id}>{s.title}{s.show_date ? ` · ${formatDateDMY(s.show_date)}` : ''}</option>)}
-          </Select>
+          <ShowSelect id="sell-show" shows={shows} value={showId} onChange={pickShow} noneLabel="Not at a show" />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="sell-date">Date</Label>
