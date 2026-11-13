@@ -19,10 +19,11 @@ import * as groups from '@/actions/groups'
 import * as recordings from '@/actions/recordings'
 import * as workspace from '@/actions/workspace'
 import * as profile from '@/actions/profile'
+import * as merch from '@/actions/merch'
 
 // The phone app runs the same server actions as the website, so validation, notifications, push and approval
 // rules stay in one place. Only these modules are reachable, and only with a signed-in user's token.
-const MODULES: Record<string, Record<string, unknown>> = { shows, setlists, songs, calendarEvents, unavailability, tasks, notes, finance, pendingPayments, eventManagement, financeSettings, financeAccounts, financeTransfers, financeChecks, budgets, groups, recordings, workspace, profile }
+const MODULES: Record<string, Record<string, unknown>> = { shows, setlists, songs, calendarEvents, unavailability, tasks, notes, finance, pendingPayments, eventManagement, financeSettings, financeAccounts, financeTransfers, financeChecks, budgets, groups, recordings, workspace, profile, merch }
 
 export const dynamic = 'force-dynamic'
 

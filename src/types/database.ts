@@ -1523,6 +1523,261 @@ export type Database = {
           }
         ]
       }
+      merch_items: {
+        Row: {
+          id: string
+          workspace_id: string
+          name: string
+          kind: string | null
+          description: string | null
+          image_url: string | null
+          price: number
+          archived_at: string | null
+          position: number
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          name: string
+          kind?: string | null
+          description?: string | null
+          image_url?: string | null
+          price?: number
+          archived_at?: string | null
+          position?: number
+          created_by?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          name?: string
+          kind?: string | null
+          description?: string | null
+          image_url?: string | null
+          price?: number
+          archived_at?: string | null
+          position?: number
+          created_by?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      merch_variants: {
+        Row: {
+          id: string
+          workspace_id: string
+          item_id: string
+          label: string
+          price: number | null
+          low_stock_at: number | null
+          archived_at: string | null
+          position: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          item_id: string
+          label?: string
+          price?: number | null
+          low_stock_at?: number | null
+          archived_at?: string | null
+          position?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          item_id?: string
+          label?: string
+          price?: number | null
+          low_stock_at?: number | null
+          archived_at?: string | null
+          position?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merch_variants_item_id_workspace_id_fkey"
+            columns: ["item_id"]
+            referencedRelation: "merch_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      merch_batches: {
+        Row: {
+          id: string
+          workspace_id: string
+          date: string
+          supplier: string | null
+          total_cost: number
+          notes: string | null
+          finance_transaction_id: string | null
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          date?: string
+          supplier?: string | null
+          total_cost?: number
+          notes?: string | null
+          finance_transaction_id?: string | null
+          created_by?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          date?: string
+          supplier?: string | null
+          total_cost?: number
+          notes?: string | null
+          finance_transaction_id?: string | null
+          created_by?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      merch_sales: {
+        Row: {
+          id: string
+          workspace_id: string
+          show_id: string | null
+          date: string
+          mode: string
+          cash_amount: number
+          upi_amount: number
+          card_amount: number
+          held_by: string | null
+          account_id: string | null
+          finance_transaction_id: string | null
+          notes: string | null
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          show_id?: string | null
+          date?: string
+          mode?: string
+          cash_amount?: number
+          upi_amount?: number
+          card_amount?: number
+          held_by?: string | null
+          account_id?: string | null
+          finance_transaction_id?: string | null
+          notes?: string | null
+          created_by?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          show_id?: string | null
+          date?: string
+          mode?: string
+          cash_amount?: number
+          upi_amount?: number
+          card_amount?: number
+          held_by?: string | null
+          account_id?: string | null
+          finance_transaction_id?: string | null
+          notes?: string | null
+          created_by?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merch_sales_show_id_fkey"
+            columns: ["show_id"]
+            referencedRelation: "shows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      merch_stock_moves: {
+        Row: {
+          id: string
+          workspace_id: string
+          variant_id: string
+          qty: number
+          reason: string
+          unit_cost: number | null
+          unit_price: number | null
+          show_id: string | null
+          batch_id: string | null
+          sale_id: string | null
+          note: string | null
+          date: string
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          variant_id: string
+          qty: number
+          reason: string
+          unit_cost?: number | null
+          unit_price?: number | null
+          show_id?: string | null
+          batch_id?: string | null
+          sale_id?: string | null
+          note?: string | null
+          date?: string
+          created_by?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          variant_id?: string
+          qty?: number
+          reason?: string
+          unit_cost?: number | null
+          unit_price?: number | null
+          show_id?: string | null
+          batch_id?: string | null
+          sale_id?: string | null
+          note?: string | null
+          date?: string
+          created_by?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merch_stock_moves_variant_id_workspace_id_fkey"
+            columns: ["variant_id"]
+            referencedRelation: "merch_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "merch_stock_moves_show_id_fkey"
+            columns: ["show_id"]
+            referencedRelation: "shows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "merch_stock_moves_batch_id_workspace_id_fkey"
+            columns: ["batch_id"]
+            referencedRelation: "merch_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "merch_stock_moves_sale_id_workspace_id_fkey"
+            columns: ["sale_id"]
+            referencedRelation: "merch_sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: { [_ in never]: never }
     Functions: {

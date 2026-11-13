@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { BrandMark } from '@/components/ui/BrandMark'
 import { Wordmark } from '@/components/ui/Wordmark'
 import { usePathname, useRouter } from 'next/navigation'
-import { Music2, ListMusic, Wallet, LogOut, CalendarDays, CalendarRange, StickyNote, SquareKanban, Building2, Settings, Mic, LayoutDashboard } from 'lucide-react'
+import { Music2, ListMusic, Wallet, Shirt, LogOut, CalendarDays, CalendarRange, StickyNote, SquareKanban, Building2, Settings, Mic, LayoutDashboard } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { ACTIVE_SETLIST_COOKIE } from '@/lib/setlist-context'
@@ -42,7 +42,7 @@ const navGroups = [
       { href: '/recordings', label: 'Recordings', icon: Mic },
     ],
   },
-  { label: 'Money', items: [{ href: '/finance', label: 'Finance', icon: Wallet }] },
+  { label: 'Money', items: [{ href: '/finance', label: 'Finance', icon: Wallet }, { href: '/merch', label: 'Merch', icon: Shirt }] },
   {
     label: 'Organise',
     items: [

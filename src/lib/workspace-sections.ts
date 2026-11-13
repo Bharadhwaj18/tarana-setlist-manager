@@ -5,6 +5,7 @@ export const SECTIONS = [
   { key: 'songs', label: 'Songs', href: '/songs' },
   { key: 'recordings', label: 'Recordings', href: '/recordings' },
   { key: 'finance', label: 'Finance', href: '/finance' },
+  { key: 'merch', label: 'Merch', href: '/merch' },
   { key: 'calendar', label: 'Calendar', href: '/calendar' },
   { key: 'tasks', label: 'Tasks', href: '/tasks' },
   { key: 'notes', label: 'Notes', href: '/notes' },
