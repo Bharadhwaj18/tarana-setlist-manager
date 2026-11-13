@@ -10,6 +10,7 @@ import { getWorkspaceContext, isMerchApprover, requireWorkspaceId } from '@/lib/
 import { getCachedFinanceSettings } from '@/lib/data'
 import { formatMoney } from '@/lib/finance/settings'
 import { sendNotification } from '@/actions/notifications'
+import { notifyLowStock, notifyLowStockForKit } from '@/lib/merch-alerts'
 import { kitSoldByVariant, outInKits, statsByVariant, statsFor } from '@/lib/merch'
 
 type Result = { error?: string; id?: string }
@@ -209,6 +210,7 @@ export async function recordKitSale(kitId: string, lines: { variantId: string; q
     p_notes: notes ?? null,
   })
   if (error) return { error: friendly(error.message) }
+  await notifyLowStock(await requireWorkspaceId(), user.id, new Map(lines.map(l => [l.variantId, -Math.trunc(Number(l.qty))])))
   refresh(kitId)
   return { id: data }
 }
@@ -235,6 +237,7 @@ export async function closeMerchKit(kitId: string, counts: KitCount[], paid: { c
     p_notes: notes ?? null,
   })
   if (error) return { error: friendly(error.message) }
+  await notifyLowStockForKit(await requireWorkspaceId(), user.id, kitId, 'close')
 
   // Tell the approvers. Crew can't read the member list, so this runs on what the kit tells us.
   const ctx = await getWorkspaceContext()
@@ -270,6 +273,7 @@ export async function approveMerchKit(kitId: string, to: { memberId?: string | n
   const { data: kit } = await supabase.from('merch_kits').select('lead_id, show_id, cash_in, upi_in, card_in').eq('id', kitId).maybeSingle()
   const { data: txId, error } = await supabase.rpc('approve_merch_kit', { p_kit: kitId, p_member: to.memberId || null, p_account: to.accountId || null })
   if (error) return { error: friendly(error.message) }
+  await notifyLowStockForKit(await requireWorkspaceId(), user.id, kitId, 'approve')
   if (kit?.lead_id && kit.lead_id !== user.id) {
     const total = Number(kit.cash_in ?? 0) + Number(kit.upi_in ?? 0) + Number(kit.card_in ?? 0)
     await sendNotification({ recipientId: kit.lead_id, title: `Merch kit approved: ${await moneyText(total)}`, body: 'Thanks for running the stall.', link: `/merch/kits/${kitId}`, type: 'merch_kit_approved' })

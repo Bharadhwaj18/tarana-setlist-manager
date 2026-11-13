@@ -103,7 +103,7 @@ export function SellView({ items, variants, moves, sales, shows, members, userId
         </p>
       ) : (
         <>
-          <SegmentedTabs className="mb-4" value={mode} onChange={setMode} tabs={[{ value: 'stall', label: 'At the stall' }, { value: 'count', label: 'End-of-night count' }]} />
+          <SegmentedTabs className="mb-4 [&>button]:leading-tight" value={mode} onChange={setMode} tabs={[{ value: 'stall', label: 'At the stall' }, { value: 'count', label: 'End-of-night count' }]} />
           {mode === 'stall'
             ? <StallMode key={`${showId}-${date}`} items={sellable} variants={variants} stockOf={id => statsFor(stats, id).stock} priceOf={priceOf}
                 onSave={async (lines, method, amount) => {
@@ -180,8 +180,8 @@ function StallMode({ items, variants, stockOf, priceOf, onSave }: {
                     inCart ? 'border-brand-400 bg-brand-100' : 'border-brand-200 bg-white hover:bg-brand-50')}
                 >
                   <span className="block truncate text-sm font-bold text-gray-900">{v.label}</span>
-                  <span className="block text-xs text-gray-500">{money(priceOf(v))}</span>
-                  <span className={cn('block text-[11px]', left <= 0 ? 'font-semibold text-red-700' : 'text-gray-500')}>{left} left</span>
+                  <span className="block truncate text-xs text-gray-500">{money(priceOf(v))}</span>
+                  <span className={cn('block truncate text-[11px]', left <= 0 ? 'font-semibold text-red-700' : 'text-gray-500')}>{left} left</span>
                   {inCart > 0 && <span className="absolute -right-1.5 -top-1.5 flex h-6 min-w-6 items-center justify-center rounded-full bg-brand-400 px-1.5 text-xs font-bold text-white">{inCart}</span>}
                 </button>
               )

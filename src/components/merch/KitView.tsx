@@ -263,8 +263,8 @@ function StallPanel({ kitId, lines }: { kitId: string; lines: KitLineView[] }) {
                   className={cn('relative rounded-xl border px-2 py-3 text-center transition-colors enabled:active:scale-[0.97] disabled:opacity-50',
                     inCart ? 'border-brand-400 bg-brand-100' : 'border-brand-200 bg-white enabled:hover:bg-brand-50')}>
                   <span className="block truncate text-sm font-bold text-gray-900">{l.label}</span>
-                  <span className="block text-xs text-gray-500">{money(l.price)}</span>
-                  <span className={cn('block text-[11px]', left <= 0 ? 'font-semibold text-red-700' : 'text-gray-500')}>{left} left</span>
+                  <span className="block truncate text-xs text-gray-500">{money(l.price)}</span>
+                  <span className={cn('block truncate text-[11px]', left <= 0 ? 'font-semibold text-red-700' : 'text-gray-500')}>{left} left</span>
                   {inCart > 0 && <span className="absolute -right-1.5 -top-1.5 flex h-6 min-w-6 items-center justify-center rounded-full bg-brand-400 px-1.5 text-xs font-bold text-white">{inCart}</span>}
                 </button>
               )

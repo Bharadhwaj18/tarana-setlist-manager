@@ -6,6 +6,7 @@ import { getWorkspaceContext, isMerchApprover, requireWorkspaceId } from '@/lib/
 import { getCachedFinanceSettings } from '@/lib/data'
 import { formatMoney } from '@/lib/finance/settings'
 import { sendNotification } from '@/actions/notifications'
+import { notifyLowStock } from '@/lib/merch-alerts'
 import { ADJUST_REASONS, parseVariantLabels, saleTakings, signedQty, unitCostOf, variantPrice, type AdjustReason, type SaleMode } from '@/lib/merch'
 
 type Result = { error?: string; id?: string }
@@ -231,12 +232,14 @@ export async function adjustMerchStock(input: AdjustInput): Promise<Result> {
   if (!isDate(input.date)) return { error: 'Pick a date.' }
   const qty = signedQty(input.reason, Number(input.qty))
   if (!Number.isFinite(qty) || qty === 0) return { error: input.reason === 'count_fix' ? 'The count already matches.' : 'Enter how many.' }
+  const workspace_id = await requireWorkspaceId()
   const { data, error } = await supabase.from('merch_stock_moves').insert({
-    workspace_id: await requireWorkspaceId(),
+    workspace_id,
     variant_id: input.variantId, qty, reason: input.reason, date: input.date,
     show_id: input.showId || null, note: clean(input.note, 500),
   }).select('id').single()
   if (error) return { error: friendly(error.message) }
+  await notifyLowStock(workspace_id, user.id, new Map([[input.variantId, qty]]))
   done()
   return { id: data.id }
 }
@@ -339,6 +342,8 @@ export async function recordMerchSale(input: SaleInput): Promise<Result> {
       return { error: friendly(mError.message) }
     }
   }
+
+  await notifyLowStock(workspace_id, user.id, new Map([...qtyByVariant].map(([id, q]) => [id, -q])))
 
   // Tell the approvers there's money to look at.
   const total = cash_amount + upi_amount + card_amount

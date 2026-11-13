@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { closeoutSold, countFixFor, kitLeft, kitSoldByVariant, outInKits, expectedTotal, groupSalesByShow, isLowStock, parseVariantLabels, saleTakings, signedQty, soldFromCount, statsByVariant, statsFor, sumStats, unitCostOf, variantPrice } from './merch'
+import { closeoutSold, countFixFor, crossedLowStock, kitLeft, kitSoldByVariant, outInKits, expectedTotal, groupSalesByShow, isLowStock, parseVariantLabels, saleTakings, signedQty, soldFromCount, statsByVariant, statsFor, sumStats, unitCostOf, variantPrice } from './merch'
 
 const move = (variant_id: string, qty: number, reason: string, unit_cost: number | null = null, unit_price: number | null = null) =>
   ({ variant_id, qty, reason, unit_cost, unit_price })
@@ -144,5 +144,16 @@ describe('show kits', () => {
     const kitMoves = [...moves, { kit_id: 'c', variant_id: 'm', qty: -1, reason: 'sale' }]
     // open kit: 10 - 4 sold = 6; closed kit: 5 - 1 sold - 3 back = 1 (a giveaway or loss waiting); approved: none
     expect(outInKits(kits, lines, kitMoves).get('m')).toBe(7)
+  })
+})
+
+describe('crossedLowStock', () => {
+  it('fires only when a sale takes stock from above the level to at or below it', () => {
+    expect(crossedLowStock(5, -2, 5)).toBe(true)   // 7 -> 5
+    expect(crossedLowStock(3, -1, 5)).toBe(false)  // already low before
+    expect(crossedLowStock(6, -1, 5)).toBe(false)  // still above
+    expect(crossedLowStock(0, -4, 0)).toBe(true)   // sold out
+    expect(crossedLowStock(5, 2, 5)).toBe(false)   // stock coming in
+    expect(crossedLowStock(1, -5, null)).toBe(false) // no level set
   })
 })

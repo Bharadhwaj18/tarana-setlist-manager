@@ -18,6 +18,7 @@ import { deleteMerchBatch, deleteMerchItem, deleteMerchMove, setMerchItemArchive
 import { AdjustModal, ItemModal, RestockModal, VariantModal, type ShowOption } from './MerchForms'
 import { PendingApprovals, SalesByShow, type AccountOption, type Person, type SaleWithShow } from './MerchSales'
 import { KitsList, type KitWithShow } from './Kits'
+import { MerchReports } from './MerchReports'
 
 type MoveWithShow = MerchMove & { show: { id: string; title: string; show_date: string | null } | null }
 
@@ -37,7 +38,7 @@ interface Props {
   userId: string
 }
 
-type Tab = 'stock' | 'kits' | 'sales' | 'history'
+type Tab = 'stock' | 'kits' | 'sales' | 'reports' | 'history'
 
 export function MerchView({ items, variants, moves, batches, shows, sales, kits, kitLines, members, accounts, canEdit, canApprove, userId }: Props) {
   const { money } = useMoney()
@@ -69,10 +70,11 @@ export function MerchView({ items, variants, moves, batches, shows, sales, kits,
   return (
     <div className="max-w-3xl">
       <PageHeader
+        className="flex-col items-start sm:flex-row sm:items-end"
         title="Merch"
         subtitle="What’s in the box, what it cost, and what went out."
         action={canEdit && items.length > 0 ? (
-          <div className="flex flex-wrap justify-end gap-2">
+          <div className="flex flex-wrap gap-2 sm:justify-end">
             {canApprove && <Button size="sm" asChild><Link href="/merch/kits/new"><Package className="h-4 w-4" />Pack a kit</Link></Button>}
             <Button variant={canApprove ? 'secondary' : 'primary'} size="sm" asChild><Link href="/merch/sell"><ShoppingBag className="h-4 w-4" />Sell</Link></Button>
             <Button variant="secondary" size="sm" onClick={() => setRestock({ open: true, itemId: null })}><PackagePlus className="h-4 w-4" />Restock</Button>
@@ -114,7 +116,7 @@ export function MerchView({ items, variants, moves, batches, shows, sales, kits,
             <Tile label="Takings" value={money(totals.revenue)} sub="all time" />
           </div>
 
-          <SegmentedTabs className="mb-4" value={tab} onChange={setTab} tabs={[{ value: 'stock', label: 'Stock' }, { value: 'kits', label: 'Kits' }, { value: 'sales', label: 'Sales' }, { value: 'history', label: 'History' }]} />
+          <div className="-mx-4 mb-4 overflow-x-auto px-4 sm:mx-0 sm:px-0"><SegmentedTabs className="w-full min-w-max [&>button]:whitespace-nowrap" value={tab} onChange={setTab} tabs={[{ value: 'stock', label: 'Stock' }, { value: 'kits', label: 'Kits' }, { value: 'sales', label: 'Sales' }, { value: 'reports', label: 'Reports' }, { value: 'history', label: 'History' }]} /></div>
 
           {tab === 'stock' ? (
             <div className="space-y-4">
@@ -143,6 +145,8 @@ export function MerchView({ items, variants, moves, batches, shows, sales, kits,
             </div>
           ) : tab === 'kits' ? (
             <KitsList kits={kits} lines={kitLines} moves={moves} nameOf={nameOf} />
+          ) : tab === 'reports' ? (
+            <MerchReports items={items} variants={variants} moves={moves} sales={sales} kits={kits} />
           ) : tab === 'sales' ? (
             <SalesByShow sales={sales} moves={moves} />
           ) : (
@@ -165,10 +169,10 @@ export function MerchView({ items, variants, moves, batches, shows, sales, kits,
 
 function Tile({ label, value, sub, warn }: { label: string; value: string; sub: string; warn?: boolean }) {
   return (
-    <div className="rounded-2xl border border-brand-200 bg-white px-4 py-3 shadow-sm">
-      <p className="text-xs font-semibold text-gray-500">{label}</p>
-      <p className="mt-0.5 text-xl font-bold tabular-nums text-gray-900">{value}</p>
-      <p className={cn('text-xs', warn ? 'font-semibold text-amber-600' : 'text-gray-500')}>{sub}</p>
+    <div className="min-w-0 overflow-hidden rounded-2xl border border-brand-200 bg-white px-3 py-2.5 shadow-sm sm:px-4 sm:py-3">
+      <p className="truncate text-[11px] font-semibold text-gray-500 sm:text-xs">{label}</p>
+      <p className="mt-0.5 truncate text-lg font-bold tabular-nums text-gray-900 sm:text-xl">{value}</p>
+      <p className={cn('break-words text-[11px] leading-snug sm:text-xs', warn ? 'font-semibold text-amber-600' : 'text-gray-500')}>{sub}</p>
     </div>
   )
 }
@@ -208,10 +212,10 @@ function ItemCard({ item, variants, stats, out, canEdit, onEdit, onAddVariant, o
 
   return (
     <div className="overflow-hidden rounded-2xl border border-brand-200 bg-white shadow-sm">
-      <div className="flex items-start justify-between gap-3 px-4 pb-2 pt-3">
-        <div className="min-w-0">
+      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 px-4 pb-2 pt-3">
+        <div className="min-w-0 flex-1">
           <p className="truncate font-semibold text-gray-900">{item.name}</p>
-          <p className="text-xs text-gray-500">
+          <p className="break-words text-xs text-gray-500">
             {[item.kind, money(Number(item.price)), total.avgCost != null ? `costs ${money(total.avgCost)}` : null].filter(Boolean).join(' · ')}
           </p>
         </div>

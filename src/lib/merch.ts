@@ -225,3 +225,9 @@ export function outInKits(kits: Pick<MerchKit, 'id' | 'status'>[], lines: Pick<M
 }
 
 export const KIT_STATUS_LABELS: Record<KitStatus, string> = { open: 'At the show', closed: 'Waiting for approval', approved: 'Done' }
+
+/** A size just crossed its low-stock level: above it before this change, at or below it now. */
+export function crossedLowStock(stockNow: number, change: number, lowAt: number | null): boolean {
+  if (lowAt == null || change >= 0) return false
+  return stockNow - change > lowAt && stockNow <= lowAt
+}
