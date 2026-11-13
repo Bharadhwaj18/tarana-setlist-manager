@@ -1,16 +1,17 @@
 import { Bell } from 'lucide-react'
-import { getCachedUser, getCachedNotifications, getCachedAllProfiles } from '@/lib/data'
+import { getCachedUser, getCachedNotifications, getCachedAllProfiles, getCachedAllProfilesWithCrew } from '@/lib/data'
 import { resolveNotificationItems } from '@/lib/notifications'
 import { SendNotificationModal } from '@/components/notifications/SendNotificationModal'
 import { NotificationInboxList } from '@/components/notifications/NotificationInboxList'
 
 export default async function NotificationsPage() {
   const { data: { user } } = await getCachedUser()
-  const [notifications, profiles] = await Promise.all([
+  const [notifications, everyone, profiles] = await Promise.all([
     user ? getCachedNotifications(user.id) : Promise.resolve([]),
+    getCachedAllProfilesWithCrew(),
     getCachedAllProfiles(),
   ])
-  const items = user ? resolveNotificationItems(notifications, profiles, user.id) : []
+  const items = user ? resolveNotificationItems(notifications, everyone, user.id) : []
   const members = profiles
     .filter(p => p.id !== user?.id)
     .map(p => ({ id: p.id, name: p.display_name ?? 'Member' }))

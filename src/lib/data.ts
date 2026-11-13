@@ -1,4 +1,5 @@
 import { cache } from 'react'
+import { isMerchCrewRow } from '@/lib/merch-crew'
 import { createClient } from '@/lib/supabase/server'
 import { getWorkspaceContext } from '@/lib/workspace'
 import type { TaskData } from '@/types/tasks'
@@ -113,19 +114,31 @@ export const getCachedSetlistSongs = cache(async (setlistId: string) => {
 
 // Members of the current workspace — the people a band's pickers, finance
 // balances and 'recorded by' names should ever list.
-export const getCachedAllProfiles = cache(async () => {
+const getCachedProfileRows = cache(async () => {
   const ctx = await getWorkspaceContext()
-  if (!ctx) return []
+  if (!ctx) return { profiles: [] as { id: string; display_name: string | null }[], crew: new Set<string>() }
   const supabase = await createClient()
   const { data: members } = await supabase
     .from('workspace_members')
-    .select('user_id')
+    .select('user_id, role, permissions')
     .eq('workspace_id', ctx.current.workspace.id)
   const ids = (members ?? []).map(m => m.user_id)
-  if (!ids.length) return []
+  if (!ids.length) return { profiles: [], crew: new Set<string>() }
   const { data } = await supabase.from('profiles').select('id, display_name').in('id', ids)
-  return data ?? []
+  return { profiles: data ?? [], crew: new Set((members ?? []).filter(isMerchCrewRow).map(m => m.user_id)) }
 })
+
+/**
+ * The band's members, for pickers and lists everywhere (Finance, Tasks, Notes, Calendar...). Merch crew are left
+ * out: they only ever appear in Merch.
+ */
+export const getCachedAllProfiles = cache(async () => {
+  const { profiles, crew } = await getCachedProfileRows()
+  return profiles.filter(p => !crew.has(p.id))
+})
+
+/** Everyone, Merch crew included: for showing names (notifications, Merch) and for Settings > Members. */
+export const getCachedAllProfilesWithCrew = cache(async () => (await getCachedProfileRows()).profiles)
 
 export const getCachedShows = cache(() =>
   inWorkspace((supabase, ws) =>
@@ -504,10 +517,4 @@ export const getCachedMerchKit = cache(async (id: string) => {
 })
 
 // Who in the current workspace has the Merch crew role, so kit pickers can list them first.
-export const getCachedMerchCrewIds = cache(async (): Promise<string[]> => {
-  const ctx = await getWorkspaceContext()
-  if (!ctx) return []
-  const supabase = await createClient()
-  const { data } = await supabase.from('workspace_members').select('user_id, permissions').eq('workspace_id', ctx.current.workspace.id)
-  return (data ?? []).filter(m => (m.permissions as Record<string, unknown> | null)?.merch_crew === true).map(m => m.user_id)
-})
+export const getCachedMerchCrewIds = cache(async (): Promise<string[]> => [...(await getCachedProfileRows()).crew])

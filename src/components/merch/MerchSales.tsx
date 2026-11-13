@@ -18,7 +18,8 @@ import { groupSalesByShow, saleTakings, type MerchMove, type MerchSale } from '@
 import { approveMerchSales, deleteMerchSale, rejectMerchSale } from '@/actions/merch'
 
 export type SaleWithShow = MerchSale & { show: { id: string; title: string; show_date: string | null } | null }
-export interface Person { id: string; name: string }
+/** `crew`: Merch crew. Named in Merch, but never picked to hold the band's money. */
+export interface Person { id: string; name: string; crew?: boolean }
 export interface AccountOption { id: string; name: string }
 
 const groupTitle = (sales: SaleWithShow[]) => sales[0]?.show?.title ?? 'Not at a show'
@@ -134,7 +135,8 @@ function ApproveModal({ sales, onClose, members, accounts }: { sales: SaleWithSh
   )
 }
 
-function ApproveForm({ sales, onDone, members, accounts }: { sales: SaleWithShow[]; onDone: () => void; members: Person[]; accounts: AccountOption[] }) {
+function ApproveForm({ sales, onDone, members: everyone, accounts }: { sales: SaleWithShow[]; onDone: () => void; members: Person[]; accounts: AccountOption[] }) {
+  const members = everyone.filter(m => !m.crew)
   const { money } = useMoney()
   const router = useRouter()
   const toast = useToast()

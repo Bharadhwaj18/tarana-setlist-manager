@@ -422,6 +422,7 @@ function CloseForm({ kitId, lines, tappedMoney, onDone }: { kitId: string; lines
 function ApproveForm({ kit, total, members, accounts, onDone }: { kit: MerchKit; total: number; members: { id: string; name: string }[]; accounts: { id: string; name: string }[]; onDone: () => void }) {
   const { money } = useMoney()
   const run = useRun()
+  // Starts on the stall lead if they can hold the band's money (Merch crew can't: they're not in this list).
   const start = kit.lead_id && members.some(m => m.id === kit.lead_id) ? `m:${kit.lead_id}` : members[0] ? `m:${members[0].id}` : ''
   const [to, setTo] = useState(start)
   const [busy, setBusy] = useState(false)

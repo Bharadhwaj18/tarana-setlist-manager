@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { NoAccess } from '@/components/layout/NoAccess'
-import { getCachedAllProfiles, getCachedFinanceAccounts, getCachedFinanceSettings, getCachedMerchCrewIds, getCachedMerchKit, getCachedUser } from '@/lib/data'
+import { getCachedAllProfilesWithCrew, getCachedFinanceAccounts, getCachedFinanceSettings, getCachedMerchCrewIds, getCachedMerchKit, getCachedUser } from '@/lib/data'
 import { crewPickerPeople } from '@/lib/merch-people'
 import { getWorkspaceContext, isMerchApprover, merchScopeOf } from '@/lib/workspace'
 import { kitSoldByVariant, variantPrice } from '@/lib/merch'
@@ -16,7 +16,7 @@ export default async function MerchKitPage({ params }: { params: Promise<{ id: s
   if (scope === 'none') return <NoAccess section="Merch" workspaceName={ctx.current.workspace.name} />
 
   const [data, profiles, { data: { user } }, settings, accounts, crewIds] = await Promise.all([
-    getCachedMerchKit(id), getCachedAllProfiles(), getCachedUser(), getCachedFinanceSettings(), getCachedFinanceAccounts(), getCachedMerchCrewIds(),
+    getCachedMerchKit(id), getCachedAllProfilesWithCrew(), getCachedUser(), getCachedFinanceSettings(), getCachedFinanceAccounts(), getCachedMerchCrewIds(),
   ])
   if (!data || !user) notFound()
   const { kit, show, sales, moves } = data
@@ -55,7 +55,7 @@ export default async function MerchKitPage({ params }: { params: Promise<{ id: s
       people={{ lead: kit.lead_id ? nameOf(kit.lead_id) : null, helpers: kit.helper_ids.map(nameOf), nameOf: Object.fromEntries(profiles.map(p => [p.id, nameOf(p.id)])) }}
       userId={user.id}
       can={{ sell: onKit || canEdit, pack: approver, approve: approver, fullView: scope === 'full' }}
-      members={profiles.map(p => ({ id: p.id, name: nameOf(p.id) }))}
+      members={profiles.filter(p => !crewIds.includes(p.id)).map(p => ({ id: p.id, name: nameOf(p.id) }))}
       crewPeople={approver ? crewPickerPeople(profiles.map(p => ({ id: p.id, name: nameOf(p.id) })), crewIds) : []}
       accounts={settings.features.accounts ? accounts.filter(a => !a.archived).map(a => ({ id: a.id, name: a.name })) : []}
     />

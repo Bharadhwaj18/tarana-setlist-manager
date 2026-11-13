@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { isMerchCrewRow } from '@/lib/merch-crew'
 import { sendPushToProfile } from '@/lib/push'
 import { todayISO } from '@/lib/shows'
 import { addDaysISO, formatDateDMY } from '@/lib/dates'
@@ -73,13 +74,14 @@ export async function GET(request: NextRequest) {
   if (upcomingShows.length) {
     const { data: members, error: membersErr } = await supabase
       .from('workspace_members')
-      .select('workspace_id, user_id')
+      .select('workspace_id, user_id, role, permissions')
       .in('workspace_id', [...new Set(upcomingShows.map(s => s.workspace_id))])
     if (membersErr) return NextResponse.json({ error: membersErr.message }, { status: 500 })
 
     for (const show of upcomingShows) {
       const dueLabel = show.show_date === today ? 'today' : 'in 3 days'
-      for (const m of (members ?? []).filter(m => m.workspace_id === show.workspace_id)) {
+      // Merch crew don't get show reminders: they only hear about their own kits.
+      for (const m of (members ?? []).filter(m => m.workspace_id === show.workspace_id && !isMerchCrewRow(m))) {
         rows.push({
           recipient_id: m.user_id,
           workspace_id: show.workspace_id,

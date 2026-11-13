@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { ArrowRight, CalendarDays, ListMusic, Music2, Plus } from 'lucide-react'
 import {
   getCachedShows, getCachedSetlistsByShow, getCachedSetlistSongCounts, getCachedTaskData,
-  getCachedPendingPayments, getCachedAllProfiles, getCachedUser, getCachedCalendarEvents, getCachedFinanceSettings,
+  getCachedPendingPayments, getCachedAllProfilesWithCrew, getCachedUser, getCachedCalendarEvents, getCachedFinanceSettings,
 } from '@/lib/data'
 import { MoneyCountUp } from '@/components/ui/MoneyCountUp'
 import { todayISO } from '@/lib/shows'
@@ -41,7 +41,7 @@ export default async function TodayPage() {
     getCachedSetlistSongCounts(),
     getCachedTaskData(),
     getCachedPendingPayments(),
-    getCachedAllProfiles(),
+    getCachedAllProfilesWithCrew(),
     getCachedUser(),
     getWorkspaceContext(),
   ])

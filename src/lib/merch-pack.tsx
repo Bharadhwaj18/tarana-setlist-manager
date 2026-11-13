@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { NoAccess } from '@/components/layout/NoAccess'
 import { KitForm, type PackRow } from '@/components/merch/KitForm'
-import { getCachedAllProfiles, getCachedMerch, getCachedMerchCrewIds, getCachedShows, getCachedUser } from '@/lib/data'
+import { getCachedAllProfilesWithCrew, getCachedMerch, getCachedMerchCrewIds, getCachedShows, getCachedUser } from '@/lib/data'
 import { crewPickerPeople } from '@/lib/merch-people'
 import { getWorkspaceContext, isMerchApprover } from '@/lib/workspace'
 import { kitSoldByVariant, outInKits, statsByVariant, statsFor, variantPrice } from '@/lib/merch'
@@ -12,7 +12,7 @@ export async function PackKitPage({ kitId, showId }: { kitId: string | null; sho
   if (!ctx) notFound()
   if (!isMerchApprover(ctx.current)) return <NoAccess section="Packing merch kits" workspaceName={ctx.current.workspace.name} />
 
-  const [merch, shows, profiles, { data: { user } }, crewIds] = await Promise.all([getCachedMerch(), getCachedShows(), getCachedAllProfiles(), getCachedUser(), getCachedMerchCrewIds()])
+  const [merch, shows, profiles, { data: { user } }, crewIds] = await Promise.all([getCachedMerch(), getCachedShows(), getCachedAllProfilesWithCrew(), getCachedUser(), getCachedMerchCrewIds()])
   const kit = kitId ? merch.kits.find(k => k.id === kitId) : null
   if (kitId && !kit) notFound()
   if (kit && kit.status !== 'open') return <NoAccess section="This kit (it’s closed; reopen it first)" workspaceName={ctx.current.workspace.name} />

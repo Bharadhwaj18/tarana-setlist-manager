@@ -2,7 +2,7 @@ import { cache } from 'react'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getWorkspaceContext } from '@/lib/workspace'
-import { getCachedAllProfiles, getCachedProfileAvatars, getCachedUser } from '@/lib/data'
+import { getCachedAllProfilesWithCrew, getCachedProfileAvatars, getCachedUser } from '@/lib/data'
 import { normalisePermissions } from '@/lib/workspace-shared'
 import { sectionLevelsFrom } from '@/lib/workspace-sections'
 import type { InviteRow, MemberRow, WorkspaceSummary } from '@/components/workspace/settings-types'
@@ -16,7 +16,7 @@ export const getSettingsContext = cache(async () => {
   const isAdmin = isOwner || role === 'admin'
   const isPersonal = workspace.type === 'personal'
 
-  const [profiles, avatars] = await Promise.all([getCachedAllProfiles(), getCachedProfileAvatars()])
+  const [profiles, avatars] = await Promise.all([getCachedAllProfilesWithCrew(), getCachedProfileAvatars()])
   const supabase = await createClient()
   const { data: me } = await supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle()
 
@@ -47,7 +47,7 @@ export const getSettingsMembers = cache(async (): Promise<MemberRow[]> => {
   const supabase = await createClient()
   const [{ data: rows }, profiles, avatars] = await Promise.all([
     supabase.from('workspace_members').select('user_id, role, permissions, created_at').eq('workspace_id', s.workspace.id).order('created_at'),
-    getCachedAllProfiles(),
+    getCachedAllProfilesWithCrew(),
     getCachedProfileAvatars(),
   ])
   return (rows ?? []).map(m => ({

@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { cookies, headers } from 'next/headers'
 import { PENDING_INVITE_COOKIE, WORKSPACE_CHOSEN_COOKIE, WORKSPACE_COOKIE } from '@/lib/workspace-shared'
 import { createClient } from '@/lib/supabase/server'
-import { getCachedUser, getCachedPendingPayments, getCachedNotifications, getCachedAllProfiles, getCachedFinanceSettings } from '@/lib/data'
+import { getCachedUser, getCachedPendingPayments, getCachedNotifications, getCachedAllProfilesWithCrew, getCachedFinanceSettings } from '@/lib/data'
 import { FinanceSettingsProvider } from '@/components/finance/FinanceSettingsContext'
 import { QuickAddMenu } from '@/components/layout/QuickAddMenu'
 import { OfflineEntrySync } from '@/components/finance/OfflineEntrySync'
@@ -50,7 +50,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     supabase.from('profiles').select('display_name').eq('id', effectiveUser.id).maybeSingle(),
     getCachedPendingPayments(),
     getCachedNotifications(effectiveUser.id, 40),
-    getCachedAllProfiles(),
+    getCachedAllProfilesWithCrew(),
     getWorkspaceOptions(),
   ])
 

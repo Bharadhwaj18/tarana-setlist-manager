@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { sendPushToProfile } from '@/lib/push'
 import { getWorkspaceContext } from '@/lib/workspace'
+import { isMerchCrewRow } from '@/lib/merch-crew'
 import { chooseWorkspace } from '@/lib/workspace-cookies'
 import { safeNextPath } from '@/lib/safe-redirect'
 
@@ -103,11 +104,12 @@ export async function sendNotificationToAll({ title, body, link, type }: SendNot
   if (!ctx) return {}
   const { data: members, error: profilesError } = await supabase
     .from('workspace_members')
-    .select('user_id')
+    .select('user_id, role, permissions')
     .eq('workspace_id', ctx.current.workspace.id)
     .neq('user_id', user.id)
   if (profilesError) return { error: profilesError.message }
-  const profiles = (members ?? []).map(m => ({ id: m.user_id }))
+  // Merch crew only hear about their own kits, never the band's news (shows, setlists, money...).
+  const profiles = (members ?? []).filter(m => !isMerchCrewRow(m)).map(m => ({ id: m.user_id }))
   if (!profiles?.length) return {}
 
   const { error } = await supabase.from('notifications').insert(
