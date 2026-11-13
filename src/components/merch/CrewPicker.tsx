@@ -18,7 +18,7 @@ export function CrewPicker({ people, leadId, helperIds, onChange }: {
       <div className="space-y-1.5">
         <Label htmlFor="kit-lead">Running the stall</Label>
         <Select id="kit-lead" value={leadId} onChange={e => onChange({ leadId: e.target.value, helperIds: helperIds.filter(id => id !== e.target.value) })}>
-          <option value="">Pick someone</option>
+          <option value="">Nobody yet (decide later)</option>
           {people.map(p => <option key={p.id} value={p.id}>{label(p)}</option>)}
         </Select>
       </div>

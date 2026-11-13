@@ -73,8 +73,8 @@ export async function saveMerchKit(input: KitInput): Promise<Result> {
   // Who's on the kit: members of this workspace only.
   const { data: members } = await supabase.from('workspace_members').select('user_id').eq('workspace_id', workspace_id)
   const memberIds = new Set((members ?? []).map(m => m.user_id))
+  // Optional: an admin can pack now and put someone on the kit later.
   const lead_id = input.leadId && memberIds.has(input.leadId) ? input.leadId : null
-  if (!lead_id) return { error: 'Pick who’s running the stall.' }
   const helper_ids = [...new Set((input.helperIds ?? []).filter(id => memberIds.has(id) && id !== lead_id))]
 
   // What's at home: stock minus what other unapproved kits still hold.
@@ -139,12 +139,12 @@ export async function saveMerchKit(input: KitInput): Promise<Result> {
 /** Tells anyone newly put on a kit (not the person doing it, and not anyone who was already on it). */
 async function tellNewCrew(
   supabase: Awaited<ReturnType<typeof createClient>>, actorId: string, kitId: string, showId: string | null,
-  now: { lead_id: string; helper_ids: string[] }, before: { lead_id: string | null; helper_ids: string[] } | null,
+  now: { lead_id: string | null; helper_ids: string[] }, before: { lead_id: string | null; helper_ids: string[] } | null,
 ) {
   const already = new Set([before?.lead_id, ...(before?.helper_ids ?? [])].filter(Boolean))
   const { data: show } = showId ? await supabase.from('shows').select('title').eq('id', showId).maybeSingle() : { data: null }
   for (const recipientId of [now.lead_id, ...now.helper_ids]) {
-    if (recipientId === actorId || already.has(recipientId)) continue
+    if (!recipientId || recipientId === actorId || already.has(recipientId)) continue
     await sendNotification({
       recipientId,
       title: recipientId === now.lead_id ? `You’re running merch at ${show?.title ?? 'a show'}` : `You’re helping with merch at ${show?.title ?? 'a show'}`,
@@ -173,7 +173,6 @@ export async function setMerchKitCrew(kitId: string, leadId: string | null, help
   const { data: members } = await supabase.from('workspace_members').select('user_id').eq('workspace_id', workspace_id)
   const memberIds = new Set((members ?? []).map(m => m.user_id))
   const lead_id = leadId && memberIds.has(leadId) ? leadId : null
-  if (!lead_id) return { error: 'Pick who’s running the stall.' }
   const helper_ids = [...new Set(helperIds.filter(id => memberIds.has(id) && id !== lead_id))]
 
   const { error } = await supabase.from('merch_kits').update({ lead_id, helper_ids }).eq('id', kitId)

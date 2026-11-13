@@ -4,6 +4,7 @@ import { useState, type FormEvent, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
+import { ReasonButton } from '@/components/ui/ReasonButton'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
 import { Textarea } from '@/components/ui/Textarea'
@@ -225,7 +226,7 @@ function RestockForm({ items, variants, focusItemId, onDone }: { items: MerchIte
         <p className="text-sm text-gray-500">{units} unit{units === 1 ? '' : 's'}</p>
         <div className="flex gap-2">
           <Button type="button" variant="secondary" onClick={onDone}>Cancel</Button>
-          <Button type="submit" loading={busy} disabled={units === 0}>Add to stock</Button>
+          <ReasonButton type="submit" loading={busy} blocked={units === 0 ? 'Enter how many came in for at least one size.' : null}>Add to stock</ReasonButton>
         </div>
       </div>
     </form>
@@ -304,7 +305,7 @@ function AdjustForm({ variant, stock, shows, onDone }: { variant: MerchVariant; 
       </Field>
       <div className="flex justify-end gap-2">
         <Button type="button" variant="secondary" onClick={onDone}>Cancel</Button>
-        <Button type="submit" loading={busy} disabled={qty === '' || change === 0}>Save</Button>
+        <ReasonButton type="submit" loading={busy} blocked={qty === '' ? (isCount ? 'Enter how many you counted.' : 'Enter how many.') : change === 0 ? (isCount ? 'That matches what’s in stock already, so there’s nothing to fix.' : 'Enter a number above 0.') : null}>Save</ReasonButton>
       </div>
     </form>
   )

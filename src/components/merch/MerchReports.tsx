@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Download, FileText } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import { ReasonButton } from '@/components/ui/ReasonButton'
 import { Chip } from '@/components/ui/Chip'
 import { Input } from '@/components/ui/Input'
 import { useToast } from '@/components/ui/Toaster'
@@ -95,8 +95,8 @@ export function MerchReports({ items, variants, moves, sales, kits }: {
           <Chip active={view === 'items'} onClick={() => setView('items')}>By item</Chip>
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" size="sm" onClick={csv} disabled={!rows.length}><Download className="h-4 w-4" />CSV</Button>
-          <Button variant="secondary" size="sm" onClick={pdf} disabled={!report.byShow.length && !report.byItem.length}><FileText className="h-4 w-4" />PDF</Button>
+          <ReasonButton variant="secondary" size="sm" onClick={csv} blocked={!rows.length ? 'Nothing to download for this period.' : null}><Download className="h-4 w-4" />CSV</ReasonButton>
+          <ReasonButton variant="secondary" size="sm" onClick={pdf} blocked={!report.byShow.length && !report.byItem.length ? 'Nothing to download for this period.' : null}><FileText className="h-4 w-4" />PDF</ReasonButton>
         </div>
       </div>
 

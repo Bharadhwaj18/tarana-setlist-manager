@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Check, ChevronLeft, Minus, Pencil, Plus, RotateCcw, Trash2, Undo2, Users } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { ReasonButton } from '@/components/ui/ReasonButton'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
 import { Modal } from '@/components/ui/Modal'
@@ -229,6 +230,7 @@ export function KitView({ kit, show, lines, sales, people, userId, can, members,
 function StallPanel({ kitId, lines }: { kitId: string; lines: KitLineView[] }) {
   const { money, symbol } = useMoney()
   const run = useRun()
+  const toast = useToast()
   const [cart, setCart] = useState<Record<string, number>>({})
   const [method, setMethod] = useState<PaymentMethod>('cash')
   const [amount, setAmount] = useState<string | null>(null)
@@ -259,8 +261,8 @@ function StallPanel({ kitId, lines }: { kitId: string; lines: KitLineView[] }) {
               const inCart = cart[l.variantId] ?? 0
               const left = kitLeft(l.taken, l.sold) - inCart
               return (
-                <button key={l.variantId} type="button" disabled={left <= 0} onClick={() => add(l, 1)}
-                  className={cn('relative rounded-xl border px-2 py-3 text-center transition-colors enabled:active:scale-[0.97] disabled:opacity-50',
+                <button key={l.variantId} type="button" aria-disabled={left <= 0} onClick={() => (left <= 0 ? toast(`No ${l.itemName} ${l.label} left in the box.`, 'info') : add(l, 1))}
+                  className={cn('relative rounded-xl border px-2 py-3 text-center transition-colors active:scale-[0.97] aria-disabled:opacity-50',
                     inCart ? 'border-brand-400 bg-brand-100' : 'border-brand-200 bg-white enabled:hover:bg-brand-50')}>
                   <span className="block truncate text-sm font-bold text-gray-900">{l.label}</span>
                   <span className="block truncate text-xs text-gray-500">{money(l.price)}</span>
@@ -405,7 +407,10 @@ function CloseForm({ kitId, lines, tappedMoney, onDone }: { kitId: string; lines
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={onDone}>Cancel</Button>
-          <Button onClick={save} loading={busy} disabled={problems.length > 0 || missing.length > 0} title={missing.length ? 'Count what came back for every item' : undefined}>Close kit</Button>
+          <ReasonButton onClick={save} loading={busy}
+            blocked={missing.length ? `Enter how many came back for every item (${missing.length} still empty). Put 0 if none came back.` : problems.length ? 'Some counts add up to more than went out (marked !). Check Back, Given and Lost.' : null}>
+            Close kit
+          </ReasonButton>
         </div>
       </div>
     </div>
@@ -468,7 +473,7 @@ function CrewForm({ kit, people, onDone }: { kit: MerchKit; people: CrewPerson[]
       <CrewPicker people={people} leadId={crew.leadId} helperIds={crew.helperIds} onChange={setCrew} />
       <div className="flex justify-end gap-2">
         <Button variant="secondary" onClick={onDone}>Cancel</Button>
-        <Button onClick={save} loading={busy} disabled={!crew.leadId}>Save crew</Button>
+        <Button onClick={save} loading={busy}>Save crew</Button>
       </div>
     </div>
   )

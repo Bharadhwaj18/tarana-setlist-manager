@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import { ReasonButton } from '@/components/ui/ReasonButton'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
 import { SectionLabel } from '@/components/ui/SectionLabel'
@@ -81,7 +81,7 @@ export function KitForm({ kitId, shows, members, rows, initial }: Props) {
         </div>
         <div className="sm:col-span-2">
           <CrewPicker people={members} leadId={leadId} helperIds={helperIds} onChange={next => { setLeadId(next.leadId); setHelperIds(next.helperIds) }} />
-          <p className="mt-1.5 text-xs text-gray-500">You can change the crew later from the kit, any time before it’s closed.</p>
+          <p className="mt-1.5 text-xs text-gray-500">Optional. You can put people on it later from the kit, any time before it’s closed. Until then, admins and the Merch role can sell from it.</p>
         </div>
         <div className="space-y-1.5 sm:col-span-2">
           <Label htmlFor="kit-notes">Notes for the crew</Label>
@@ -132,7 +132,10 @@ export function KitForm({ kitId, shows, members, rows, initial }: Props) {
 
       <div className="mt-5 flex items-center justify-between gap-3">
         <p className="text-sm text-gray-500">{units} unit{units === 1 ? '' : 's'} going</p>
-        <Button onClick={save} loading={busy} disabled={!showId || !leadId || units === 0 || over.length > 0}>{kitId ? 'Save kit' : 'Pack kit'}</Button>
+        <ReasonButton onClick={save} loading={busy}
+          blocked={!showId ? 'Pick the show first.' : units === 0 ? 'Enter how many of at least one item are going.' : over.length ? `You’re taking more than is at home on ${over.length === 1 ? 'one item' : `${over.length} items`} (shown in red).` : null}>
+          {kitId ? 'Save kit' : 'Pack kit'}
+        </ReasonButton>
       </div>
     </div>
   )

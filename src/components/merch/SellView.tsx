@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, Minus, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { ReasonButton } from '@/components/ui/ReasonButton'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
 import { Select } from '@/components/ui/Select'
@@ -322,7 +323,10 @@ function CountMode({ items, variants, stockOf, priceOf, onSave }: {
               Taken {money(taken)}{taken !== expected && ` (${taken < expected ? 'short' : 'over'} by ${money(Math.abs(taken - expected))})`}
             </p>
           </div>
-          <Button onClick={save} loading={busy} disabled={problems.length > 0 || (lines.length === 0 && taken === 0)}>Save count</Button>
+          <ReasonButton onClick={save} loading={busy}
+            blocked={problems.length ? 'Some rows have more coming back than went out (marked !).' : lines.length === 0 && taken === 0 ? 'Enter what went out and came back, or the money taken.' : null}>
+            Save count
+          </ReasonButton>
         </div>
       </div>
     </div>
