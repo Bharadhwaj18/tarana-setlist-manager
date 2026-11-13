@@ -1,9 +1,13 @@
 import { getCachedAllProfiles, getCachedMerch, getCachedShows, getCachedUser } from '@/lib/data'
-import { getWorkspaceContext } from '@/lib/workspace'
+import { redirect } from 'next/navigation'
+import { getWorkspaceContext, merchScopeOf } from '@/lib/workspace'
 import { sectionGuard } from '@/lib/section-guard'
 import { SellView } from '@/components/merch/SellView'
 
 export default async function MerchSellPage({ searchParams }: { searchParams: Promise<{ show?: string }> }) {
+  // Merch crew sell from the kits they're on, not from the whole stock.
+  const scopeCtx = await getWorkspaceContext()
+  if (scopeCtx && merchScopeOf(scopeCtx.current) === 'crew') redirect('/merch')
   const denied = await sectionGuard('merch')
   if (denied) return denied
   const [{ show }, ctx, merch, shows, profiles, { data: { user } }] = await Promise.all([

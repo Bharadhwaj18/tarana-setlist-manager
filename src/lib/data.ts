@@ -453,15 +453,52 @@ export const getCachedFinanceRequests = cache(() =>
 // restock batches, and sales. Stock is summed from the log on the page, so this is the whole picture in four reads.
 export const getCachedMerch = cache(async () => {
   const ctx = await getWorkspaceContext()
-  if (!ctx) return { items: [], variants: [], moves: [], batches: [], sales: [] }
+  if (!ctx) return { items: [], variants: [], moves: [], batches: [], sales: [], kits: [], kitLines: [] }
   const supabase = await createClient()
   const ws = ctx.current.workspace.id
-  const [items, variants, moves, batches, sales] = await Promise.all([
+  const [items, variants, moves, batches, sales, kits, kitLines] = await Promise.all([
     supabase.from('merch_items').select('*').eq('workspace_id', ws).order('position').order('created_at'),
     supabase.from('merch_variants').select('*').eq('workspace_id', ws).order('position').order('created_at'),
     supabase.from('merch_stock_moves').select('*, show:shows(id, title, show_date)').eq('workspace_id', ws).order('date', { ascending: false }).order('created_at', { ascending: false }),
     supabase.from('merch_batches').select('*').eq('workspace_id', ws).order('date', { ascending: false }),
     supabase.from('merch_sales').select('*, show:shows(id, title, show_date)').eq('workspace_id', ws).order('date', { ascending: false }).order('created_at', { ascending: false }),
+    supabase.from('merch_kits').select('*, show:shows(id, title, show_date, venue)').eq('workspace_id', ws).order('created_at', { ascending: false }),
+    supabase.from('merch_kit_lines').select('*').eq('workspace_id', ws),
   ])
-  return { items: items.data ?? [], variants: variants.data ?? [], moves: moves.data ?? [], batches: batches.data ?? [], sales: sales.data ?? [] }
+  return { items: items.data ?? [], variants: variants.data ?? [], moves: moves.data ?? [], batches: batches.data ?? [], sales: sales.data ?? [], kits: kits.data ?? [], kitLines: kitLines.data ?? [] }
+})
+
+// The signed-in member's own show kits (what Merch crew see), with the show's name, date and venue.
+export const getCachedMyKits = cache(async () => {
+  const ctx = await getWorkspaceContext()
+  if (!ctx) return []
+  const supabase = await createClient()
+  const { data } = await supabase.rpc('my_merch_kits', { p_ws: ctx.current.workspace.id })
+  return data ?? []
+})
+
+// One kit with everything its page needs. Row-level security decides whether this person may see it at all
+// (crew only see their own), so a kit they can't see comes back as null.
+export const getCachedMerchKit = cache(async (id: string) => {
+  const ctx = await getWorkspaceContext()
+  if (!ctx) return null
+  const supabase = await createClient()
+  const { data: kit } = await supabase.from('merch_kits').select('*').eq('id', id).eq('workspace_id', ctx.current.workspace.id).maybeSingle()
+  if (!kit) return null
+  const [lines, sales, moves, mine] = await Promise.all([
+    supabase.from('merch_kit_lines').select('*, variant:merch_variants(id, label, price, position, item:merch_items(id, name, price, position))').eq('kit_id', id),
+    supabase.from('merch_sales').select('*').eq('kit_id', id).order('created_at', { ascending: false }),
+    supabase.from('merch_stock_moves').select('*').eq('kit_id', id),
+    supabase.rpc('my_merch_kits', { p_ws: ctx.current.workspace.id }),
+  ])
+  // Crew can't read shows, so the show details come from their kit list; everyone else reads the show.
+  const fromMine = (mine.data ?? []).find(k => k.id === id)
+  let show: { id: string | null; title: string; show_date: string | null; venue: string | null } | null = fromMine
+    ? { id: fromMine.show_id, title: fromMine.show_title ?? 'Deleted show', show_date: fromMine.show_date, venue: fromMine.venue }
+    : null
+  if (!show && kit.show_id) {
+    const { data } = await supabase.from('shows').select('id, title, show_date, venue').eq('id', kit.show_id).maybeSingle()
+    if (data) show = data
+  }
+  return { kit, show, lines: lines.data ?? [], sales: sales.data ?? [], moves: moves.data ?? [] }
 })

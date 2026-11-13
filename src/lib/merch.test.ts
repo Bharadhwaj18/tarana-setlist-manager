@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { countFixFor, expectedTotal, groupSalesByShow, isLowStock, parseVariantLabels, saleTakings, signedQty, soldFromCount, statsByVariant, statsFor, sumStats, unitCostOf, variantPrice } from './merch'
+import { closeoutSold, countFixFor, kitLeft, kitSoldByVariant, outInKits, expectedTotal, groupSalesByShow, isLowStock, parseVariantLabels, saleTakings, signedQty, soldFromCount, statsByVariant, statsFor, sumStats, unitCostOf, variantPrice } from './merch'
 
 const move = (variant_id: string, qty: number, reason: string, unit_cost: number | null = null, unit_price: number | null = null) =>
   ({ variant_id, qty, reason, unit_cost, unit_price })
@@ -106,5 +106,43 @@ describe('sales helpers', () => {
       { show_id: 'b', date: '2026-11-05' },
     ])
     expect(groups.map(g => [g.showId, g.sales.length])).toEqual([[null, 1], ['b', 1], ['a', 2]])
+  })
+})
+
+describe('show kits', () => {
+  const moves = [
+    { kit_id: 'k', variant_id: 'm', qty: -3, reason: 'sale' },
+    { kit_id: 'k', variant_id: 'm', qty: -1, reason: 'sale' },
+    { kit_id: 'k', variant_id: 'l', qty: -2, reason: 'sale' },
+    { kit_id: 'other', variant_id: 'm', qty: -5, reason: 'sale' },
+    { kit_id: null, variant_id: 'm', qty: -9, reason: 'sale' },
+    { kit_id: 'k', variant_id: 'm', qty: -1, reason: 'giveaway' },
+  ]
+
+  it('counts what each kit has sold', () => {
+    expect(Object.fromEntries(kitSoldByVariant('k', moves))).toEqual({ m: 4, l: 2 })
+  })
+
+  it('knows what is left in the box', () => {
+    expect(kitLeft(10, 4)).toBe(6)
+    expect(kitLeft(3, 4)).toBe(0)
+  })
+
+  it('works out the close-out sales', () => {
+    expect(closeoutSold(10, 4, 3, 1, 0)).toBe(2)
+    expect(closeoutSold(10, 4, 6, 0, 0)).toBe(0)
+    expect(closeoutSold(10, 4, 7, 0, 0)).toBe(-1)
+  })
+
+  it('tracks what is still out of the house in kits', () => {
+    const kits = [{ id: 'k', status: 'open' }, { id: 'c', status: 'closed' }, { id: 'a', status: 'approved' }]
+    const lines = [
+      { kit_id: 'k', variant_id: 'm', taken: 10, returned: null },
+      { kit_id: 'c', variant_id: 'm', taken: 5, returned: 3 },
+      { kit_id: 'a', variant_id: 'm', taken: 8, returned: 2 },
+    ]
+    const kitMoves = [...moves, { kit_id: 'c', variant_id: 'm', qty: -1, reason: 'sale' }]
+    // open kit: 10 - 4 sold = 6; closed kit: 5 - 1 sold - 3 back = 1 (a giveaway or loss waiting); approved: none
+    expect(outInKits(kits, lines, kitMoves).get('m')).toBe(7)
   })
 })

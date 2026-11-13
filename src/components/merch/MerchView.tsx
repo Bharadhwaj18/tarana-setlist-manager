@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Archive, ArchiveRestore, PackagePlus, Pencil, Plus, ShoppingBag, Shirt, SlidersHorizontal, Trash2 } from 'lucide-react'
+import { Archive, ArchiveRestore, ChevronRight, Package, PackagePlus, Pencil, Plus, ShoppingBag, Shirt, SlidersHorizontal, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -13,10 +13,11 @@ import { useToast } from '@/components/ui/Toaster'
 import { useMoney } from '@/components/finance/FinanceSettingsContext'
 import { cn } from '@/lib/utils'
 import { formatDateDMY } from '@/lib/dates'
-import { REASON_LABELS, isLowStock, isMoveReason, statsByVariant, statsFor, sumStats, variantPrice, type MerchBatch, type MerchItem, type MerchMove, type MerchVariant } from '@/lib/merch'
+import { REASON_LABELS, isLowStock, isMoveReason, outInKits, statsByVariant, statsFor, sumStats, variantPrice, type MerchBatch, type MerchItem, type MerchKitLine, type MerchMove, type MerchVariant } from '@/lib/merch'
 import { deleteMerchBatch, deleteMerchItem, deleteMerchMove, setMerchItemArchived, setMerchVariantArchived } from '@/actions/merch'
 import { AdjustModal, ItemModal, RestockModal, VariantModal, type ShowOption } from './MerchForms'
 import { PendingApprovals, SalesByShow, type AccountOption, type Person, type SaleWithShow } from './MerchSales'
+import { KitsList, type KitWithShow } from './Kits'
 
 type MoveWithShow = MerchMove & { show: { id: string; title: string; show_date: string | null } | null }
 
@@ -27,6 +28,8 @@ interface Props {
   batches: MerchBatch[]
   shows: ShowOption[]
   sales: SaleWithShow[]
+  kits: KitWithShow[]
+  kitLines: MerchKitLine[]
   members: Person[]
   accounts: AccountOption[]
   canEdit: boolean
@@ -34,9 +37,9 @@ interface Props {
   userId: string
 }
 
-type Tab = 'stock' | 'sales' | 'history'
+type Tab = 'stock' | 'kits' | 'sales' | 'history'
 
-export function MerchView({ items, variants, moves, batches, shows, sales, members, accounts, canEdit, canApprove, userId }: Props) {
+export function MerchView({ items, variants, moves, batches, shows, sales, kits, kitLines, members, accounts, canEdit, canApprove, userId }: Props) {
   const { money } = useMoney()
   const [tab, setTab] = useState<Tab>('stock')
   const [showArchived, setShowArchived] = useState(false)
@@ -47,6 +50,9 @@ export function MerchView({ items, variants, moves, batches, shows, sales, membe
   const [adjust, setAdjust] = useState<{ open: boolean; item: MerchItem | null; variant: MerchVariant | null }>({ open: false, item: null, variant: null })
 
   const stats = useMemo(() => statsByVariant(moves), [moves])
+  const out = useMemo(() => outInKits(kits, kitLines, moves), [kits, kitLines, moves])
+  const nameOf = (id: string | null) => members.find(m => m.id === id)?.name ?? 'Nobody yet'
+  const toApprove = kits.filter(k => k.status === 'closed')
   const activeItems = items.filter(i => !i.archived_at)
   const archivedItems = items.filter(i => i.archived_at)
   const liveVariants = variants.filter(v => !v.archived_at && activeItems.some(i => i.id === v.item_id))
@@ -55,6 +61,7 @@ export function MerchView({ items, variants, moves, batches, shows, sales, membe
     ...sumStats(liveVariants.map(v => statsFor(stats, v.id))),
     stockValue: liveVariants.reduce((sum, v) => { const s = statsFor(stats, v.id); return sum + (s.avgCost != null ? Math.max(0, s.stock) * s.avgCost : 0) }, 0),
     low: liveVariants.filter(v => isLowStock(v, statsFor(stats, v.id).stock)).length,
+    out: liveVariants.reduce((n, v) => n + (out.get(v.id) ?? 0), 0),
   }
 
   const shownItems = showArchived ? archivedItems : activeItems
@@ -66,7 +73,8 @@ export function MerchView({ items, variants, moves, batches, shows, sales, membe
         subtitle="What’s in the box, what it cost, and what went out."
         action={canEdit && items.length > 0 ? (
           <div className="flex flex-wrap justify-end gap-2">
-            <Button size="sm" asChild><Link href="/merch/sell"><ShoppingBag className="h-4 w-4" />Sell</Link></Button>
+            {canApprove && <Button size="sm" asChild><Link href="/merch/kits/new"><Package className="h-4 w-4" />Pack a kit</Link></Button>}
+            <Button variant={canApprove ? 'secondary' : 'primary'} size="sm" asChild><Link href="/merch/sell"><ShoppingBag className="h-4 w-4" />Sell</Link></Button>
             <Button variant="secondary" size="sm" onClick={() => setRestock({ open: true, itemId: null })}><PackagePlus className="h-4 w-4" />Restock</Button>
             <Button variant="secondary" size="sm" onClick={() => setItemModal({ open: true, item: null })}><Plus className="h-4 w-4" />New item</Button>
           </div>
@@ -82,15 +90,31 @@ export function MerchView({ items, variants, moves, batches, shows, sales, membe
         />
       ) : (
         <>
-          <PendingApprovals sales={sales} moves={moves} members={members} accounts={accounts} canApprove={canApprove} userId={userId} />
+          {toApprove.length > 0 && (
+            <div className="mb-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-500/40 dark:bg-amber-500/10">
+              <SectionLabel className="mb-2">Kits waiting for approval</SectionLabel>
+              <ul className="space-y-2">
+                {toApprove.map(k => (
+                  <li key={k.id}>
+                    <Link href={`/merch/kits/${k.id}`} className="flex items-center gap-3 rounded-xl bg-white px-3 py-2.5 shadow-sm hover:bg-brand-50">
+                      <span className="min-w-0 flex-1 truncate text-sm font-semibold text-gray-900">{k.show?.title ?? 'Deleted show'}<span className="font-normal text-gray-500"> · closed by {nameOf(k.closed_by)}</span></span>
+                      <span className="text-sm font-bold tabular-nums text-gray-900">{money(Number(k.cash_in ?? 0) + Number(k.upi_in ?? 0) + Number(k.card_in ?? 0))}</span>
+                      <ChevronRight className="h-4 w-4 text-gray-400" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <PendingApprovals sales={sales.filter(s => !s.kit_id)} moves={moves} members={members} accounts={accounts} canApprove={canApprove} userId={userId} />
           <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Tile label="In stock" value={`${totals.stock}`} sub={totals.low > 0 ? `${totals.low} running low` : 'units'} warn={totals.low > 0} />
+            <Tile label="In stock" value={`${totals.stock}`} sub={totals.low > 0 ? `${totals.low} running low` : totals.out > 0 ? `${totals.out} out at shows` : 'units'} warn={totals.low > 0} />
             <Tile label="Stock value" value={money(totals.stockValue)} sub="at cost" />
             <Tile label="Sold" value={`${totals.sold}`} sub="units, all time" />
             <Tile label="Takings" value={money(totals.revenue)} sub="all time" />
           </div>
 
-          <SegmentedTabs className="mb-4" value={tab} onChange={setTab} tabs={[{ value: 'stock', label: 'Stock' }, { value: 'sales', label: 'Sales' }, { value: 'history', label: 'History' }]} />
+          <SegmentedTabs className="mb-4" value={tab} onChange={setTab} tabs={[{ value: 'stock', label: 'Stock' }, { value: 'kits', label: 'Kits' }, { value: 'sales', label: 'Sales' }, { value: 'history', label: 'History' }]} />
 
           {tab === 'stock' ? (
             <div className="space-y-4">
@@ -106,6 +130,7 @@ export function MerchView({ items, variants, moves, batches, shows, sales, membe
                   item={item}
                   variants={variants.filter(v => v.item_id === item.id)}
                   stats={stats}
+                  out={out}
                   canEdit={canEdit}
                   onEdit={() => setItemModal({ open: true, item })}
                   onAddVariant={() => setVariantModal({ open: true, item, variant: null })}
@@ -116,6 +141,8 @@ export function MerchView({ items, variants, moves, batches, shows, sales, membe
               ))}
               {shownItems.length === 0 && <p className="py-6 text-center text-sm text-gray-500">Nothing here.</p>}
             </div>
+          ) : tab === 'kits' ? (
+            <KitsList kits={kits} lines={kitLines} moves={moves} nameOf={nameOf} />
           ) : tab === 'sales' ? (
             <SalesByShow sales={sales} moves={moves} />
           ) : (
@@ -158,10 +185,11 @@ function useQuickAction() {
   }
 }
 
-function ItemCard({ item, variants, stats, canEdit, onEdit, onAddVariant, onEditVariant, onRestock, onAdjust }: {
+function ItemCard({ item, variants, stats, out, canEdit, onEdit, onAddVariant, onEditVariant, onRestock, onAdjust }: {
   item: MerchItem
   variants: MerchVariant[]
   stats: ReturnType<typeof statsByVariant>
+  out: Map<string, number>
   canEdit: boolean
   onEdit: () => void
   onAddVariant: () => void
@@ -230,6 +258,7 @@ function ItemCard({ item, variants, stats, canEdit, onEdit, onAddVariant, onEdit
                 </td>
                 <td className={cn('px-2 py-2 text-right font-semibold tabular-nums', s.stock < 0 ? 'text-red-700' : low ? 'text-amber-600' : 'text-gray-900')} title={low ? `Low: warns at ${v.low_stock_at}` : undefined}>
                   {s.stock}{low && ' ⚠'}
+                  {(out.get(v.id) ?? 0) > 0 && <span className="block text-[11px] font-normal text-gray-500">{out.get(v.id)} out</span>}
                 </td>
                 <td className="hidden px-2 py-2 text-right tabular-nums text-gray-600 sm:table-cell">{s.sold}</td>
                 <td className="hidden px-2 py-2 text-right tabular-nums text-gray-600 sm:table-cell">{money(variantPrice(item, v))}</td>

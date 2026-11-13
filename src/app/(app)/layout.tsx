@@ -16,8 +16,7 @@ import { Sidebar } from '@/components/layout/Sidebar'
 import { OfflineUserSync } from '@/components/OfflineUserSync'
 import { IdentifyUser } from '@/components/analytics/IdentifyUser'
 import type { ReactNode } from 'react'
-import { hiddenSectionsOf } from '@/lib/workspace-sections'
-import { getWorkspaceContext, isFinanceApprover } from '@/lib/workspace'
+import { getWorkspaceContext, isFinanceApprover, navHiddenSections } from '@/lib/workspace'
 import { PageFade } from '@/components/layout/PageFade'
 import { PlayerProvider, PlayerSpacer } from '@/components/player/PlayerProvider'
 import { TooltipLayer } from '@/components/ui/TooltipLayer'
@@ -73,7 +72,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const notificationItems = resolveNotificationItems(notifications, profiles, effectiveUser.id)
 
   const ctx = await getWorkspaceContext()
-  const hiddenSections = ctx ? hiddenSectionsOf(ctx.current.sections) : []
+  const hiddenSections = ctx ? navHiddenSections(ctx.current) : []
 
   // Opening the app on Today? Carry on in the section they were last in. Only the first page of a visit, so
   // choosing Today by hand later stays on Today.

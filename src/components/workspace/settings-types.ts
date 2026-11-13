@@ -8,6 +8,8 @@ export interface MemberRow {
   treasurer: boolean
   /** Can approve merch takings into Finance. */
   merchManager: boolean
+  /** Merch crew: sees only the show kits they run. */
+  merchCrew: boolean
   isYou: boolean
   /** Their profile photo, when they have one. */
   avatarUrl?: string | null

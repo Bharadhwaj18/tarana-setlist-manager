@@ -1646,6 +1646,7 @@ export type Database = {
       }
       merch_sales: {
         Row: {
+          kit_id: string | null
           id: string
           workspace_id: string
           show_id: string | null
@@ -1665,6 +1666,7 @@ export type Database = {
           approved_at: string | null
         }
         Insert: {
+          kit_id?: string | null
           id?: string
           workspace_id: string
           show_id?: string | null
@@ -1684,6 +1686,7 @@ export type Database = {
           approved_at?: string | null
         }
         Update: {
+          kit_id?: string | null
           id?: string
           workspace_id?: string
           show_id?: string | null
@@ -1713,6 +1716,7 @@ export type Database = {
       }
       merch_stock_moves: {
         Row: {
+          kit_id: string | null
           id: string
           workspace_id: string
           variant_id: string
@@ -1729,6 +1733,7 @@ export type Database = {
           created_at: string
         }
         Insert: {
+          kit_id?: string | null
           id?: string
           workspace_id: string
           variant_id: string
@@ -1745,6 +1750,7 @@ export type Database = {
           created_at?: string
         }
         Update: {
+          kit_id?: string | null
           id?: string
           workspace_id?: string
           variant_id?: string
@@ -1787,9 +1793,153 @@ export type Database = {
           },
         ]
       }
+      merch_kits: {
+        Row: {
+          id: string
+          workspace_id: string
+          show_id: string | null
+          lead_id: string | null
+          helper_ids: string[]
+          status: string
+          notes: string | null
+          cash_in: number | null
+          upi_in: number | null
+          card_in: number | null
+          close_notes: string | null
+          closed_by: string | null
+          closed_at: string | null
+          approved_by: string | null
+          approved_at: string | null
+          finance_transaction_id: string | null
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          show_id?: string | null
+          lead_id?: string | null
+          helper_ids?: string[]
+          status?: string
+          notes?: string | null
+          cash_in?: number | null
+          upi_in?: number | null
+          card_in?: number | null
+          close_notes?: string | null
+          closed_by?: string | null
+          closed_at?: string | null
+          approved_by?: string | null
+          approved_at?: string | null
+          finance_transaction_id?: string | null
+          created_by?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          show_id?: string | null
+          lead_id?: string | null
+          helper_ids?: string[]
+          status?: string
+          notes?: string | null
+          cash_in?: number | null
+          upi_in?: number | null
+          card_in?: number | null
+          close_notes?: string | null
+          closed_by?: string | null
+          closed_at?: string | null
+          approved_by?: string | null
+          approved_at?: string | null
+          finance_transaction_id?: string | null
+          created_by?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merch_kits_show_id_workspace_id_fkey"
+            columns: ["show_id"]
+            referencedRelation: "shows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      merch_kit_lines: {
+        Row: {
+          kit_id: string
+          workspace_id: string
+          variant_id: string
+          taken: number
+          price: number | null
+          returned: number | null
+          given: number
+          lost: number
+        }
+        Insert: {
+          kit_id: string
+          workspace_id: string
+          variant_id: string
+          taken: number
+          price?: number | null
+          returned?: number | null
+          given?: number
+          lost?: number
+        }
+        Update: {
+          kit_id?: string
+          workspace_id?: string
+          variant_id?: string
+          taken?: number
+          price?: number | null
+          returned?: number | null
+          given?: number
+          lost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merch_kit_lines_kit_id_workspace_id_fkey"
+            columns: ["kit_id"]
+            referencedRelation: "merch_kits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "merch_kit_lines_variant_id_workspace_id_fkey"
+            columns: ["variant_id"]
+            referencedRelation: "merch_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: { [_ in never]: never }
     Functions: {
+      approve_merch_kit: {
+        Args: { p_kit: string; p_member?: string | null; p_account?: string | null }
+        Returns: string | null
+      }
+      close_merch_kit: {
+        Args: { p_kit: string; p_counts: Json; p_cash: number; p_upi: number; p_card: number; p_notes?: string | null }
+        Returns: undefined
+      }
+      merch_scope: {
+        Args: { ws: string }
+        Returns: string
+      }
+      my_merch_kits: {
+        Args: { p_ws: string }
+        Returns: { id: string; show_id: string | null; show_title: string | null; show_date: string | null; venue: string | null; status: string; lead_id: string | null; helper_ids: string[]; closed_at: string | null; approved_at: string | null }[]
+      }
+      record_kit_sale: {
+        Args: { p_kit: string; p_lines: Json; p_cash?: number; p_upi?: number; p_card?: number; p_notes?: string | null }
+        Returns: string
+      }
+      reopen_merch_kit: {
+        Args: { p_kit: string }
+        Returns: undefined
+      }
+      undo_kit_sale: {
+        Args: { p_sale: string }
+        Returns: undefined
+      }
       approve_merch_sales: {
         Args: { p_ids: string[]; p_member?: string | null; p_account?: string | null }
         Returns: string | null

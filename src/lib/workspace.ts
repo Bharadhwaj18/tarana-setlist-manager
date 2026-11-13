@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getCachedUser } from '@/lib/auth-cache'
 import { WORKSPACE_COOKIE, pickCurrentWorkspace, normalisePermissions } from '@/lib/workspace-shared'
 import type { WorkspaceContext, WorkspaceMembership } from '@/types/workspace'
-import { sectionLevelsFrom } from '@/lib/workspace-sections'
+import { hiddenSectionsOf, sectionLevelsFrom, type SectionKey } from '@/lib/workspace-sections'
 
 /**
  * The signed-in user's workspaces plus which one is currently selected
@@ -65,6 +65,25 @@ export function isFinanceApprover(membership: WorkspaceMembership): boolean {
 /** Can approve merch takings into Finance: owners, admins and members given the Merch role. */
 export function isMerchApprover(membership: WorkspaceMembership): boolean {
   return membership.role === 'owner' || membership.role === 'admin' || hasPermission(membership, 'merch_manager')
+}
+
+export type MerchScope = 'full' | 'crew' | 'none'
+
+/**
+ * What of Merch this member sees. Mirrors merch_scope() in the database:
+ * 'full' for owners, admins, the Merch role and anyone whose Merch section isn't hidden;
+ * 'crew' for Merch crew (only their own show kits); 'none' otherwise.
+ */
+export function merchScopeOf(membership: WorkspaceMembership): MerchScope {
+  if (isMerchApprover(membership)) return 'full'
+  if (hasPermission(membership, 'merch_crew')) return 'crew'
+  return membership.sections.merch === 'none' ? 'none' : 'full'
+}
+
+/** Sections hidden from the nav. Merch crew still get the Merch link (it opens their kits). */
+export function navHiddenSections(membership: WorkspaceMembership): SectionKey[] {
+  const hidden = hiddenSectionsOf(membership.sections)
+  return merchScopeOf(membership) === 'crew' ? hidden.filter(k => k !== 'merch') : hidden
 }
 
 /** Treasurer in the currently selected workspace. */

@@ -180,3 +180,48 @@ export function groupSalesByShow<T extends Pick<MerchSale, 'show_id' | 'date'>>(
     .map(([key, list]) => ({ showId: key || null, sales: list }))
     .sort((a, b) => latest(b.sales).localeCompare(latest(a.sales)))
 }
+
+// ---- Show kits -----------------------------------------------------------------------------------------------------
+
+export type MerchKit = Database['public']['Tables']['merch_kits']['Row']
+export type MerchKitLine = Database['public']['Tables']['merch_kit_lines']['Row']
+export type KitStatus = 'open' | 'closed' | 'approved'
+
+type KitMoveLike = Pick<MerchMove, 'kit_id' | 'variant_id' | 'qty' | 'reason'>
+
+/** Units sold from a kit so far, per variant. */
+export function kitSoldByVariant(kitId: string, moves: KitMoveLike[]): Map<string, number> {
+  const out = new Map<string, number>()
+  for (const m of moves) if (m.kit_id === kitId && m.reason === 'sale') out.set(m.variant_id, (out.get(m.variant_id) ?? 0) - m.qty)
+  return out
+}
+
+/** Still in the box: went out, minus sold so far. */
+export const kitLeft = (taken: number, sold: number): number => Math.max(0, taken - sold)
+
+/**
+ * At close: units that went out and aren't accounted for by taps, the count back, giveaways or losses are sold
+ * (recorded in one close-out sale). Negative means more was counted than went out.
+ */
+export const closeoutSold = (taken: number, tapped: number, returned: number, given: number, lost: number): number =>
+  taken - tapped - returned - given - lost
+
+/**
+ * Units of each variant that are out of the house in kits not yet approved: an open kit holds what went minus what
+ * sold; a closed kit still holds its giveaways and losses until it's approved. Approved kits hold nothing.
+ */
+export function outInKits(kits: Pick<MerchKit, 'id' | 'status'>[], lines: Pick<MerchKitLine, 'kit_id' | 'variant_id' | 'taken' | 'returned'>[], moves: KitMoveLike[]): Map<string, number> {
+  const out = new Map<string, number>()
+  for (const kit of kits) {
+    if (kit.status === 'approved') continue
+    const sold = kitSoldByVariant(kit.id, moves)
+    for (const l of lines) {
+      if (l.kit_id !== kit.id) continue
+      const n = l.taken - (sold.get(l.variant_id) ?? 0) - (l.returned ?? 0)
+      if (n > 0) out.set(l.variant_id, (out.get(l.variant_id) ?? 0) + n)
+    }
+  }
+  return out
+}
+
+export const KIT_STATUS_LABELS: Record<KitStatus, string> = { open: 'At the show', closed: 'Waiting for approval', approved: 'Done' }

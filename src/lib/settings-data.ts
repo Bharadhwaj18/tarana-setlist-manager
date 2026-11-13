@@ -56,6 +56,7 @@ export const getSettingsMembers = cache(async (): Promise<MemberRow[]> => {
     role: m.role,
     treasurer: normalisePermissions(m.permissions).treasurer === true,
     merchManager: normalisePermissions(m.permissions).merch_manager === true,
+    merchCrew: normalisePermissions(m.permissions).merch_crew === true,
     sections: sectionLevelsFrom(s.isAdmin ? m.permissions : null, m.role),
     isYou: m.user_id === s.userId,
     avatarUrl: avatars[m.user_id] ?? null,

@@ -17,8 +17,8 @@ import { computeTds } from '@/lib/finance/tds'
 import { todayISO } from '@/lib/shows'
 import { countdownLabel } from '@/lib/dates'
 import { cn } from '@/lib/utils'
-import { getWorkspaceContext } from '@/lib/workspace'
-import { saleTakings } from '@/lib/merch'
+import { getWorkspaceContext, isMerchApprover } from '@/lib/workspace'
+import { KIT_STATUS_LABELS, saleTakings, type KitStatus } from '@/lib/merch'
 
 
 const BOOKED = ['Confirmed', 'Advance Received', 'Completed']
@@ -47,7 +47,7 @@ export default async function ShowDetailPage({ params }: Props) {
   const { id } = await params
   const supabase = await createClient()
 
-  const [show, { data: { user } }, profiles, { data: txns }, { data: setlist }, { data: documents }, ctx, { data: merchSales }, { data: merchMoves }] = await Promise.all([
+  const [show, { data: { user } }, profiles, { data: txns }, { data: setlist }, { data: documents }, ctx, { data: merchSales }, { data: merchMoves }, { data: merchKit }] = await Promise.all([
     getCachedShow(id),
     getCachedUser(),
     getCachedAllProfiles(),
@@ -57,6 +57,7 @@ export default async function ShowDetailPage({ params }: Props) {
     getWorkspaceContext(),
     supabase.from('merch_sales').select('status, cash_amount, upi_amount, card_amount').eq('show_id', id),
     supabase.from('merch_stock_moves').select('qty, reason').eq('show_id', id).in('reason', ['sale', 'giveaway']),
+    supabase.from('merch_kits').select('id, status').eq('show_id', id).maybeSingle(),
   ])
 
   if (!show) notFound()
@@ -83,6 +84,7 @@ export default async function ShowDetailPage({ params }: Props) {
 
   // Merch at this show: what sold, what was given away, and how much of the money is approved into Finance.
   const merchLevel = ctx?.current.sections.merch ?? 'none'
+  const canPackKit = !!ctx && isMerchApprover(ctx.current)
   const merchSold = (merchMoves ?? []).filter(m => m.reason === 'sale').reduce((n, m) => n - m.qty, 0)
   const merchGiven = (merchMoves ?? []).filter(m => m.reason === 'giveaway').reduce((n, m) => n - m.qty, 0)
   const merchTakings = (merchSales ?? []).reduce((n, s) => n + saleTakings(s), 0)
@@ -213,6 +215,12 @@ export default async function ShowDetailPage({ params }: Props) {
                 <SectionLabel className="flex items-center gap-2"><Shirt className="h-4 w-4" /> Merch</SectionLabel>
                 {merchTakings > 0 && <span className="font-display text-lg font-bold text-gray-900">{fmt(merchTakings)}</span>}
               </div>
+              {merchKit && (
+                <Link href={`/merch/kits/${merchKit.id}`} className="mb-3 flex items-center justify-between rounded-xl bg-brand-50 px-4 py-3 text-sm font-semibold text-gray-900 hover:bg-brand-100">
+                  Merch kit
+                  <StatusPill tone={merchKit.status === 'approved' ? 'green' : merchKit.status === 'closed' ? 'amber' : 'gray'}>{KIT_STATUS_LABELS[merchKit.status as KitStatus] ?? merchKit.status}</StatusPill>
+                </Link>
+              )}
               {(merchSales ?? []).length > 0 || merchGiven > 0 ? (
                 <div className="mb-3 space-y-1.5">
                   <Row label="Sold">{merchSold} unit{merchSold === 1 ? '' : 's'}</Row>
@@ -224,8 +232,11 @@ export default async function ShowDetailPage({ params }: Props) {
                 <p className="mb-3 text-sm text-gray-400">No merch sold at this show yet.</p>
               )}
               <div className="flex flex-wrap gap-2">
+                {!merchKit && canPackKit && (
+                  <Button size="sm" asChild><Link href={`/merch/kits/new?show=${id}`}><Plus className="h-4 w-4" /> Pack a merch kit</Link></Button>
+                )}
                 {merchLevel === 'edit' && (
-                  <Button size="sm" asChild><Link href={`/merch/sell?show=${id}`}><Plus className="h-4 w-4" /> Sell merch</Link></Button>
+                  <Button size="sm" variant={!merchKit && canPackKit ? 'secondary' : 'primary'} asChild><Link href={`/merch/sell?show=${id}`}><Plus className="h-4 w-4" /> Sell merch</Link></Button>
                 )}
                 {(merchSales ?? []).length > 0 && (
                   <Button size="sm" variant="secondary" asChild><Link href="/merch">Open Merch</Link></Button>

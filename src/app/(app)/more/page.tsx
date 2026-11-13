@@ -2,8 +2,7 @@ import { getCachedUser } from '@/lib/data'
 import { getWorkspaceOptions } from '@/lib/workspace-options-server'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { MoreMenu } from '@/components/layout/MoreMenu'
-import { getWorkspaceContext } from '@/lib/workspace'
-import { hiddenSectionsOf } from '@/lib/workspace-sections'
+import { getWorkspaceContext, navHiddenSections } from '@/lib/workspace'
 
 export default async function MorePage() {
   const [{ data: { user } }, { options, currentId }, ctx] = await Promise.all([getCachedUser(), getWorkspaceOptions(), getWorkspaceContext()])
@@ -15,7 +14,7 @@ export default async function MorePage() {
         email={user?.email ?? ''}
         workspaces={options}
         currentWorkspaceId={currentId}
-        hiddenSections={ctx ? hiddenSectionsOf(ctx.current.sections) : []}
+        hiddenSections={ctx ? navHiddenSections(ctx.current) : []}
       />
     </div>
   )

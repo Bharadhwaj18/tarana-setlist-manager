@@ -171,7 +171,15 @@ export async function setMemberMerchManager(userId: string, on: boolean): Promis
   return setMemberPermission(userId, 'merch_manager', on)
 }
 
-async function setMemberPermission(userId: string, key: 'treasurer' | 'merch_manager', on: boolean): Promise<{ error?: string }> {
+/**
+ * Merch crew: someone who runs the merch stall. They only ever see the show kits they're put on. Turning it on also
+ * hides every section from them (they can be given sections back afterwards).
+ */
+export async function setMemberMerchCrew(userId: string, on: boolean): Promise<{ error?: string }> {
+  return setMemberPermission(userId, 'merch_crew', on, on ? Object.fromEntries(SECTIONS.map(s => [s.key, 'none'])) : undefined)
+}
+
+async function setMemberPermission(userId: string, key: 'treasurer' | 'merch_manager' | 'merch_crew', on: boolean, sections?: Record<string, string>): Promise<{ error?: string }> {
   const auth = await requireAdminContext()
   if ('error' in auth) return { error: auth.error }
   const supabase = await createClient()
@@ -183,7 +191,7 @@ async function setMemberPermission(userId: string, key: 'treasurer' | 'merch_man
     .maybeSingle()
   if (!member) return { error: 'Member not found.' }
   const raw = member.permissions && typeof member.permissions === 'object' && !Array.isArray(member.permissions) ? member.permissions : {}
-  const permissions = { ...raw, [key]: on }
+  const permissions = { ...raw, [key]: on, ...(sections ? { sections } : {}) }
   const { error } = await supabase
     .from('workspace_members')
     .update({ permissions })
