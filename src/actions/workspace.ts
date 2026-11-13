@@ -101,7 +101,8 @@ export async function transferOwnership(userId: string): Promise<{ error?: strin
 }
 
 export interface CreateInviteInput {
-  role: 'member' | 'admin'
+  /** 'crew' joins as a member who is Merch crew: only their own show kits in Merch, plus the sections given. */
+  role: 'member' | 'admin' | 'crew'
   expiresInDays: number
   maxUses: number | null
   /** What a member who joins with this link can open. Ignored for admins, who always get everything. */
@@ -118,16 +119,19 @@ export async function createInvite(input: CreateInviteInput): Promise<{ error?: 
     return { error: 'Max uses must be at least 1.' }
   }
   const allowed = new Set<string>(SECTIONS.map(s => s.key))
-  const sections = input.role === 'member' && input.sections
+  const crew = input.role === 'crew'
+  const sections = input.role !== 'admin' && input.sections
     ? Object.fromEntries(Object.entries(input.sections).filter(([k, v]) => allowed.has(k) && (v === 'edit' || v === 'view' || v === 'none')))
     : null
+  // Crew see Merch through their kits only, so the Merch section itself stays hidden from them.
+  if (crew && sections) sections.merch = 'none'
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('workspace_invites')
     .insert({
       workspace_id: auth.workspaceId,
-      role: input.role,
-      permissions: sections ? { sections } : {},
+      role: crew ? 'member' : input.role,
+      permissions: { ...(sections ? { sections } : {}), ...(crew ? { merch_crew: true } : {}) },
       max_uses: input.maxUses,
       expires_at: new Date(Date.now() + input.expiresInDays * 86_400_000).toISOString(),
     })
@@ -172,11 +176,11 @@ export async function setMemberMerchManager(userId: string, on: boolean): Promis
 }
 
 /**
- * Merch crew: someone who runs the merch stall. They only ever see the show kits they're put on. Turning it on also
- * hides every section from them (they can be given sections back afterwards).
+ * Merch crew: someone who runs the merch stall. In Merch they only ever see the show kits they're put on (nothing
+ * until they're on one). Their other sections stay as they are.
  */
 export async function setMemberMerchCrew(userId: string, on: boolean): Promise<{ error?: string }> {
-  return setMemberPermission(userId, 'merch_crew', on, on ? Object.fromEntries(SECTIONS.map(s => [s.key, 'none'])) : undefined)
+  return setMemberPermission(userId, 'merch_crew', on)
 }
 
 async function setMemberPermission(userId: string, key: 'treasurer' | 'merch_manager' | 'merch_crew', on: boolean, sections?: Record<string, string>): Promise<{ error?: string }> {

@@ -100,7 +100,7 @@ export function MembersSettings({ workspaceName, members, isAdmin, isOwner, acti
                     <input type="checkbox" checked={m.merchCrew} disabled={pending}
                       onChange={e => {
                         const on = e.target.checked
-                        if (on && !confirm(`Make ${m.name} Merch crew? They'll only see the show kits they're put on, and every other section is hidden from them.`)) return
+                        if (on && !confirm(`Make ${m.name} Merch crew? In Merch they'll only see the show kits they're put on. Their other sections stay as they are (change them with Access).`)) return
                         run(() => setMemberMerchCrew(m.userId, on))
                       }}
                       className="h-4 w-4 accent-brand-400" />

@@ -7,7 +7,7 @@ const box = 'h-5 w-5 cursor-pointer accent-brand-400 disabled:cursor-not-allowed
 export const allSections = (level: SectionLevel) => Object.fromEntries(SECTIONS.map(s => [s.key, level])) as SectionLevels
 
 /** Two tick boxes per section: View (can open it) and Edit (can change things). Edit implies View. */
-export function SectionAccessGrid({ levels, onChange, disabled }: { levels: SectionLevels; onChange: (next: SectionLevels) => void; disabled?: boolean }) {
+export function SectionAccessGrid({ levels, onChange, disabled, hide = [] }: { levels: SectionLevels; onChange: (next: SectionLevels) => void; disabled?: boolean; hide?: SectionKey[] }) {
   const setLevel = (key: SectionKey, level: SectionLevel) => onChange({ ...levels, [key]: level })
   const toggleView = (key: SectionKey, on: boolean) => setLevel(key, on ? 'view' : 'none')
   const toggleEdit = (key: SectionKey, on: boolean) => setLevel(key, on ? 'edit' : levels[key] === 'none' ? 'none' : 'view')
@@ -26,7 +26,7 @@ export function SectionAccessGrid({ levels, onChange, disabled }: { levels: Sect
           <span className="text-center">View</span>
           <span className="text-center">Edit</span>
         </div>
-        {SECTIONS.map(s => {
+        {SECTIONS.filter(s => !hide.includes(s.key)).map(s => {
           const level = levels[s.key]
           return (
             <div key={s.key} className="grid grid-cols-[1fr_4.5rem_4.5rem] items-center border-t border-brand-100 px-4 py-2.5">

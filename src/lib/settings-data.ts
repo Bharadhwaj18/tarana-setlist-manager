@@ -80,6 +80,7 @@ export const getSettingsInvites = cache(async (): Promise<InviteRow[]> => {
     .map(i => ({
       id: i.id, token: i.token, role: i.role, expiresAt: i.expires_at, maxUses: i.max_uses, useCount: i.use_count,
       sections: i.permissions && typeof i.permissions === 'object' && !Array.isArray(i.permissions) && 'sections' in i.permissions ? sectionLevelsFrom(i.permissions, 'member') : null,
+      crew: i.role !== 'admin' && !!i.permissions && typeof i.permissions === 'object' && !Array.isArray(i.permissions) && (i.permissions as Record<string, unknown>).merch_crew === true,
     }))
 })
 

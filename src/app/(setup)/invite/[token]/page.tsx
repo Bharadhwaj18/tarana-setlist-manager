@@ -26,8 +26,14 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
   const invite = data?.[0]
   // What a member joining with this link can open (null = everything, or the function isn't set up yet).
   const { data: rawSections } = await supabase.rpc('invite_sections', { p_token: token })
+  const { data: crewInvite } = await supabase.rpc('invite_crew', { p_token: token })
   const levels = rawSections && typeof rawSections === 'object' && !Array.isArray(rawSections) ? sectionLevelsFrom({ sections: rawSections }, 'member') : null
-  const canOpen = levels ? SECTIONS.filter(sec => levels[sec.key] !== 'none').map(sec => (levels[sec.key] === 'view' ? `${sec.label} (view only)` : sec.label)) : null
+  const canOpen = levels
+    ? [
+        ...(crewInvite ? ['Merch (only the show kits you’re put on)'] : []),
+        ...SECTIONS.filter(sec => !(crewInvite && sec.key === 'merch') && levels[sec.key] !== 'none').map(sec => (levels[sec.key] === 'view' ? sec.label + ' (view only)' : sec.label)),
+      ]
+    : null
   const { data: { user } } = await getCachedUser()
   const loginHref = `/login?next=${encodeURIComponent(`/invite/${token}`)}`
 

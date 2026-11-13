@@ -9,7 +9,7 @@ import { SectionLabel } from '@/components/ui/SectionLabel'
 import { StatusPill } from '@/components/ui/StatusPill'
 import { APP_NAME } from '@/lib/brand'
 import { cn } from '@/lib/utils'
-import type { SectionLevels } from '@/lib/workspace-sections'
+import { SECTIONS, type SectionLevels } from '@/lib/workspace-sections'
 import { SectionAccessGrid, accessSummary, allSections } from './SectionAccessGrid'
 import type { InviteRow } from './settings-types'
 import { Select } from '@/components/ui/Select'
@@ -72,9 +72,15 @@ function LinkReady({ token, workspaceName, onClose }: { token: string; workspace
   )
 }
 
+/** What a crew invite opens: their own kits, plus anything else ticked. */
+function crewSummary(levels: SectionLevels | null): string {
+  const extra = levels ? SECTIONS.filter(x => x.key !== 'merch' && levels[x.key] !== 'none').map(x => (levels[x.key] === 'view' ? x.label + ' (view)' : x.label)) : []
+  return extra.length ? 'Own kits, also ' + extra.join(', ') : 'Own kits only'
+}
+
 export function InvitesSettings({ invites, workspaceName }: { invites: InviteRow[]; workspaceName: string }) {
   const router = useRouter()
-  const [role, setRole] = useState<'member' | 'admin'>('member')
+  const [role, setRole] = useState<'member' | 'admin' | 'crew'>('member')
   const [sections, setSections] = useState<SectionLevels>(allSections('edit'))
   const [days, setDays] = useState(7)
   const [maxUses, setMaxUses] = useState('')
@@ -97,7 +103,7 @@ export function InvitesSettings({ invites, workspaceName }: { invites: InviteRow
     setError(null)
     const parsedMax = maxUses.trim() ? Number(maxUses) : null
     startTransition(async () => {
-      const res = await createInvite({ role, expiresInDays: days, maxUses: parsedMax, sections: role === 'member' ? sections : undefined })
+      const res = await createInvite({ role, expiresInDays: days, maxUses: parsedMax, sections: role !== 'admin' ? sections : undefined })
       if (res.error) { setError(res.error); return }
       if (res.token) setReadyToken(res.token)
       router.refresh()
@@ -127,12 +133,19 @@ export function InvitesSettings({ invites, workspaceName }: { invites: InviteRow
 
         <div>
           <p className={label}>1. They join as</p>
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid gap-2 sm:grid-cols-3">
             {([
               { value: 'member', title: 'Member', text: 'Opens only the sections you choose below.' },
+              { value: 'crew', title: 'Merch crew', text: 'Sees only the merch kits they’re put on (nothing until then), plus any sections you tick.' },
               { value: 'admin', title: 'Admin', text: 'Everything, plus inviting people and changing settings.' },
             ] as const).map(o => (
-              <button key={o.value} type="button" aria-pressed={role === o.value} onClick={() => setRole(o.value)}
+              <button key={o.value} type="button" aria-pressed={role === o.value}
+                onClick={() => {
+                  // Crew usually need nothing else, so start them with everything hidden.
+                  if (o.value === 'crew' && role !== 'crew') setSections(allSections('none'))
+                  if (o.value === 'member' && role === 'crew') setSections(allSections('edit'))
+                  setRole(o.value)
+                }}
                 className={cn('rounded-xl border p-3 text-left transition-colors', role === o.value ? 'border-brand-400 bg-brand-100' : 'border-brand-200 hover:bg-brand-50')}>
                 <span className="block text-sm font-bold text-gray-900">{o.title}</span>
                 <span className="block text-xs text-gray-500">{o.text}</span>
@@ -141,16 +154,20 @@ export function InvitesSettings({ invites, workspaceName }: { invites: InviteRow
           </div>
         </div>
 
-        {role === 'member' && (
+        {role !== 'admin' && (
           <div>
-            <p className={label}>2. What they can open</p>
-            <p className="-mt-1 mb-2 text-xs text-gray-500">View lets them see a section. Edit lets them add and change things. You can still change this for each person later in Members.</p>
-            <SectionAccessGrid levels={sections} onChange={setSections} disabled={pending} />
+            <p className={label}>2. {role === 'crew' ? 'Anything else they can open' : 'What they can open'}</p>
+            <p className="-mt-1 mb-2 text-xs text-gray-500">
+              {role === 'crew'
+                ? 'Merch is always just their own kits. Tick anything else they should see, like Setlists. You can change this later in Members.'
+                : 'View lets them see a section. Edit lets them add and change things. You can still change this for each person later in Members.'}
+            </p>
+            <SectionAccessGrid levels={sections} onChange={setSections} disabled={pending} hide={role === 'crew' ? ['merch'] : []} />
           </div>
         )}
 
         <div>
-          <p className={label}>{role === 'member' ? '3.' : '2.'} How long the link works</p>
+          <p className={label}>{role !== 'admin' ? '3.' : '2.'} How long the link works</p>
           <div className="grid max-w-md grid-cols-2 gap-3">
             <label className="text-xs font-semibold text-gray-600">
               Expires in
@@ -178,8 +195,8 @@ export function InvitesSettings({ invites, workspaceName }: { invites: InviteRow
               <li key={i.id} className="animate-row-in flex items-center gap-3 px-4 py-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
-                    <StatusPill tone={i.role === 'admin' ? 'amber' : 'gray'}>{i.role === 'admin' ? 'Admin' : 'Member'}</StatusPill>
-                    <span className="font-semibold text-gray-700">{i.role !== 'admin' && i.sections ? accessSummary(i.sections) : 'Everything'}</span>
+                    <StatusPill tone={i.role === 'admin' ? 'amber' : 'gray'}>{i.role === 'admin' ? 'Admin' : i.crew ? 'Merch crew' : 'Member'}</StatusPill>
+                    <span className="font-semibold text-gray-700">{i.crew ? crewSummary(i.sections) : i.role !== 'admin' && i.sections ? accessSummary(i.sections) : 'Everything'}</span>
                   </div>
                   <p className="mt-1 text-xs text-gray-500">{i.useCount}{i.maxUses ? ` of ${i.maxUses}` : ''} joined · expires {formatDate(i.expiresAt)}</p>
                 </div>

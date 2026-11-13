@@ -1912,6 +1912,10 @@ export type Database = {
     }
     Views: { [_ in never]: never }
     Functions: {
+      invite_crew: {
+        Args: { p_token: string }
+        Returns: boolean
+      }
       approve_merch_kit: {
         Args: { p_kit: string; p_member?: string | null; p_account?: string | null }
         Returns: string | null

@@ -24,6 +24,8 @@ export interface InviteRow {
   useCount: number
   /** Access a member joining with this link gets; null means everything. */
   sections: SectionLevels | null
+  /** Joins as Merch crew. */
+  crew: boolean
 }
 
 export interface WorkspaceSummary {
