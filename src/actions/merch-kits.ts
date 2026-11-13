@@ -130,22 +130,56 @@ export async function saveMerchKit(input: KitInput): Promise<Result> {
     return { error: friendly(lError.message) }
   }
 
-  // Tell anyone newly put on the kit.
-  const before = new Set([previous?.lead_id, ...(previous?.helper_ids ?? [])].filter(Boolean))
-  const { data: show } = await supabase.from('shows').select('title').eq('id', input.showId).maybeSingle()
-  for (const recipientId of [lead_id, ...helper_ids]) {
-    if (recipientId === user.id || before.has(recipientId)) continue
+  await tellNewCrew(supabase, user.id, kitId!, input.showId, { lead_id, helper_ids }, previous)
+  refresh(kitId, input.showId)
+  return { id: kitId! }
+}
+
+/** Tells anyone newly put on a kit (not the person doing it, and not anyone who was already on it). */
+async function tellNewCrew(
+  supabase: Awaited<ReturnType<typeof createClient>>, actorId: string, kitId: string, showId: string | null,
+  now: { lead_id: string; helper_ids: string[] }, before: { lead_id: string | null; helper_ids: string[] } | null,
+) {
+  const already = new Set([before?.lead_id, ...(before?.helper_ids ?? [])].filter(Boolean))
+  const { data: show } = showId ? await supabase.from('shows').select('title').eq('id', showId).maybeSingle() : { data: null }
+  for (const recipientId of [now.lead_id, ...now.helper_ids]) {
+    if (recipientId === actorId || already.has(recipientId)) continue
     await sendNotification({
       recipientId,
-      title: recipientId === lead_id ? `You’re running merch at ${show?.title ?? 'a show'}` : `You’re helping with merch at ${show?.title ?? 'a show'}`,
+      title: recipientId === now.lead_id ? `You’re running merch at ${show?.title ?? 'a show'}` : `You’re helping with merch at ${show?.title ?? 'a show'}`,
       body: 'Open the kit to see what’s in the box.',
       link: `/merch/kits/${kitId}`,
       type: 'merch_kit_assigned',
     })
   }
+}
 
-  refresh(kitId, input.showId)
-  return { id: kitId! }
+/**
+ * Changes who runs a kit and who helps, without touching what's in it. Works any time before the kit is closed;
+ * whoever is taken off loses access straight away, and whoever is put on is told.
+ */
+export async function setMerchKitCrew(kitId: string, leadId: string | null, helperIds: string[] = []): Promise<Result> {
+  const { supabase, user } = await signedIn()
+  if (!user) return { error: 'Not signed in' }
+  const denied = await requirePacker()
+  if (denied) return { error: denied }
+  const workspace_id = await requireWorkspaceId()
+
+  const { data: kit } = await supabase.from('merch_kits').select('show_id, status, lead_id, helper_ids').eq('id', kitId).maybeSingle()
+  if (!kit) return { error: 'That kit is no longer there.' }
+  if (kit.status !== 'open') return { error: 'The crew can only be changed before the kit is closed. Reopen it first.' }
+
+  const { data: members } = await supabase.from('workspace_members').select('user_id').eq('workspace_id', workspace_id)
+  const memberIds = new Set((members ?? []).map(m => m.user_id))
+  const lead_id = leadId && memberIds.has(leadId) ? leadId : null
+  if (!lead_id) return { error: 'Pick who’s running the stall.' }
+  const helper_ids = [...new Set(helperIds.filter(id => memberIds.has(id) && id !== lead_id))]
+
+  const { error } = await supabase.from('merch_kits').update({ lead_id, helper_ids }).eq('id', kitId)
+  if (error) return { error: friendly(error.message) }
+  await tellNewCrew(supabase, user.id, kitId, kit.show_id, { lead_id, helper_ids }, kit)
+  refresh(kitId, kit.show_id)
+  return {}
 }
 
 /** Deletes a kit that hasn't sold anything yet. */

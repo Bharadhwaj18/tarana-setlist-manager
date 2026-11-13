@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { NoAccess } from '@/components/layout/NoAccess'
-import { getCachedAllProfiles, getCachedFinanceAccounts, getCachedFinanceSettings, getCachedMerchKit, getCachedUser } from '@/lib/data'
+import { getCachedAllProfiles, getCachedFinanceAccounts, getCachedFinanceSettings, getCachedMerchCrewIds, getCachedMerchKit, getCachedUser } from '@/lib/data'
+import { crewPickerPeople } from '@/lib/merch-people'
 import { getWorkspaceContext, isMerchApprover, merchScopeOf } from '@/lib/workspace'
 import { kitSoldByVariant, variantPrice } from '@/lib/merch'
 import { KitView, type KitLineView } from '@/components/merch/KitView'
@@ -14,8 +15,8 @@ export default async function MerchKitPage({ params }: { params: Promise<{ id: s
   const scope = merchScopeOf(ctx.current)
   if (scope === 'none') return <NoAccess section="Merch" workspaceName={ctx.current.workspace.name} />
 
-  const [data, profiles, { data: { user } }, settings, accounts] = await Promise.all([
-    getCachedMerchKit(id), getCachedAllProfiles(), getCachedUser(), getCachedFinanceSettings(), getCachedFinanceAccounts(),
+  const [data, profiles, { data: { user } }, settings, accounts, crewIds] = await Promise.all([
+    getCachedMerchKit(id), getCachedAllProfiles(), getCachedUser(), getCachedFinanceSettings(), getCachedFinanceAccounts(), getCachedMerchCrewIds(),
   ])
   if (!data || !user) notFound()
   const { kit, show, sales, moves } = data
@@ -55,6 +56,7 @@ export default async function MerchKitPage({ params }: { params: Promise<{ id: s
       userId={user.id}
       can={{ sell: onKit || canEdit, pack: approver, approve: approver, fullView: scope === 'full' }}
       members={profiles.map(p => ({ id: p.id, name: nameOf(p.id) }))}
+      crewPeople={approver ? crewPickerPeople(profiles.map(p => ({ id: p.id, name: nameOf(p.id) })), crewIds) : []}
       accounts={settings.features.accounts ? accounts.filter(a => !a.archived).map(a => ({ id: a.id, name: a.name })) : []}
     />
   )

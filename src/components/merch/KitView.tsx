@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Check, ChevronLeft, Minus, Pencil, Plus, RotateCcw, Trash2, Undo2 } from 'lucide-react'
+import { Check, ChevronLeft, Minus, Pencil, Plus, RotateCcw, Trash2, Undo2, Users } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
@@ -16,7 +16,8 @@ import { useMoney } from '@/components/finance/FinanceSettingsContext'
 import { cn } from '@/lib/utils'
 import { formatDateDMY } from '@/lib/dates'
 import { KIT_STATUS_LABELS, closeoutSold, expectedTotal, kitLeft, saleTakings, type KitStatus, type MerchKit, type MerchSale, type PaymentMethod } from '@/lib/merch'
-import { approveMerchKit, closeMerchKit, deleteMerchKit, recordKitSale, reopenMerchKit, undoKitSale } from '@/actions/merch-kits'
+import { approveMerchKit, closeMerchKit, deleteMerchKit, recordKitSale, reopenMerchKit, setMerchKitCrew, undoKitSale } from '@/actions/merch-kits'
+import { CrewPicker, type CrewPerson } from './CrewPicker'
 
 export interface KitLineView {
   variantId: string
@@ -40,6 +41,8 @@ interface Props {
   userId: string
   can: { sell: boolean; pack: boolean; approve: boolean; fullView: boolean }
   members: { id: string; name: string }[]
+  /** Everyone, for changing the crew (Merch crew first). Empty for people who can't change it. */
+  crewPeople: CrewPerson[]
   accounts: { id: string; name: string }[]
 }
 
@@ -62,13 +65,14 @@ function useRun() {
   }
 }
 
-export function KitView({ kit, show, lines, sales, people, userId, can, members, accounts }: Props) {
+export function KitView({ kit, show, lines, sales, people, userId, can, members, crewPeople, accounts }: Props) {
   const { money } = useMoney()
   const router = useRouter()
   const run = useRun()
   const status = kit.status as KitStatus
   const [closing, setClosing] = useState(false)
   const [approving, setApproving] = useState(false)
+  const [changingCrew, setChangingCrew] = useState(false)
 
   const went = lines.reduce((n, l) => n + l.taken, 0)
   const soldUnits = lines.reduce((n, l) => n + l.sold, 0)
@@ -88,7 +92,12 @@ export function KitView({ kit, show, lines, sales, people, userId, can, members,
           <p className="mt-1 text-sm text-gray-500">{[show?.show_date && formatDateDMY(show.show_date), show?.venue].filter(Boolean).join(' · ')}</p>
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             <StatusPill tone={status === 'approved' ? 'green' : status === 'closed' ? 'amber' : 'gray'}>{KIT_STATUS_LABELS[status]}</StatusPill>
-            {people.lead && <span className="text-xs text-gray-500">Run by {people.lead}{people.helpers.length ? `, with ${people.helpers.join(', ')}` : ''}</span>}
+            <span className="text-xs text-gray-500">{people.lead ? <>Run by {people.lead}{people.helpers.length ? `, with ${people.helpers.join(', ')}` : ''}</> : 'Nobody is running this kit'}</span>
+            {can.pack && status === 'open' && (
+              <button type="button" onClick={() => setChangingCrew(true)} className="inline-flex items-center gap-1 text-xs font-semibold text-brand-400 hover:underline">
+                <Users className="h-3.5 w-3.5" />Change crew
+              </button>
+            )}
           </div>
         </div>
         {can.pack && status === 'open' && (
@@ -204,6 +213,9 @@ export function KitView({ kit, show, lines, sales, people, userId, can, members,
 
       <Modal open={closing} onOpenChange={setClosing} title="Close the kit" description="Count what came back and the money you’re handing in." className="max-w-xl">
         {closing && <CloseForm kitId={kit.id} lines={lines} tappedMoney={tapped.reduce((n, s) => n + saleTakings(s), 0)} onDone={() => setClosing(false)} />}
+      </Modal>
+      <Modal open={changingCrew} onOpenChange={setChangingCrew} title="Change the crew" description="Whoever you take off loses access to this kit straight away. Anyone new is told.">
+        {changingCrew && <CrewForm kit={kit} people={crewPeople} onDone={() => setChangingCrew(false)} />}
       </Modal>
       <Modal open={approving} onOpenChange={setApproving} title="Approve this kit" description="Adds one income entry to Finance, takes giveaways and missing items off stock, and locks the kit.">
         {approving && <ApproveForm kit={kit} total={handedIn} members={members} accounts={accounts} onDone={() => setApproving(false)} />}
@@ -434,6 +446,29 @@ function ApproveForm({ kit, total, members, accounts, onDone }: { kit: MerchKit;
       <div className="flex justify-end gap-2">
         <Button variant="secondary" onClick={onDone}>Cancel</Button>
         <Button onClick={approve} loading={busy}>Approve</Button>
+      </div>
+    </div>
+  )
+}
+
+// ---- Changing the crew -------------------------------------------------------------------------------------------------
+
+function CrewForm({ kit, people, onDone }: { kit: MerchKit; people: CrewPerson[]; onDone: () => void }) {
+  const run = useRun()
+  const [crew, setCrew] = useState({ leadId: kit.lead_id ?? '', helperIds: kit.helper_ids })
+  const [busy, setBusy] = useState(false)
+  const save = async () => {
+    setBusy(true)
+    const ok = await run(() => setMerchKitCrew(kit.id, crew.leadId || null, crew.helperIds), 'Crew updated')
+    setBusy(false)
+    if (ok) onDone()
+  }
+  return (
+    <div className="space-y-4">
+      <CrewPicker people={people} leadId={crew.leadId} helperIds={crew.helperIds} onChange={setCrew} />
+      <div className="flex justify-end gap-2">
+        <Button variant="secondary" onClick={onDone}>Cancel</Button>
+        <Button onClick={save} loading={busy} disabled={!crew.leadId}>Save crew</Button>
       </div>
     </div>
   )

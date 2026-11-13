@@ -7,12 +7,12 @@ import { ChevronLeft } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
-import { Select } from '@/components/ui/Select'
 import { SectionLabel } from '@/components/ui/SectionLabel'
 import { useToast } from '@/components/ui/Toaster'
 import { useMoney } from '@/components/finance/FinanceSettingsContext'
 import { saveMerchKit } from '@/actions/merch-kits'
 import { ShowSelect, type ShowChoice } from './ShowSelect'
+import { CrewPicker, type CrewPerson } from './CrewPicker'
 
 export interface PackRow {
   variantId: string
@@ -31,7 +31,7 @@ export interface PackRow {
 interface Props {
   kitId: string | null
   shows: ShowChoice[]
-  members: { id: string; name: string }[]
+  members: CrewPerson[]
   rows: PackRow[]
   initial: { showId: string; leadId: string; helperIds: string[]; notes: string }
 }
@@ -79,26 +79,9 @@ export function KitForm({ kitId, shows, members, rows, initial }: Props) {
           <Label htmlFor="kit-show">Show</Label>
           <ShowSelect id="kit-show" shows={shows} value={showId} onChange={setShowId} />
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="kit-lead">Running the stall</Label>
-          <Select id="kit-lead" value={leadId} onChange={e => { setLeadId(e.target.value); setHelperIds(h => h.filter(id => id !== e.target.value)) }}>
-            <option value="">Pick someone</option>
-            {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-          </Select>
-        </div>
-        <div className="space-y-1.5">
-          <Label>Helping (can sell too)</Label>
-          <div className="flex flex-wrap gap-1.5">
-            {members.filter(m => m.id !== leadId).map(m => {
-              const on = helperIds.includes(m.id)
-              return (
-                <button key={m.id} type="button" aria-pressed={on} onClick={() => setHelperIds(h => (on ? h.filter(x => x !== m.id) : [...h, m.id]))}
-                  className={`rounded-full px-3 py-1 text-xs font-bold ${on ? 'bg-brand-400 text-white' : 'bg-brand-100 text-gray-700'}`}>
-                  {m.name}
-                </button>
-              )
-            })}
-          </div>
+        <div className="sm:col-span-2">
+          <CrewPicker people={members} leadId={leadId} helperIds={helperIds} onChange={next => { setLeadId(next.leadId); setHelperIds(next.helperIds) }} />
+          <p className="mt-1.5 text-xs text-gray-500">You can change the crew later from the kit, any time before it’s closed.</p>
         </div>
         <div className="space-y-1.5 sm:col-span-2">
           <Label htmlFor="kit-notes">Notes for the crew</Label>

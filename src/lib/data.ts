@@ -502,3 +502,12 @@ export const getCachedMerchKit = cache(async (id: string) => {
   }
   return { kit, show, lines: lines.data ?? [], sales: sales.data ?? [], moves: moves.data ?? [] }
 })
+
+// Who in the current workspace has the Merch crew role, so kit pickers can list them first.
+export const getCachedMerchCrewIds = cache(async (): Promise<string[]> => {
+  const ctx = await getWorkspaceContext()
+  if (!ctx) return []
+  const supabase = await createClient()
+  const { data } = await supabase.from('workspace_members').select('user_id, permissions').eq('workspace_id', ctx.current.workspace.id)
+  return (data ?? []).filter(m => (m.permissions as Record<string, unknown> | null)?.merch_crew === true).map(m => m.user_id)
+})
